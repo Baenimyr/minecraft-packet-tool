@@ -29,6 +29,10 @@ public class Depot {
                 : null;
     }
 
+    public List<ModVersion> getModVersions(Mod mod) {
+        return this.mod_version.getOrDefault(mod, Collections.emptyList());
+    }
+
     /**
      * Ajoute un nouveau mod à la liste.
      *
