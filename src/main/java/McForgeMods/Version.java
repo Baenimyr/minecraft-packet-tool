@@ -1,11 +1,11 @@
 package McForgeMods;
 
 import java.util.Arrays;
-import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Permet de décomposer et comparer les versions entre-elles.
+/**
+ * Permet de décomposer et comparer les versions entre-elles.
  * Une version valide est composés de chiffres séparés par des virgules.
  * Le format minimum est <i>major.minor</i>. Le format le plus large est <i>major.medium.minor.patch</i>.
  *
@@ -14,7 +14,9 @@ import java.util.regex.Pattern;
  */
 public class Version implements Comparable<Version> {
     private static final Pattern version = Pattern.compile("^(?<major>\\p{Digit}+)\\.(?<medium>\\p{Digit}+)(\\.(?<minor>\\p{Digit}+)(\\.(?<patch>\\p{Digit}+))?)?");
-    /** major, medium, minor, patch */
+    /**
+     * major, medium, minor, patch
+     */
     private final int[] versions = new int[4];
 
     public Version(int major, int medium, int minor, int patch) {
@@ -61,7 +63,12 @@ public class Version implements Comparable<Version> {
 
     @Override
     public String toString() {
-        return "Version{" + this.versions[0] + "." + this.versions[1] + "." + this.versions[2] + (this.versions[3] != 0 ? "." + this.versions[3] : "") + "}";
+        StringBuilder sb = new StringBuilder(this.versions[0] + "." + this.versions[1] + "." + this.versions[2]);
+        if (this.versions[3] != 0) {
+            sb.append('.');
+            sb.append(this.versions[3]);
+        }
+        return sb.toString();
     }
 
     @Override
