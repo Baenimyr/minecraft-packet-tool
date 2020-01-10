@@ -65,7 +65,6 @@ public class Mod {
                 "modid='" + modid + '\'' +
                 ", name='" + name + '\'' +
                 ", description='" + description + '\'' +
-                ", updateJSON='" + updateJSON + '\'' +
                 '}';
     }
 }
