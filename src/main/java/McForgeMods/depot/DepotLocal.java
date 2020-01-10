@@ -1,61 +1,27 @@
-package McForgeMods;
+package McForgeMods.depot;
 
+import McForgeMods.Mod;
+import McForgeMods.ModVersion;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.*;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 
-public class Depot {
-    final Map<String, Mod> mods = new HashMap<>();
-    final Map<Mod, List<ModVersion>> mod_version = new HashMap<>();
-    final Path dossier;
+public class DepotLocal extends Depot {
+    public final Path dossier;
 
-    public Depot(Path dossier) {
+    public DepotLocal(Path dossier) {
         this.dossier = dossier;
     }
 
-    /** Ajoute un nouveau mod à la liste.
-     * @return l'instance de {@link Mod} réelle sauvegardée.
+    /**
+     * Enregistre la liste des mods dans le fichier <i>Mods.json</i> à la racine du dépôt.
+     * Sauvegarde les informations d'un mod ({@link #enregistrerModInformations(String)}) en même temps.
      */
-    public Mod ajoutMod(Mod mod) {
-        if (this.mods.containsKey(mod.modid)) {
-            Mod present = this.mods.get(mod.modid);
-            if (present.description == null)
-                present.description = mod.description;
-            if (present.updateJSON == null)
-                present.updateJSON = mod.updateJSON;
-            return present;
-        } else {
-            this.mods.put(mod.modid, mod);
-            return mod;
-        }
-    }
-
-    public Collection<String> getModids() {
-        return this.mods.keySet();
-    }
-
-    public Mod getMod(String modid) {
-        return this.mods.get(modid);
-    }
-
-    /** Enregistre une nouvelle version dans le dépôt. */
-    public void ajoutModVersion(ModVersion modVersion) {
-        Mod mod = this.ajoutMod(modVersion.mod);
-        // TODO: remplacer la valeur de ModVersion::mod, si une autre instance existe.
-
-        if(!this.mod_version.containsKey(mod)) {
-            this.mod_version.put(mod, new ArrayList<>(2));
-        }
-
-        Collection<ModVersion> liste = this.mod_version.get(mod);
-        if (!liste.contains(modVersion))
-            liste.add(modVersion);
-    }
-
-    /** Enregistre la liste des mods dans le fichier <i>Mods.json</i> à la racine du dépôt. */
     public void enregistrerMods() throws FileNotFoundException, IOException {
         if (!this.dossier.toFile().exists())
             this.dossier.toFile().mkdirs();
@@ -81,6 +47,14 @@ public class Depot {
         }
     }
 
+    /**
+     * Enregistre les informations d'un mod.
+     * Enregistre toutes les versions disponibles ainsi que les informations de celles-ci.
+     * <p>
+     * Dans le dossier de dépôt, le fichier de sauvegarde se situe en <i>./m/modid/modid.json</i>
+     *
+     * @throws FileNotFoundException si impossible de créer le fichier de sauvegarde
+     */
     public void enregistrerModInformations(String modid) throws FileNotFoundException, IOException {
         final Mod mod = this.getMod(modid);
         if (!this.mod_version.containsKey(mod))
