@@ -6,9 +6,7 @@ import org.json.JSONObject;
 
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * Cette classe incarne une version particulière d'un mod.
@@ -22,17 +20,21 @@ public class ModVersion {
     public final Version version;
     public final Version mcversion;
 
-    /** Liste des liens menant au fichier (localement ou un url) */
+    /**
+     * Liste des liens menant au fichier (localement ou un url)
+     */
     public List<URL> urls = new ArrayList<>(1);
     String parent = null;
     /**
      * Mods obligatoires pour le bon fonctionnement de celui-ci.
+     * Une intervalle de version doit être spécifiée.
      */
-    List<String> requiredMods;
+    public final Map<String, VersionIntervalle> requiredMods = new HashMap<>();
     /**
      * Mods, si présents à charger avant.
+     * Aucune intervalle de version n'est nécessaire.
      */
-    List<String> dependants;
+    public final List<String> dependants = new ArrayList<>();
 
     /*
     List<String> authorList;
@@ -47,7 +49,9 @@ public class ModVersion {
         this.mcversion = mcversion;
     }
 
-    /** Constructeur utilisé pour initialisé une version à partir des informations d'un dépot. */
+    /**
+     * Constructeur utilisé pour initialisé une version à partir des informations d'un dépot.
+     */
     public ModVersion(Depot depot, JSONObject json) {
         String modid = json.getString("modid").toLowerCase();
         this.mod = depot.getMod(modid);
@@ -80,6 +84,15 @@ public class ModVersion {
 
         if (this.urls != null)
             json.put("urls", new JSONArray(this.urls));
+        if (!this.requiredMods.isEmpty()) {
+            JSONArray liste = new JSONArray();
+            this.requiredMods.forEach((id, inter) -> liste.put(id + (inter.maximum != null && inter.minimum != null ? "@" + inter : "")));
+            json.put("requiredMods", liste);
+        }
+        if (!this.dependants.isEmpty()) {
+            JSONArray liste = new JSONArray(this.dependants);
+            json.put("dependants", liste);
+        }
     }
 
     @Override

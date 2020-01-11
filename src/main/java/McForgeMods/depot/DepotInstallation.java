@@ -3,6 +3,7 @@ package McForgeMods.depot;
 import McForgeMods.Mod;
 import McForgeMods.ModVersion;
 import McForgeMods.Version;
+import McForgeMods.VersionIntervalle;
 import McForgeMods.outils.NoNewlineReader;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -13,8 +14,7 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.LinkedList;
-import java.util.Queue;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -31,6 +31,13 @@ public class DepotInstallation extends Depot {
 
     public DepotInstallation(Path dossier) {
         this.dossier = dossier;
+    }
+
+    @Override
+    public void ajoutModVersion(ModVersion modVersion) {
+        if (this.mod_version.containsKey(modVersion.mod))
+            throw new IllegalArgumentException(String.format("Le mod '%s' existe déjà dans ce répertoire, il y a conflit.", modVersion.mod));
+        super.ajoutModVersion(modVersion);
     }
 
     /**
@@ -59,8 +66,8 @@ public class DepotInstallation extends Depot {
 
             final String modid = json.getString("modid");
             final String name = json.getString("name");
-
             Version version, mcversion;
+
             String texte_version = json.getString("version");
             Matcher m = minecraft_version.matcher(texte_version);
             if (m.find()) {
@@ -82,8 +89,56 @@ public class DepotInstallation extends Depot {
 
             ModVersion modVersion = new ModVersion(this.ajoutMod(mod), version, mcversion);
             modVersion.urls.add(fichier.getAbsoluteFile().toURI().toURL());
+
+            if (json.has("requiredMods")) {
+                lectureDependances(json.getJSONArray("requiredMods")).forEach(modVersion.requiredMods::put);
+            }
+            if (json.has("dependencies")) {
+                lectureDependances(json.getJSONArray("dependencies")).forEach(modVersion.requiredMods::put);
+            }
+            if (json.has("dependants")) {
+                JSONArray dependants = json.getJSONArray("dependants");
+                dependants.forEach(d -> modVersion.dependants.add((String) d));
+            }
             this.ajoutModVersion(modVersion);
         }
+    }
+
+    static Map<String, VersionIntervalle> lectureDependances(Iterable<Object> entree) throws IllegalFormatException {
+        final Map<String, VersionIntervalle> resultat = new HashMap<>();
+        for (Object o : entree) {
+            String texte = o.toString();
+            int pos = 0;
+            StringBuilder sb = new StringBuilder();
+            VersionIntervalle versionIntervalle = null;
+
+            while (pos < texte.length()) {
+                char c = texte.charAt(pos);
+                if (c == ',') {
+                    resultat.put(sb.toString().toLowerCase(), versionIntervalle == null ? new VersionIntervalle() : versionIntervalle);
+                    sb = new StringBuilder();
+                    versionIntervalle = null;
+                } else if (c == '@' && sb.length() > 0) {
+                    StringBuilder dep = new StringBuilder();
+                    while (pos < texte.length()
+                            && (Character.isDigit(c) || c == ',' || c == '[' || c == ']' || c == '(' || c == ')' || c == '.')) {
+                        c = texte.charAt(++pos);
+                    }
+                    versionIntervalle = VersionIntervalle.read(dep.toString());
+
+                } else if (Character.isAlphabetic(c) || Character.isDigit(c)) {
+                    sb.append(c);
+                } else {
+                    throw new IllegalArgumentException(texte);
+                }
+                pos++;
+            }
+
+            if (sb.length() > 0) {
+                resultat.put(sb.toString().toLowerCase(), versionIntervalle == null ? new VersionIntervalle() : versionIntervalle);
+            }
+        }
+        return resultat;
     }
 
     /**
