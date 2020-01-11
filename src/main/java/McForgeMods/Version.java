@@ -30,6 +30,10 @@ public class Version implements Comparable<Version> {
         this(major, medium, minor, 0);
     }
 
+    public Version(Version v) {
+        System.arraycopy(v.versions, 0, this.versions, 0, 4);
+    }
+
     public static Version read(String version) throws IllegalArgumentException {
         final int[] versions = new int[]{0, 0, 0, 0};
         Matcher m = Version.version.matcher(version);
