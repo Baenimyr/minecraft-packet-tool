@@ -28,16 +28,40 @@ import java.util.zip.ZipFile;
 public class DepotInstallation extends Depot {
     public static final Pattern minecraft_version = Pattern.compile("^1\\.(14(\\.[1-4])?|13(\\.[1-2])?|12(\\.[1-2])?|11(\\.1)?|10(\\.[1-2])?|9(\\.[1-4])?|8(\\.1)?|7(\\.[1-9]|(10))?)-");
     public final Path dossier;
+    private final HashMap<String, Mod> mods = new HashMap<>();
+    private final HashMap<String, ModVersion> mod_versions = new HashMap<>();
 
     public DepotInstallation(Path dossier) {
         this.dossier = dossier;
     }
 
     @Override
+    public Collection<String> getModids() {
+        return this.mod_versions.keySet();
+    }
+
+    @Override
+    public Mod getMod(String modid) {
+        return this.mods.get(modid);
+    }
+
+    @Override
+    public List<ModVersion> getModVersions(String nom) {
+        return Collections.singletonList(this.mod_versions.get(nom));
+    }
+
+    Mod ajoutMod(Mod mod) {
+        if (!this.mods.containsKey(mod.modid))
+            this.mods.put(mod.modid, mod);
+        return this.mods.get(mod.modid);
+    }
+
     public void ajoutModVersion(ModVersion modVersion) {
-        if (this.mod_version.containsKey(modVersion.mod))
+        if (this.mod_versions.containsKey(modVersion.mod.modid))
             throw new IllegalArgumentException(String.format("Le mod '%s' existe déjà dans ce répertoire, il y a conflit.", modVersion.mod));
-        super.ajoutModVersion(modVersion);
+
+        Mod mod = this.ajoutMod(modVersion.mod);
+        this.mod_versions.put(mod.modid, modVersion);
     }
 
     /**
@@ -122,6 +146,7 @@ public class DepotInstallation extends Depot {
                     StringBuilder dep = new StringBuilder();
                     while (pos < texte.length()
                             && (Character.isDigit(c) || c == ',' || c == '[' || c == ']' || c == '(' || c == ')' || c == '.')) {
+                        dep.append(c);
                         c = texte.charAt(++pos);
                     }
                     versionIntervalle = VersionIntervalle.read(dep.toString());
@@ -160,9 +185,8 @@ public class DepotInstallation extends Depot {
                 else if (f.getName().endsWith(".jar")) {
                     try {
                         importationJar(f);
-                    } catch (IllegalArgumentException i) {
-                        i.printStackTrace(System.out);
-                    } catch (IOException | JSONException i) {
+                    } catch (IllegalArgumentException | JSONException ignored) {
+                    } catch (IOException i) {
                         System.err.println("Erreur sur '" + f.getName() + '\'');
                         i.printStackTrace();
                     }

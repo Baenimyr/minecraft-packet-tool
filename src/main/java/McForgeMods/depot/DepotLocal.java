@@ -7,22 +7,64 @@ import org.json.JSONObject;
 
 import java.io.*;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 
 public class DepotLocal extends Depot {
     public final Path dossier;
+    protected final Map<String, Mod> mods = new HashMap<>();
+    protected final Map<Mod, List<ModVersion>> mod_version = new HashMap<>();
 
     public DepotLocal(Path dossier) {
         this.dossier = dossier;
     }
 
+    @Override
+    public Collection<String> getModids() {
+        return this.mods.keySet();
+    }
+
+    @Override
+    public Mod getMod(String modid) {
+        return this.mods.get(modid);
+    }
+
+    @Override
+    public List<ModVersion> getModVersions(String nom) {
+        return this.mod_version.getOrDefault(this.getMod(nom), Collections.emptyList());
+    }
+
+    private Mod ajoutMod(Mod mod) {
+        if (this.mods.containsKey(mod.modid)) {
+            Mod present = this.mods.get(mod.modid);
+            if (present.description == null)
+                present.description = mod.description;
+            if (present.updateJSON == null)
+                present.updateJSON = mod.updateJSON;
+            return present;
+        } else {
+            this.mods.put(mod.modid, mod);
+            return mod;
+        }
+    }
+
+    private void ajoutModVersion(ModVersion modVersion) {
+        Mod mod = this.ajoutMod(modVersion.mod);
+        // TODO: remplacer la valeur de ModVersion::mod, si une autre instance existe.
+
+        if (!this.mod_version.containsKey(mod)) {
+            this.mod_version.put(mod, new ArrayList<>(2));
+        }
+
+        Collection<ModVersion> liste = this.mod_version.get(mod);
+        if (!liste.contains(modVersion))
+            liste.add(modVersion);
+    }
+
     /**
      * Enregistre la liste des mods dans le fichier <i>Mods.json</i> à la racine du dépôt.
-     * Sauvegarde les informations d'un mod ({@link #enregistrerModInformations(String)}) en même temps.
+     * Sauvegarde les informations d'un mod ({@link #sauvegardeMod(String)}) en même temps.
      */
-    public void enregistrerMods() throws FileNotFoundException, IOException {
+    public void sauvegarde() throws FileNotFoundException, IOException {
         if (!this.dossier.toFile().exists())
             this.dossier.toFile().mkdirs();
 
@@ -39,7 +81,7 @@ public class DepotLocal extends Depot {
                 mod.json(data);
                 json.put(data);
 
-                this.enregistrerModInformations(modid);
+                this.sauvegardeMod(modid);
             }
 
             json.write(writer, 2, 0);
@@ -55,7 +97,7 @@ public class DepotLocal extends Depot {
      *
      * @throws FileNotFoundException si impossible de créer le fichier de sauvegarde
      */
-    public void enregistrerModInformations(String modid) throws FileNotFoundException, IOException {
+    private void sauvegardeMod(String modid) throws FileNotFoundException, IOException {
         final Mod mod = this.getMod(modid);
         if (!this.mod_version.containsKey(mod))
             return;

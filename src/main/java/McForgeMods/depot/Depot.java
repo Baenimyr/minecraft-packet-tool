@@ -3,68 +3,66 @@ package McForgeMods.depot;
 import McForgeMods.Mod;
 import McForgeMods.ModVersion;
 import McForgeMods.Version;
+import McForgeMods.VersionIntervalle;
 
 import java.util.*;
 
-public class Depot {
-    protected final Map<String, Mod> mods = new HashMap<>();
-    protected final Map<Mod, List<ModVersion>> mod_version = new HashMap<>();
+public abstract class Depot {
 
-    public Collection<String> getModids() {
-        return this.mods.keySet();
-    }
+    public abstract Collection<String> getModids();
 
-    public Mod getMod(String modid) {
-        return this.mods.get(modid);
-    }
+    public abstract Mod getMod(String modid);
+
+    public abstract List<ModVersion> getModVersions(String nom);
 
     /**
      * @param mcversion version de minecraft précise.
-     * @return la dernier version d'un mod pour une version de minecraft précise.
+     * @return la derniere version d'un mod pour une version de minecraft précise.
      */
-    public ModVersion getModLatest(Mod mod, Version mcversion) {
-        return this.mod_version.containsKey(mod) ?
-                this.mod_version.get(mod).stream().filter(m -> m.mcversion.equals(mcversion))
-                        .max(Comparator.comparing(v -> v.version)).orElse(null)
-                : null;
-    }
-
-    public List<ModVersion> getModVersions(Mod mod) {
-        return this.mod_version.getOrDefault(mod, Collections.emptyList());
+    public Optional<ModVersion> getModLatest(String mod, Version mcversion) {
+        return this.getModids().contains(mod) ?
+                this.getModVersions(mod).stream().filter(m -> m.mcversion.equals(mcversion))
+                        .max(Comparator.comparing(v -> v.version))
+                : Optional.empty();
     }
 
     /**
-     * Ajoute un nouveau mod à la liste.
+     * Construit la liste des dépendances.
+     * Pour chaque mod présent dans la liste, extrait les dépendances et fusionne les intervalles de version.
+     * La fonction utilise les informations du dépot comme source d'informations pour les nouveaux mods rencontrés.
+     * Si un mod à étudier est inconnu, ses dépendances sont ignorées.
      *
-     * @return l'instance de {@link Mod} réelle sauvegardée.
+     * @param liste: liste des mods pour lesquels chercher les dépendances.
+     * @return une map{modid -> version}
      */
-    public Mod ajoutMod(Mod mod) {
-        if (this.mods.containsKey(mod.modid)) {
-            Mod present = this.mods.get(mod.modid);
-            if (present.description == null)
-                present.description = mod.description;
-            if (present.updateJSON == null)
-                present.updateJSON = mod.updateJSON;
-            return present;
-        } else {
-            this.mods.put(mod.modid, mod);
-            return mod;
+    public HashMap<String, VersionIntervalle> listeDependances(Collection<ModVersion> liste) {
+        final HashMap<String, VersionIntervalle> requis = new HashMap<>();
+
+        final LinkedList<ModVersion> temp = new LinkedList<>(liste);
+        while (!temp.isEmpty()) {
+            ModVersion mver = temp.removeFirst();
+            for (Map.Entry<String, VersionIntervalle> depend : mver.requiredMods.entrySet()) {
+                String modid_d = depend.getKey();
+                VersionIntervalle version_d = depend.getValue();
+                if (requis.containsKey(modid_d))
+                    requis.get(modid_d).fusion(version_d);
+                else {
+                    requis.put(modid_d, version_d);
+
+                    if (this.getModids().contains(modid_d)) {
+                        List<ModVersion> versions = new ArrayList<>(this.getModVersions(modid_d));
+                        versions.sort(Comparator.comparing(v -> v.version));
+                        for (ModVersion candidat : this.getModVersions(modid_d)) {
+                            if (mver.mcversion.equals(candidat.mcversion) &&
+                                    (!requis.containsKey(modid_d) || requis.get(modid_d).correspond(candidat.version))) {
+                                temp.add(candidat);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
         }
-    }
-
-    /**
-     * Enregistre une nouvelle version dans le dépôt.
-     */
-    public void ajoutModVersion(ModVersion modVersion) {
-        Mod mod = this.ajoutMod(modVersion.mod);
-        // TODO: remplacer la valeur de ModVersion::mod, si une autre instance existe.
-
-        if (!this.mod_version.containsKey(mod)) {
-            this.mod_version.put(mod, new ArrayList<>(2));
-        }
-
-        Collection<ModVersion> liste = this.mod_version.get(mod);
-        if (!liste.contains(modVersion))
-            liste.add(modVersion);
+        return requis;
     }
 }
