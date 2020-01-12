@@ -20,10 +20,14 @@ repositories {
     jcenter()
 }
 
-// sourceCompatibility = JavaVersion.VERSION_11;
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+}
 
 dependencies {
-    implementation "org.json:json:20190722"
+    compile "org.json:json:20190722"
+    //implementation group: 'commons-cli', name: 'commons-cli', version: '1.4'
+    compile 'info.picocli:picocli:4.1.4'
 
     // Use JUnit Jupiter API for testing.
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.5.1'
@@ -34,10 +38,29 @@ dependencies {
 
 application {
     // Define the main class for the application.
-    mainClassName = 'McForgeMods.App'
+    mainClassName = 'McForgeMods.ForgeMods'
+}
+
+jar {
+    manifest {
+        attributes (
+            'Main-Class': application.mainClassName
+        )
+    }
 }
 
 test {
     // Use junit platform for unit tests
     useJUnitPlatform()
+}
+
+
+task fatJar(type: Jar, group: "build") {
+    manifest {
+        attributes (
+                'Main-Class': application.mainClassName
+        )
+    }
+    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    with jar
 }
