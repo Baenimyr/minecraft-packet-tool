@@ -31,7 +31,7 @@ Le système Linux, propose des gestionnaire de paquets capable également de ré
 Les fonctionnalités suivantes sont présentées dans l'ordre de complexité et l'ordre de réalisation.
 
 \subsection{Analyse de l'installation}
-Il s'agit ici de lire les fichiers \texttt{jar} présent dans le répertoire d'installation et d'en extraire des données.
+Il s'agit ici de lire les fichiers \texttt{jar} présent dans le répertoire d'installation et d'en extraire des données (voir \ref{subsection:depot_installation}).
 Ensuite le système peut vérifier l'arbre des dépendances et informer l'utilisateur de l'absence d'un mod particulier.
 
 Une fois les informations extraites, le programme peut afficher les informations, afficher l'arbre de dépendance, faire des estimations de ram nécessaire au lancement du jeu.
@@ -43,18 +43,19 @@ Une fois un mod demandé ou requis par les autres, le programme doit pouvoir tro
 Pour un identifiant de mod et une version, il faut maintenant fournir l'url de téléchargement (par exemple directement les sites hébergeurs).
 Les versions disponibles peuvent être limitées aux versions stables.
 
-\subsubsection{Dépôt local des informations}
-\label{section:depot_local}
-Sans connexion internet, le programme doit pouvoir fournir les informations détaillées glanées sur internet et concernant les mods couremment installés.
-Il est inutile de s'encombrer des informations non nécessaires.
-Les informations locales peuvent être mises à jour sur demande ou automatiquement de temps en temps.
+\subsection{Analyse des demandes pour serveur sous MinecraftForge}
+Les serveurs MinecraftForge transmettent la liste des mods requis lors des opérations de salutations (nom, nombre de joueurs, \dots).
+Avec une adresse de serveur fournies, le programme peut vérifier la disponibilité des mods et proposer d'en télécharger.
 
-\subsubsection{Dépot internet de informations complètes}
+
+\section{Dépôts}
+\label{section:depot}
 Malheureusement trop souvent, les informations des fichiers \textit{mcmod.info} sont mal renseignées et les vrais données sont fournies à \textit{@Mod} dans le code.
 Cette source d'information est inaccessible.
 S'ajoute à cela les informations comme le lien de téléchargement qui ne sont pas fournies dans le fichier jar.
 L'ensemble des informations vérifiées devront donc être disponibles en ligne, et localement en cache.
 
+\subsection{Dépot internet}
 Une base de données en ligne pose des problèmes de complexité de lecture et de mise en place.
 En s'inspirant des paquets Linux toujours, le téléchargement de fichiers individuels dans une arborescence structurée est plus adéquate.
 Un premier fichier texte compressé, recense les mods disponibles dans un dépôt (voir \texttt{Packages.xz}).
@@ -62,6 +63,18 @@ Pour un mod et une version connue, correspond un emplacement dans l'arbre des ar
 Un système basé sur les dépôt permet aux groupes de développeurs de gérer leur propre dépôt.
 L'utilisation d'un dossier intermédiaire avec la première lettre du modid permet une gestion mémoire physique plus souple sur les grands dépôts.
 
+\subsection{Dépot local}
+Sans connexion internet, le programme doit pouvoir fournir les informations détaillées glanées sur internet et concernant les mods couremment installés.
+Il est inutile de s'encombrer des informations non nécessaires.
+Les informations locales peuvent être mises à jour sur demande ou automatiquement de temps en temps.
+
+\subsection{Dépot d'installation}
+\label{subsection:depot_installation}
+Une installation minecraft, définie par un dossier \textit{.minecraft}, est importée au besoin grâce aux fichiers \textit{mcmod.info} présents dans l'archive.
+Elle se comporte virtuellement comme un véritable dépot, ce qui permet de le comparer au dépot local et de l'utiliser de manière transparente dans le système.
+
+\subsection{Structure du dépot}
+\begin{figure}
 \dirtree{%
 .1 /.
 .2 Mods.json.
@@ -78,6 +91,9 @@ L'utilisation d'un dossier intermédiaire avec la première lettre du modid perm
 .4 cofhcore.
 .5 cofhcore.json.
 }
+\caption{Exemple de hiérarchie d'un dépot}
+\label{fig:hierarchie}
+\end{figure}
 
 Mods.json (\ref{figure:mods.json}) contient la liste des modid proposés et les informations générales, indépendantes des versions.
 Les champs obligatoires sont \textit{modid} et \textit{name}.
@@ -130,18 +146,12 @@ Les informations que l'on peut y trouver sont:
 \end{figure}
 
 
-\subsection{Analyse des demandes pour serveur sous MinecraftForge}
-Les serveurs MinecraftForge transmettent la liste des mods requis lors des opérations de salutations (nom, nombre de joueurs, \dots).
-Avec une adresse de serveur fournies, le programme peut vérifier la disponibilité des mods et proposer d'en télécharger.
-
-
-
 \section{Fichiers locaux}
 L'instance de jeu utilisée dépend du lieu de lancement du programme ou des options passées en paramètres.
 Par défaut, le programme remonte jusqu'au dossier \textit{.minecraft} le plus proche.
 S'il n'est existe pas parmis les parents, tente d'utiliser le répertoire par défaut: \textit{.minecraft} sur Linux, ou \textit{AppData/.minecraft} sur windows.
 
-Les informations sauvegardées localement comme décris au paragraphe \ref{section:depot_local} sont placées par défaut dans le répertoire \textit{.minecraft/forgemods}.
+Les informations sauvegardées localement comme décris au paragraphe \ref{section:depot} sont placées par défaut dans le répertoire \textit{.minecraft/forgemods}.
 Ce répertoire sert de dépôt local et se présente sous la même forme qu'un dépôt en ligne pour simplifier l'importation des données.
 Les informations du dépôt local sont toujours utilisées en premier, mais peuvent être mises à jour par les autres dépôts connus.
 Si l'utilisateur le permet, un dépôt généralisé peut sauvegarder les fichiers originaux qui ont un jour été téléchargés ou détectés pour les mettre à disposition.
