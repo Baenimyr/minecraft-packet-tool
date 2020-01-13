@@ -22,7 +22,7 @@ public class ModVersion {
     /**
      * Liste des liens menant au fichier (localement ou un url)
      */
-    public List<URL> urls = new ArrayList<>(1);
+    public final List<URL> urls = new ArrayList<>(1);
     String parent = null;
     /**
      * Mods obligatoires pour le bon fonctionnement de celui-ci.
@@ -73,21 +73,41 @@ public class ModVersion {
                 }
             }
         }
+
+        if (json.has("requiredMods")) {
+            JSONArray liste = json.getJSONArray("requiredMods");
+            for (int i = 0; i < liste.length(); i++) {
+                String required = liste.getString(i);
+                int at = required.indexOf('@');
+                if (at != -1) {
+                    this.requiredMods.put(required.substring(0, at).toLowerCase(),
+                            VersionIntervalle.read(required.substring(at + 1)));
+                } else {
+                    this.requiredMods.put(required, new VersionIntervalle());
+                }
+            }
+        }
+
+        if (json.has("dependants")) {
+            JSONArray liste = json.getJSONArray("dependants");
+            for (int i = 0; i < liste.length(); i++) {
+                this.dependants.add(liste.getString(i));
+            }
+        }
     }
 
     public void json(JSONObject json) {
         json.put("mcversion", this.mcversion);
 
-        if (this.urls != null)
-            json.put("urls", new JSONArray(this.urls));
-        if (!this.requiredMods.isEmpty()) {
-            JSONArray liste = new JSONArray();
-            this.requiredMods.forEach((id, inter) -> liste.put(id + (inter.maximum != null && inter.minimum != null ? "@" + inter : "")));
-            json.put("requiredMods", liste);
-        }
+        json.put("urls", new JSONArray(this.urls));
+
+        JSONArray liste = new JSONArray();
+        this.requiredMods.forEach((id, inter) -> liste.put(id + "@" + inter));
+        json.put("requiredMods", liste);
+
         if (!this.dependants.isEmpty()) {
-            JSONArray liste = new JSONArray(this.dependants);
-            json.put("dependants", liste);
+            JSONArray dep = new JSONArray(this.dependants);
+            json.put("dependants", dep);
         }
     }
 
@@ -96,8 +116,7 @@ public class ModVersion {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ModVersion that = (ModVersion) o;
-        return mod.equals(that.mod) &&
-                version.equals(that.version);
+        return mod.equals(that.mod) && version.equals(that.version);
     }
 
     @Override
@@ -107,10 +126,6 @@ public class ModVersion {
 
     @Override
     public String toString() {
-        return "ModVersion{" +
-                "mod=" + mod.name +
-                ", version=" + version +
-                ", mcversion=" + mcversion +
-                '}';
+        return "ModVersion{" + "mod=" + mod.name + ", version=" + version + ", mcversion=" + mcversion + '}';
     }
 }
