@@ -2,6 +2,7 @@ package McForgeMods.depot;
 
 import McForgeMods.Mod;
 import McForgeMods.ModVersion;
+import McForgeMods.Version;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
@@ -75,12 +76,12 @@ public class DepotLocal extends Depot {
 
             for (String version : json.keySet()) {
                 JSONObject v = json.getJSONObject(version);
-                ModVersion modVersion = new ModVersion(this.getMod(modid), v);
+                ModVersion modVersion = new ModVersion(this.getMod(modid), Version.read(version), v);
                 this.ajoutModVersion(modVersion);
             }
             reader.close();
         } catch (JSONException j) {
-            System.err.println("Erreur de lecture du json.");
+            System.err.println("Erreur de lecture du json '" + DATA.toString() + "': " + j.getMessage());
             return false;
         } catch (IOException f) {
             return false;
