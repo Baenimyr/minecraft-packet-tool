@@ -8,7 +8,8 @@ import org.json.JSONTokener;
 
 import java.io.*;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * <h2>Format du dépot</h2>
@@ -23,54 +24,12 @@ import java.util.*;
  * }
  */
 public class DepotLocal extends Depot {
+    static final String FICHIER_PRINCIPAL = "Mods.json";
+
     public final Path dossier;
-    protected final Map<String, Mod> mods = new HashMap<>();
-    protected final Map<Mod, List<ModVersion>> mod_version = new HashMap<>();
 
     public DepotLocal(Path dossier) {
         this.dossier = dossier;
-    }
-
-    @Override
-    public Collection<String> getModids() {
-        return this.mods.keySet();
-    }
-
-    @Override
-    public Mod getMod(String modid) {
-        return this.mods.get(modid);
-    }
-
-    @Override
-    public List<ModVersion> getModVersions(String nom) {
-        return this.mod_version.getOrDefault(this.getMod(nom), Collections.emptyList());
-    }
-
-    private Mod ajoutMod(Mod mod) {
-        if (this.mods.containsKey(mod.modid)) {
-            Mod present = this.mods.get(mod.modid);
-            if (present.description == null)
-                present.description = mod.description;
-            if (present.updateJSON == null)
-                present.updateJSON = mod.updateJSON;
-            return present;
-        } else {
-            this.mods.put(mod.modid, mod);
-            return mod;
-        }
-    }
-
-    public void ajoutModVersion(ModVersion modVersion) {
-        Mod mod = this.ajoutMod(modVersion.mod);
-        // TODO: remplacer la valeur de ModVersion::mod, si une autre instance existe.
-
-        if (!this.mod_version.containsKey(mod)) {
-            this.mod_version.put(mod, new ArrayList<>(2));
-        }
-
-        Collection<ModVersion> liste = this.mod_version.get(mod);
-        if (!liste.contains(modVersion))
-            liste.add(modVersion);
     }
 
     /**
@@ -79,9 +38,11 @@ public class DepotLocal extends Depot {
      * @return le nombre de mod différents importés depuis le répertoire de dépot.
      */
     public int importation() throws IOException {
-        final File MODS = dossier.resolve("Mods.json").toFile();
-        if (!MODS.exists())
+        final File MODS = dossier.resolve(FICHIER_PRINCIPAL).toFile();
+        if (!MODS.exists()) {
+            System.err.println("Absence du fichier principal: '" + FICHIER_PRINCIPAL + "'");
             return 0;
+        }
 
         int compteur = 0;
         try (FileInputStream fichier = new FileInputStream(MODS)) {
@@ -96,11 +57,12 @@ public class DepotLocal extends Depot {
                 if (this.importationMod(mod.modid)) compteur++;
             }
         }
+        System.err.flush();
         return compteur;
     }
 
     private boolean importationMod(String modid) {
-        final File DATA = dossier.resolve(modid).resolve(modid + ".json").toFile();
+        final File DATA = dossier.resolve(modid.substring(0, 1)).resolve(modid).resolve(modid + ".json").toFile();
         if (!DATA.exists()) {
             System.err.println("Le fichier '" + DATA.toString() + "' n'existe pas.");
             return false;
@@ -130,11 +92,10 @@ public class DepotLocal extends Depot {
      * Enregistre la liste des mods dans le fichier <i>Mods.json</i> à la racine du dépôt.
      * Sauvegarde les informations d'un mod ({@link #sauvegardeMod(String)}) en même temps.
      */
-    public void sauvegarde() throws FileNotFoundException, IOException {
-        if (!this.dossier.toFile().exists())
-            this.dossier.toFile().mkdirs();
+    public void sauvegarde() throws IOException {
+        if (!this.dossier.toFile().exists()) this.dossier.toFile().mkdirs();
 
-        try (FileOutputStream fichier = new FileOutputStream(dossier.resolve("Mods.json").toFile())) {
+        try (FileOutputStream fichier = new FileOutputStream(dossier.resolve(FICHIER_PRINCIPAL).toFile())) {
             OutputStreamWriter writer = new OutputStreamWriter(new BufferedOutputStream(fichier));
 
             JSONObject json = new JSONObject();
@@ -163,14 +124,12 @@ public class DepotLocal extends Depot {
      *
      * @throws FileNotFoundException si impossible de créer le fichier de sauvegarde
      */
-    private void sauvegardeMod(String modid) throws FileNotFoundException, IOException {
+    private void sauvegardeMod(String modid) throws IOException {
         final Mod mod = this.getMod(modid);
-        if (!this.mod_version.containsKey(mod))
-            return;
+        if (!this.mod_version.containsKey(mod)) return;
 
         Path dossier_mod = this.dossier.resolve(mod.modid.substring(0, 1)).resolve(mod.modid);
-        if (!dossier_mod.toFile().exists())
-            dossier_mod.toFile().mkdirs();
+        if (!dossier_mod.toFile().exists()) dossier_mod.toFile().mkdirs();
 
         try (FileOutputStream donnees = new FileOutputStream(dossier_mod.resolve(mod.modid + ".json").toFile())) {
             JSONObject json = new JSONObject();

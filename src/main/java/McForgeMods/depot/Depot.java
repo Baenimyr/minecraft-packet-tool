@@ -7,23 +7,78 @@ import McForgeMods.VersionIntervalle;
 
 import java.util.*;
 
-public abstract class Depot {
+public class Depot {
+    protected final Map<String, Mod> mods = new HashMap<>();
+    protected final Map<Mod, Set<ModVersion>> mod_version = new HashMap<>();
 
-    public abstract Collection<String> getModids();
+    /**
+     * Renvoit la liste complète, sans doublons, des mods présents dans le dépot.
+     */
+    public Collection<String> getModids() {
+        return this.mods.keySet();
+    }
 
-    public abstract Mod getMod(String modid);
+    /**
+     * Renvoit le mod, et les informations qu'il contient, associé au modid.
+     */
+    public Mod getMod(String modid) {
+        return this.mods.get(modid);
+    }
 
-    public abstract List<ModVersion> getModVersions(String nom);
+    /**
+     * Fournit la liste complète des version du mod.
+     * Si le mod n'est pas connus, renvoit une liste vide.
+     */
+    public Set<ModVersion> getModVersions(Mod mod) {
+        return this.mod_version.getOrDefault(mod, Collections.emptySet());
+    }
+
+    public Set<ModVersion> getModVersions(String modid) {
+        return this.getModVersions(this.getMod(modid));
+    }
 
     /**
      * @param mcversion version de minecraft précise.
      * @return la derniere version d'un mod pour une version de minecraft précise.
      */
     public Optional<ModVersion> getModLatest(String mod, Version mcversion) {
-        return this.getModids().contains(mod) ?
-                this.getModVersions(mod).stream().filter(m -> m.mcversion.equals(mcversion))
-                        .max(Comparator.comparing(v -> v.version))
-                : Optional.empty();
+        return this.getModids().contains(mod) ? this.getModVersions(mod).stream()
+                .filter(m -> m.mcversion.equals(mcversion)).max(Comparator.comparing(v -> v.version)) : Optional
+                .empty();
+    }
+
+    /**
+     * Enregistre un nouveau mod dans le dépot.
+     * Si le mod existe déjà, les informations utiles sont importées.
+     *
+     * @return l'instance réellement sauvegardée.
+     */
+    protected Mod ajoutMod(Mod mod) {
+        if (this.mods.containsKey(mod.modid)) {
+            Mod present = this.mods.get(mod.modid);
+            present.fusion(mod);
+            return present;
+        } else {
+            this.mods.put(mod.modid, mod);
+            return mod;
+        }
+    }
+
+    /**
+     * Enregistre une nouvelle version d'un mod dans le dépot.
+     * De préférence, l'instance de mod utilisée à {@link ModVersion#mod} doit correspondre à celle renvoyée par
+     * {@link #ajoutMod(Mod)}.
+     */
+    public void ajoutModVersion(ModVersion modVersion) {
+        Mod mod = this.ajoutMod(modVersion.mod);
+        // TODO: remplacer la valeur de ModVersion::mod, si une autre instance existe.
+
+        if (!this.mod_version.containsKey(mod)) {
+            this.mod_version.put(mod, new LinkedHashSet<>(2));
+        }
+
+        Collection<ModVersion> liste = this.mod_version.get(mod);
+        if (!liste.contains(modVersion)) liste.add(modVersion);
     }
 
     /**

@@ -12,38 +12,52 @@ import java.util.Objects;
  */
 public class Mod {
     public final String modid;
-    public String name;
-    public String url = "";
-    public String description = "";
-    public String updateJSON = "";
+    public final String name;
+    public String url = null;
+    public String description = null;
+    public String updateJSON = null;
 
     public Mod(String modid, String name) {
-        this.modid = modid;
+        this.modid = modid.toLowerCase().intern();
         this.name = name;
     }
 
-    /** Importe un mod à partir des informations sauvegardées dans un JSON.
+    /**
+     * Importe un mod à partir des informations sauvegardées dans un JSON.
+     *
      * @throws JSONException en cas d'échec (absence de clé ou mauvais format).
      */
     public Mod(String modid, JSONObject json) throws JSONException {
-        this.modid = modid.toLowerCase().intern();
-        this.name = json.getString("name");
-        if (json.has("url"))
-            this.url = json.getString("url");
-        if (json.has("description"))
-            this.description = json.getString("description");
-        if (json.has("updateJSON"))
-            this.updateJSON = json.getString("updateJSON");
+        this(modid, json.getString("name"));
+        if (json.has("url")) {
+            String url = json.getString("url");
+            this.url = url.length() == 0 ? null : url;
+        }
+        if (json.has("description")) {
+            String description = json.getString("description");
+            this.description = description.length() == 0 ? null : description;
+        }
+        if (json.has("updateJSON")) {
+            String updateJSON = json.getString("updateJSON");
+            this.updateJSON = updateJSON.length() == 0 ? null : updateJSON;
+        }
     }
 
     public void json(JSONObject json) {
         json.put("name", this.name);
-        if (this.url.length() != 0)
-            json.put("url", this.url);
-        if (this.description.length() != 0)
-            json.put("description", this.description);
-        if (this.updateJSON.length() != 0)
-            json.put("updateJSON", this.updateJSON);
+        if (this.url != null) json.put("url", this.url);
+        if (this.description != null) json.put("description", this.description);
+        if (this.updateJSON != null) json.put("updateJSON", this.updateJSON);
+    }
+
+    /**
+     * Récupère les informations utiles dans l'autre instance de mod.
+     */
+    public void fusion(Mod mod) {
+        if (!this.modid.equals(mod.modid)) return;
+        if (this.url == null) this.url = mod.url;
+        if (this.description == null) this.description = mod.description;
+        if (this.updateJSON == null) this.updateJSON = mod.updateJSON;
     }
 
     @Override

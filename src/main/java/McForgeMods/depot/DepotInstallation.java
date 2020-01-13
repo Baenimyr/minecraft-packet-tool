@@ -24,44 +24,19 @@ import java.util.zip.ZipFile;
  * Ce dépot lit les informations directement dans les fichiers qu'il rencontre.
  * Il permet d'analyser une instance minecraft (un dossier .minecraft) pour déduire les mods présents.
  * Ensuite toutes les actions d'un dépot sont applicables: présence de mod, présence de version, ...
+ * <p>
+ * L'unique contrainte avec un dépot d'installation, est qu'il ne peut pas y avoir plus d'un seul fichier par modid
+ * et version minecraft dans les dossiers <i>mods</i> ou <i>mods/mcversion</i>. Autrement, il y a conflit lors du
+ * chargement du jeu. Seulement si les versions de mod sont différentes, le dépot d'installation sera capable de
+ * détecter cette erreur.
  */
 public class DepotInstallation extends Depot {
-    public static final Pattern minecraft_version = Pattern.compile("^1\\.(14(\\.[1-4])?|13(\\.[1-2])?|12(\\.[1-2])?|11(\\.1)?|10(\\.[1-2])?|9(\\.[1-4])?|8(\\.1)?|7(\\.[1-9]|(10))?)-");
+    public static final Pattern minecraft_version = Pattern.compile(
+            "^1\\.(14(\\.[1-4])?|13(\\.[1-2])?|12(\\.[1-2])?|11(\\.1)?|10(\\.[1-2])?|9(\\.[1-4])?|8(\\.1)?|7(\\.[1-9]|(10))?)-");
     public final Path dossier;
-    private final HashMap<String, Mod> mods = new HashMap<>();
-    private final HashMap<String, ModVersion> mod_versions = new HashMap<>();
 
     public DepotInstallation(Path dossier) {
         this.dossier = dossier;
-    }
-
-    @Override
-    public Collection<String> getModids() {
-        return this.mod_versions.keySet();
-    }
-
-    @Override
-    public Mod getMod(String modid) {
-        return this.mods.get(modid);
-    }
-
-    @Override
-    public List<ModVersion> getModVersions(String nom) {
-        return Collections.singletonList(this.mod_versions.get(nom));
-    }
-
-    Mod ajoutMod(Mod mod) {
-        if (!this.mods.containsKey(mod.modid))
-            this.mods.put(mod.modid, mod);
-        return this.mods.get(mod.modid);
-    }
-
-    public void ajoutModVersion(ModVersion modVersion) {
-        if (this.mod_versions.containsKey(modVersion.mod.modid))
-            throw new IllegalArgumentException(String.format("Le mod '%s' existe déjà dans ce répertoire, il y a conflit.", modVersion.mod));
-
-        Mod mod = this.ajoutMod(modVersion.mod);
-        this.mod_versions.put(mod.modid, modVersion);
     }
 
     /**
@@ -78,8 +53,7 @@ public class DepotInstallation extends Depot {
     public void importationJar(File fichier) throws IOException, JSONException, IllegalArgumentException {
         try (ZipFile zip = new ZipFile(fichier)) {
             ZipEntry mcmod = zip.getEntry("mcmod.info");
-            if (mcmod == null)
-                return;
+            if (mcmod == null) return;
             BufferedInputStream lecture = new BufferedInputStream(zip.getInputStream(mcmod));
 
             JSONTokener token = new JSONTokener(new NoNewlineReader(lecture));
@@ -99,8 +73,7 @@ public class DepotInstallation extends Depot {
                 mcversion = Version.read(texte_version.substring(0, m.end() - 1));
                 version = Version.read(texte_version.substring(m.end()));
 
-                if (json.has("mcversion"))
-                    mcversion = Version.read(json.getString("mcversion"));
+                if (json.has("mcversion")) mcversion = Version.read(json.getString("mcversion"));
             } else {
                 version = Version.read(texte_version);
                 mcversion = Version.read(json.getString("mcversion")); // obligatoire car non déduit de la version
@@ -139,13 +112,14 @@ public class DepotInstallation extends Depot {
             while (pos < texte.length()) {
                 char c = texte.charAt(pos);
                 if (c == ',') {
-                    resultat.put(sb.toString().toLowerCase(), versionIntervalle == null ? new VersionIntervalle() : versionIntervalle);
+                    resultat.put(sb.toString().toLowerCase(),
+                            versionIntervalle == null ? new VersionIntervalle() : versionIntervalle);
                     sb = new StringBuilder();
                     versionIntervalle = null;
                 } else if (c == '@' && sb.length() > 0) {
                     StringBuilder dep = new StringBuilder();
-                    while (pos < texte.length()
-                            && (Character.isDigit(c) || c == ',' || c == '[' || c == ']' || c == '(' || c == ')' || c == '.')) {
+                    while (pos < texte.length() && (Character
+                            .isDigit(c) || c == ',' || c == '[' || c == ']' || c == '(' || c == ')' || c == '.')) {
                         dep.append(c);
                         c = texte.charAt(++pos);
                     }
@@ -160,7 +134,8 @@ public class DepotInstallation extends Depot {
             }
 
             if (sb.length() > 0) {
-                resultat.put(sb.toString().toLowerCase(), versionIntervalle == null ? new VersionIntervalle() : versionIntervalle);
+                resultat.put(sb.toString().toLowerCase(),
+                        versionIntervalle == null ? new VersionIntervalle() : versionIntervalle);
             }
         }
         return resultat;
@@ -178,10 +153,10 @@ public class DepotInstallation extends Depot {
 
         while (!dossiers.isEmpty()) {
             File doss = dossiers.poll();
-            for (File f : doss.listFiles()) {
+            File[] fichiers = doss.listFiles();
+            if (fichiers != null) for (File f : fichiers) {
                 if (f.isHidden()) continue;
-                else if (f.isDirectory())
-                    dossiers.add(f);
+                else if (f.isDirectory()) dossiers.add(f);
                 else if (f.getName().endsWith(".jar")) {
                     try {
                         importationJar(f);
