@@ -1,13 +1,15 @@
 package McForgeMods;
 
 import McForgeMods.commandes.Show;
+import McForgeMods.depot.DepotInstallation;
+import McForgeMods.depot.DepotLocal;
 import picocli.CommandLine;
 
+import java.io.IOException;
 import java.nio.file.Path;
-import java.util.concurrent.Callable;
 
 @CommandLine.Command(name = "forgemods", showDefaultValues = true, mixinStandardHelpOptions = true,
-        subcommands = {Show.class, ForgeMods.Install.class, ForgeMods.Depot.class})
+        subcommands = {Show.class, ForgeMods.Depot.class})
 public class ForgeMods implements Runnable {
 
     @CommandLine.Spec
@@ -23,8 +25,8 @@ public class ForgeMods implements Runnable {
      * Options commune aux fonctions utilisant un dépot et une installation minecraft.
      */
     public static class DossiersOptions {
-        @CommandLine.Option(names = {"-d", "--depot"}, description = "Dépot local à utiliser", defaultValue = "~/.minecraft/forgemods")
-        public Path depot;
+        @CommandLine.Option(names = {"-d", "--depot"}, description = "Dépot local à utiliser")
+        public Path depot = Path.of(System.getProperty("user.home")).resolve(".minecraft/forgemods");
 
         @CommandLine.Option(names = {"-m", "--minecraft"}, description = "Dossier minecraft (~/.minecraft)")
         public Path minecraft;
@@ -32,30 +34,74 @@ public class ForgeMods implements Runnable {
 
     @CommandLine.Command(name = "install", mixinStandardHelpOptions = true,
             description = "Installe un mod et ses dépendances")
-    static class Install implements Callable<Integer> {
-        @CommandLine.Mixin
-        DossiersOptions dossiers;
+    public int installation(@CommandLine.Mixin DossiersOptions dossiers,
+            @CommandLine.Parameters(arity = "0..*", description = "Liste d'identifiants") String[] modid,
+            @CommandLine.Option(names = {"--dependences"}, negatable = true,
+                    description = "Installe tous les autres mods nécessaires au bon fonctionnement de l'installation.") boolean dependances) {
 
-        @CommandLine.Parameters(arity = "0..*", description = "Liste d'identifiants")
-        String[] modid;
-
-        @CommandLine.Option(names = {"--dependences"}, negatable = true,
-                description = "Installe tous les autres mods nécessaires au bon fonctionnement de l'installation.")
-        boolean dependances = true;
-
-        @Override
-        public Integer call() {
-            System.err.println("Cette fonction n'est pas prête");
-            return 1;
-        }
+        System.err.println("Cette fonction n'est pas prête");
+        return 1;
     }
 
     @CommandLine.Command(name = "depot", mixinStandardHelpOptions = true,
-            description = "Outil de gestion d'un dépot.\n" +
-                    "Une installation minecraft peut être utilisée comme source de fichiers.")
-    static class Depot {
+            description = "Outil de gestion d'un dépot.\n" + "Une installation minecraft peut être utilisée comme source de fichiers.")
+    static class Depot implements Runnable {
         @CommandLine.Mixin
         DossiersOptions dossiers;
+
+        @Override
+        public void run() {
+
+        }
+
+        @CommandLine.Command(name = "import", mixinStandardHelpOptions = true)
+        public int importation(
+                @CommandLine.Parameters(index = "0", arity = "0..*", paramLabel = "modid") String[] modids,
+                @CommandLine.Option(names = {"-a", "--all"}) boolean all, @CommandLine.Mixin DossiersOptions dossiers) {
+            Path minecraft = Gestionnaire.resolutionDossierMinecraft(dossiers.minecraft);
+            if (minecraft == null) {
+                System.out.println("Impossible de trouver un dossier d'installation minecraft.");
+                return 1;
+            }
+
+            DepotInstallation installation = new DepotInstallation(minecraft);
+            installation.analyseDossier();
+            DepotLocal depot = new DepotLocal(dossiers.depot);
+            try {
+                depot.importation();
+            } catch (IOException i) {
+                System.err.println("Erreur de lecture des informations du dépot.");
+                return 1;
+            }
+
+            if (all) {
+                for (String modid : installation.getModids()) {
+                    for (ModVersion mv : installation.getModVersions(modid))
+                        depot.ajoutModVersion(mv);
+                }
+                System.out.println(installation.getModids().size() + " mods importés");
+            } else if (modids != null && modids.length > 0) {
+                for (String modid : modids) {
+                    if (installation.getModids().contains(modid)) {
+                        for (ModVersion version : installation.getModVersions(modid))
+                            depot.ajoutModVersion(version);
+                    } else {
+                        System.err.println("Modid non reconnu: '" + modid + "'");
+                    }
+                }
+            } else {
+                System.err.println("Il faut au moins un nom de mod à importer. Sinon utiliser l'option '--all'.");
+                return 2;
+            }
+
+            try {
+                depot.sauvegarde();
+            } catch (IOException i) {
+                System.err.println("Impossible de sauvegarder le dépot local à '" + depot.dossier + "'");
+                return 1;
+            }
+            return 0;
+        }
     }
 
     public static void main(String[] args) {
