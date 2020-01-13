@@ -51,9 +51,9 @@ public class ModVersion {
     /**
      * Constructeur utilisé pour initialisé une version à partir des informations d'un dépot.
      */
-    public ModVersion(Mod mod, JSONObject json) {
+    public ModVersion(Mod mod, Version version, JSONObject json) {
         this.mod = mod;
-        this.version = Version.read(json.getString("version"));
+        this.version = version;
         this.mcversion = Version.read(json.getString("mcversion"));
 
         if (json.has("urls")) {

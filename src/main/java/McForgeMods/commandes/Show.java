@@ -1,9 +1,6 @@
 package McForgeMods.commandes;
 
-import McForgeMods.ForgeMods;
-import McForgeMods.Gestionnaire;
-import McForgeMods.ModVersion;
-import McForgeMods.VersionIntervalle;
+import McForgeMods.*;
 import McForgeMods.depot.Depot;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
@@ -133,7 +130,7 @@ public class Show implements Runnable {
 
                 System.out.println(modid);
                 for (ModVersion mv : dep.getModVersions(modid)) {
-                    if (mcversion == null || mv.mcversion.equals(mv))
+                    if (mcversion == null || Version.read(mcversion).equals(mv.mcversion))
                         System.out.println(String.format("\t+ %s [%s]", mv.version, mv.mcversion));
                 }
             }
