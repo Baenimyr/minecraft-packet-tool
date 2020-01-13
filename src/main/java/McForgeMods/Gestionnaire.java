@@ -1,11 +1,10 @@
 package McForgeMods;
 
-import McForgeMods.depot.Depot;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
 
+import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -16,13 +15,18 @@ import java.util.Map;
  */
 public class Gestionnaire {
     public final DepotInstallation installation;
-    public final Depot depot;
+    public final DepotLocal depot;
 
     public Gestionnaire(Path instance, Path depot) {
         this.installation = new DepotInstallation(instance);
         this.depot = new DepotLocal(depot);
 
         this.installation.analyseDossier();
+        try {
+            this.depot.importation();
+        } catch (IOException i) {
+            i.printStackTrace();
+        }
     }
 
     /**
@@ -61,27 +65,5 @@ public class Gestionnaire {
             }
         }
         return absents;
-    }
-
-
-    /**
-     * Cherche un dossier <i>.minecraft</i> où est l'installation minecraft de l'utilisateur.
-     */
-    public static Path resolutionDossierMinecraft(Path minecraft) {
-        if (minecraft != null) {
-            return minecraft;
-        } else {
-            Path p = Path.of("").toAbsolutePath();
-            int i;
-            for (i = p.getNameCount() - 1; i >= 0 && !p.getName(i).toString().equals(".minecraft"); i--)
-                ;
-
-            if (i == -1) {
-                p = Paths.get(System.getProperty("user.home")).resolve(".minecraft").toAbsolutePath();
-                if (!p.toFile().exists())
-                    return null;
-            }
-            return p.resolve("mods");
-        }
     }
 }

@@ -5,14 +5,18 @@ import McForgeMods.Gestionnaire;
 import McForgeMods.ModVersion;
 import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.Depot;
+import McForgeMods.depot.DepotInstallation;
+import McForgeMods.depot.DepotLocal;
 import picocli.CommandLine;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.regex.Pattern;
 
-@CommandLine.Command(name = "show", description = "Affichage d'informations", subcommands = {Show.showDependencies.class, Show.Mods.class})
+@CommandLine.Command(name = "show", mixinStandardHelpOptions = true, description = "Affichage d'informations",
+        subcommands = {Show.showDependencies.class, Show.Mods.class})
 public class Show implements Runnable {
     @CommandLine.Spec
     CommandLine.Model.CommandSpec spec;
@@ -45,7 +49,7 @@ public class Show implements Runnable {
 
         @Override
         public Integer call() {
-            Path minecraft = Gestionnaire.resolutionDossierMinecraft(dossiers.minecraft);
+            Path minecraft = DepotInstallation.resolutionDossierMinecraft(dossiers.minecraft);
             if (minecraft == null) {
                 System.out.println("Impossible de trouver un dossier d'installation minecraft.");
                 return 1;
@@ -78,7 +82,7 @@ public class Show implements Runnable {
         }
     }
 
-    @CommandLine.Command(name = "mods", description = "affiche les mods présents")
+    @CommandLine.Command(name = "mods", description = "Affiche les mods présents.")
     static class Mods implements Callable<Integer> {
         @CommandLine.Mixin
         ShowOptions show;
@@ -88,33 +92,49 @@ public class Show implements Runnable {
         @CommandLine.Parameters(arity = "0..1", index = "0", description = "regex pour la recherche")
         String recherche = null;
 
-        @CommandLine.Option(names = {"-i", "--installes"}, defaultValue = "false", description = "restriction aux mods dans le repertoire minecraft")
+        @CommandLine.Option(names = {"-i", "--installes"}, defaultValue = "false",
+                description = "Lecture des mods dans le repertoire minecraft.")
         boolean installes;
 
-        @CommandLine.Option(names = {"--mcversion"}, description = "Limite l'affichage aux mods compatibles avec une version de minecraft.")
+        @CommandLine.Option(names = {"--mcversion"},
+                description = "Limite l'affichage aux mods compatibles avec une version de minecraft.")
         String mcversion;
 
         @Override
         public Integer call() {
-            Path minecraft = Gestionnaire.resolutionDossierMinecraft(dossiers.minecraft);
-            if (minecraft == null) {
-                System.out.println("Impossible de trouver un dossier d'installation minecraft.");
-                return 1;
+            Depot dep;
+            if (installes) {
+                Path minecraft = DepotInstallation.resolutionDossierMinecraft(dossiers.minecraft);
+                if (minecraft == null) {
+                    System.out.println("Impossible de trouver un dossier d'installation minecraft.");
+                    return 1;
+                }
+                DepotInstallation depot = new DepotInstallation(minecraft);
+                System.out.print("Analyse du dossier '" + depot.dossier + "'...\t");
+                depot.analyseDossier();
+                System.out.println(depot.getModids().size() + " mods");
+                dep = depot;
+            } else {
+                try {
+                    DepotLocal depot = new DepotLocal(dossiers.depot);
+                    System.out.print("Analyse du dossier '" + depot.dossier + "'...\t");
+                    depot.importation();
+                    System.out.println(depot.getModids().size() + " mods");
+                    dep = depot;
+                } catch (IOException erreur) {
+                    System.out.println("Erreur de lecture du dépot.");
+                    return 1;
+                }
             }
 
-            System.out.print("Analyse du dossier '" + minecraft + "'...\t");
-            Gestionnaire gest = new Gestionnaire(minecraft);
-            System.out.println(gest.depot.getModids().size() + " mods");
-
             Pattern regex = recherche != null ? Pattern.compile(recherche) : null;
-            Depot dep = installes ? gest.installation : gest.depot;
             for (String modid : dep.getModids()) {
-                if (regex != null && !regex.matcher(modid).find())
-                    continue;
+                if (regex != null && !regex.matcher(modid).find()) continue;
 
                 System.out.println(modid);
                 for (ModVersion mv : dep.getModVersions(modid)) {
-                    System.out.println(String.format("\t+ %s [%s]", mv.version, mv.mcversion));
+                    if (mcversion == null || mv.mcversion.equals(mv))
+                        System.out.println(String.format("\t+ %s [%s]", mv.version, mv.mcversion));
                 }
             }
 
