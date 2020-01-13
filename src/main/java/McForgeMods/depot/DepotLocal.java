@@ -2,13 +2,26 @@ package McForgeMods.depot;
 
 import McForgeMods.Mod;
 import McForgeMods.ModVersion;
-import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
+import org.json.JSONTokener;
 
 import java.io.*;
 import java.nio.file.Path;
 import java.util.*;
 
+/**
+ * <h2>Format du dépot</h2>
+ * - fichier Mods.json: contient la liste des mods disponibles et les informations générales
+ * {
+ * "<i>modid</i>": {
+ * "name": "<i>name</i>",
+ * "description": "<i>description</i>",
+ * "url": "<i>URL</i>",
+ * "updateJSON": "<i>URL</i>", ...
+ * },...
+ * }
+ */
 public class DepotLocal extends Depot {
     public final Path dossier;
     protected final Map<String, Mod> mods = new HashMap<>();
@@ -47,7 +60,7 @@ public class DepotLocal extends Depot {
         }
     }
 
-    private void ajoutModVersion(ModVersion modVersion) {
+    public void ajoutModVersion(ModVersion modVersion) {
         Mod mod = this.ajoutMod(modVersion.mod);
         // TODO: remplacer la valeur de ModVersion::mod, si une autre instance existe.
 
@@ -61,6 +74,59 @@ public class DepotLocal extends Depot {
     }
 
     /**
+     * Importe les informations du dépot à partir du répertoire de sauvegarde.
+     *
+     * @return le nombre de mod différents importés depuis le répertoire de dépot.
+     */
+    public int importation() throws IOException {
+        final File MODS = dossier.resolve("Mods.json").toFile();
+        if (!MODS.exists())
+            return 0;
+
+        int compteur = 0;
+        try (FileInputStream fichier = new FileInputStream(MODS)) {
+            JSONTokener tokener = new JSONTokener(new BufferedInputStream(fichier));
+            JSONObject json = new JSONObject(tokener);
+
+            for (String modid : json.keySet()) {
+                JSONObject data = json.getJSONObject(modid);
+                Mod mod = new Mod(modid, data);
+                this.ajoutMod(mod);
+
+                if (this.importationMod(mod.modid)) compteur++;
+            }
+        }
+        return compteur;
+    }
+
+    private boolean importationMod(String modid) {
+        final File DATA = dossier.resolve(modid).resolve(modid + ".json").toFile();
+        if (!DATA.exists()) {
+            System.err.println("Le fichier '" + DATA.toString() + "' n'existe pas.");
+            return false;
+        }
+
+        try (FileInputStream fichier = new FileInputStream(DATA)) {
+            BufferedReader reader = new BufferedReader(new InputStreamReader(fichier));
+            JSONTokener tokener = new JSONTokener(reader);
+            JSONObject json = new JSONObject(tokener);
+
+            for (String version : json.keySet()) {
+                JSONObject v = json.getJSONObject(version);
+                ModVersion modVersion = new ModVersion(this.getMod(modid), v);
+                this.ajoutModVersion(modVersion);
+            }
+            reader.close();
+        } catch (JSONException j) {
+            System.err.println("Erreur de lecture du json.");
+            return false;
+        } catch (IOException f) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * Enregistre la liste des mods dans le fichier <i>Mods.json</i> à la racine du dépôt.
      * Sauvegarde les informations d'un mod ({@link #sauvegardeMod(String)}) en même temps.
      */
@@ -71,7 +137,7 @@ public class DepotLocal extends Depot {
         try (FileOutputStream fichier = new FileOutputStream(dossier.resolve("Mods.json").toFile())) {
             OutputStreamWriter writer = new OutputStreamWriter(new BufferedOutputStream(fichier));
 
-            JSONArray json = new JSONArray();
+            JSONObject json = new JSONObject();
             List<String> modids = new ArrayList<>(mods.keySet());
             modids.sort(String::compareToIgnoreCase);
 
@@ -79,7 +145,7 @@ public class DepotLocal extends Depot {
                 JSONObject data = new JSONObject();
                 Mod mod = this.mods.get(modid);
                 mod.json(data);
-                json.put(data);
+                json.put(modid, data);
 
                 this.sauvegardeMod(modid);
             }
@@ -107,15 +173,12 @@ public class DepotLocal extends Depot {
             dossier_mod.toFile().mkdirs();
 
         try (FileOutputStream donnees = new FileOutputStream(dossier_mod.resolve(mod.modid + ".json").toFile())) {
-            JSONArray json = new JSONArray();
+            JSONObject json = new JSONObject();
 
-            List<ModVersion> versions = new ArrayList<>(this.mod_version.get(mod));
-            versions.sort(Comparator.comparing(v -> v.version));
-
-            for (ModVersion mv : versions) {
+            for (ModVersion mv : this.mod_version.get(mod)) {
                 JSONObject json_version = new JSONObject();
                 mv.json(json_version);
-                json.put(json_version);
+                json.put(mv.version.toString(), json_version);
             }
 
             OutputStreamWriter writer = new OutputStreamWriter(donnees);

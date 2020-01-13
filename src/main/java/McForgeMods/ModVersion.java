@@ -1,6 +1,5 @@
 package McForgeMods;
 
-import McForgeMods.depot.Depot;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -52,9 +51,8 @@ public class ModVersion {
     /**
      * Constructeur utilisé pour initialisé une version à partir des informations d'un dépot.
      */
-    public ModVersion(Depot depot, JSONObject json) {
-        String modid = json.getString("modid").toLowerCase();
-        this.mod = depot.getMod(modid);
+    public ModVersion(Mod mod, JSONObject json) {
+        this.mod = mod;
         this.version = Version.read(json.getString("version"));
         this.mcversion = Version.read(json.getString("mcversion"));
 
@@ -78,8 +76,6 @@ public class ModVersion {
     }
 
     public void json(JSONObject json) {
-        json.put("modid", this.mod.modid);
-        json.put("version", this.version);
         json.put("mcversion", this.mcversion);
 
         if (this.urls != null)
