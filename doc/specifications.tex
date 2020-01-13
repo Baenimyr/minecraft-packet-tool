@@ -26,6 +26,7 @@ Il faut attendre le lancement du jeu pour ce rendre compte qu'il en manque un, e
 L'objectif est un programme en ligne de commande capable de télécharger n'importe quel mod (suffisamment connu) dans le dossier de son choix en quelques secondes.
 Le système Linux, propose des gestionnaire de paquets capable également de résoudre les dépendances au moment de l'installation, ainsi rien ne manque.
 
+
 \section{Fonctionnalités}
 Les fonctionnalités suivantes sont présentées dans l'ordre de complexité et l'ordre de réalisation.
 
@@ -35,14 +36,6 @@ Ensuite le système peut vérifier l'arbre des dépendances et informer l'utilis
 
 Une fois les informations extraites, le programme peut afficher les informations, afficher l'arbre de dépendance, faire des estimations de ram nécessaire au lancement du jeu.
 MinecraftForge est déjà capable de vérifier les mises à jour et ce programme pourrait également le faire.
-
-\medskip\noindent
-Exemple de commandes:
-\begin{itemize}
-\item \texttt{forgemods check-update}
-\item \texttt{forgemods check-dependencies}
-\item \texttt{forgemods show [mod]}
-\end{itemize}
 
 
 \subsection{Téléchargement des fichiers}
@@ -71,75 +64,70 @@ L'utilisation d'un dossier intermédiaire avec la première lettre du modid perm
 
 \dirtree{%
 .1 /.
-.2 Mods.xz.
+.2 Mods.json.
 .2 pool.
 .3 a.
 .4 aether.
-.5 aether.xz.
+.5 aether.json.
 .5 aether\_legacy-1.12.2-v1.4.4.
 .4 appliedenergistics.
-.5 appliedenergistics.xz.
+.5 appliedenergistics.json.
 .5 Applied-Energistics-2-Mod-1.12.2.
 .5 ...
 .3 c.
 .4 cofhcore.
-.5 cofhcore.xz.
-.3 t.
-.4 thermalexpansion.
-.4 thermaldynamic.
+.5 cofhcore.json.
 }
 
-Mods.xz (\ref{figure:mods.xz}) contient la liste des modid proposés et les informations générales, indépendantes des versions.
+Mods.json (\ref{figure:mods.json}) contient la liste des modid proposés et les informations générales, indépendantes des versions.
 Les champs obligatoires sont \textit{modid} et \textit{name}.
 
-Pour un modid donnée, \textit{modid}.xz (\ref{figure:modid.xz}) contient la liste de toutes les versions connues et leurs informations particulières.
+Pour un modid donnée, \textit{modid}.json (\ref{figure:modid.json}) contient la liste de toutes les versions connues et leurs informations particulières.
 Notamment, pour chaque version si un lien de téléchargement est donné, il peut pointer vers le dépôt lui-même ou un site de téléchargement.
-Il n'y a aucun champs obligatoire.
+Les informations que l'on peut y trouver sont:
+\begin{itemize}
+    \item mcversion: \textbf{obligatoire}
+    \item requiredMods: liste des mods et leurs versions requis pour le bon fonctionnement de celui-ci
+    \item dependencies: liste de mods non obligatoires mais recommandés.
+    \item dependants: liste de mods qui pourrait utiliser celui-ci.
+    \item file: url pour récupérer le fichier
+    \item alias: peut servir à identifier les mods grâce à leur nom de fichier, dans le cas d'un \textit{mcmod.info}.
+\end{itemize}
 
 \begin{figure}
 \centering
 \begin{verbatim}
 [
-    {
-        "modid": <modid>,
+    "<modid>"{
         "name": <name>,
-        "description": <description>
+        "description": <description>,
+        "url": <url>,
         "updateJSON": <url>
     },
-    {
-        "modid": "thermalexpansion",
+    "cofhcore": {
         "name": "Thermal Expansion"
     }
 ]
 \end{verbatim}
-\caption{Fichier Mods.xz}
-\label{figure:mods.xz}
+\caption{Fichier Mods.json}
+\label{figure:mods.json}
 \end{figure}
 
 \begin{figure}
 \begin{verbatim}
 {
-    "<mcversion>": {
-        "<modversion>": {
-            "file": "<file url>",
-            "requiredMods": [],
-            "dependencies": [],
-            "dependants": []
-        }
+    "<modversion>": {
+        "mcversion": <mcversion>
+        "file": "<file url>",
+        "requiredMods": [],
+        "dependencies": [],
+        "dependants": []
     }
 }
 \end{verbatim}
-\caption{Fichier \textit{modid}.xz}
-\label{figure:modid.xz}
+\caption{Fichier \textit{modid}.json}
+\label{figure:modid.json}
 \end{figure}
-
-\medskip\noindent
-\begin{itemize}
-\item \texttt{forgemods install [mod]}: installe un nouveau mod
-\item \texttt{forgemods remove [mod]}: supprime un mod
-\item \texttt{forgemods autoremove}: supprimer les mods installés automatiquement, notamment les librairies inutiles
-\item \texttt{forgemods upgrade [mod] [----all]}: met à jour les mods correspondants à la version minecraft actuelle
-\end{itemize}
 
 
 \subsection{Analyse des demandes pour serveur sous MinecraftForge}
@@ -148,14 +136,39 @@ Avec une adresse de serveur fournies, le programme peut vérifier la disponibili
 
 
 
-\section{Fonctionnement local}
+\section{Fichiers locaux}
 L'instance de jeu utilisée dépend du lieu de lancement du programme ou des options passées en paramètres.
 Par défaut, le programme remonte jusqu'au dossier \textit{.minecraft} le plus proche.
-S'il n'est existe pas parmis les parents, tente d'utiliser le répertoire par défaut: \textit{~/.minecraft} sur Linux, ou \textit{~/AppData/.minecraft} sur windows.
+S'il n'est existe pas parmis les parents, tente d'utiliser le répertoire par défaut: \textit{.minecraft} sur Linux, ou \textit{AppData/.minecraft} sur windows.
 
-Les informations sauvegardées localement comme décris au paragraphe \ref{section:depot_local} sont placées par défaut dans un sous répertoire de \textit{.minecraft}.
+Les informations sauvegardées localement comme décris au paragraphe \ref{section:depot_local} sont placées par défaut dans le répertoire \textit{.minecraft/forgemods}.
 Ce répertoire sert de dépôt local et se présente sous la même forme qu'un dépôt en ligne pour simplifier l'importation des données.
-Les informations du dépôt local sont toujours utilisées en premier, mais peuvent être mise à jour par les autres dépôts connus.
-Si l'utilisateur le permet un dépôt généralisé peut sauvegarder les fichiers originaux qui ont un jour été téléchargés ou détectés pour les mettre à disposition.
+Les informations du dépôt local sont toujours utilisées en premier, mais peuvent être mises à jour par les autres dépôts connus.
+Si l'utilisateur le permet, un dépôt généralisé peut sauvegarder les fichiers originaux qui ont un jour été téléchargés ou détectés pour les mettre à disposition.
+
+
+\section{Commandes}
+Paramètres génériques:
+\begin{itemize}
+    \item \texttt{----minecraft}: dossier d'installation minecraft (\$USER\_HOME/.minecraft)
+    \item \texttt{----depot}: dossier de dépot local (\$USER\_HOME/.minecraft/forgemods)
+\end{itemize}
+
+\medskip
+Description de commandes utiles:
+\begin{itemize}
+    \item \texttt{show mods [regex] [--v] [----all] [----installes]} affiche les mods connus: dans l'installation, et/ou dans le dépot.
+L'option --v permet d'afficher toutes les informations connues (ne pas combiner avec \texttt{----all}).
+    \item \texttt{show dependences [----absents]}: affiche la liste des dépendances pour les mods dans l'installation minecraft, ou seulement les absents.
+    \item \texttt{update}: met à jour le dépot local grâce aux dépots distants.
+    \item \texttt{install modid}: installe un nouveau mod grâce aux informations dans le dépot local.
+    \item \texttt{uninstall modid}: désinstalle un mod. Ne fait pas la différence entre les mods installés manuellement et les installations automatiques.
+    \item \texttt{depot import [modid] [----all]}: importe les informations extraites des mods dans l'installation vers le dépot local.
+Necessite une installation minecraft.
+    \item \texttt{depot udpate}: similaire à \texttt{update}
+    \item \texttt{depot get modid[@version] cle}: affiche la valeur d'une information dans le système de dépot local.
+    \item \texttt{depot set modid[@version] cle valeur}: modifie les informations dans le dépot local. Si la version n'est pas spécifiée, les clés sont limités aux données globales du mod.
+\end{itemize}
+
 
 \end{document}
