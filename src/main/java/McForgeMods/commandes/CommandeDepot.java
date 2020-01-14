@@ -33,14 +33,41 @@ public class CommandeDepot implements Runnable {
 		throw new CommandLine.ParameterException(spec.commandLine(), "Missing required subcommand");
 	}
 	
+	@CommandLine.Command(name = "refresh", description = "Importe est sauvegarde le dépot.\nPermet de détecter des "
+			+ "erreurs. En cas d'erreur ne sauvegarde pas les informations corrompues.")
+	public int refresh(@CommandLine.Mixin ForgeMods.DossiersOptions dossiers,
+			@CommandLine.Option(names = {"-f", "--force"}, defaultValue = "false",
+					description = "Force la sauvegarde du dépot, même après des erreurs lors de l'importation.")
+					boolean force) {
+		DepotLocal depot = new DepotLocal(dossiers.depot);
+		try {
+			depot.importation();
+		} catch (IOException i) {
+			System.err.println("Erreur de lecture du dépot: " + i.getMessage());
+			
+			if (!force) return 1;
+		}
+		
+		System.out.println("Dépot importé.");
+		
+		try {
+			depot.sauvegarde();
+		} catch (IOException i) {
+			System.err.println("Erreur d'écriture du dépot: " + i.getMessage());
+			return 1;
+		}
+		
+		System.out.println("Dépot sauvegardé.");
+		return 0;
+	}
+	
 	@CommandLine.Command(name = "import",
 			description = "Permet d'importer des informations présentes dans les fichiers mcmod.info des archives jar. "
 					+ "Utilise un dépot minecraft comme source des jars.")
 	public int importation(@CommandLine.Parameters(index = "0", arity = "0..*", paramLabel = "modid",
 			description = "Liste de mod spécifiques à importer (modid).") String[] modids,
 			@CommandLine.Option(names = {"-a", "--all"}, description = "Importe tout") boolean all,
-			@CommandLine.Mixin ForgeMods.DossiersOptions dossiers,
-			@CommandLine.Option(names = {"--help"}, usageHelp = true) boolean help) {
+			@CommandLine.Mixin ForgeMods.DossiersOptions dossiers) {
 		Path minecraft = DepotInstallation.resolutionDossierMinecraft(dossiers.minecraft);
 		if (minecraft == null) {
 			System.out.println("Impossible de trouver un dossier d'installation minecraft.");
