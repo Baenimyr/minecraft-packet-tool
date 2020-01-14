@@ -8,12 +8,13 @@ public class VersionIntervalle {
 
     public VersionIntervalle() {
         this(null, null);
-        this.inclut_min = this.inclut_max = true;
     }
 
     public VersionIntervalle(Version minimum, Version maximum) {
         this.minimum = minimum;
         this.maximum = maximum;
+        this.inclut_min = true;
+        this.inclut_max = false;
     }
 
     /**
@@ -21,8 +22,12 @@ public class VersionIntervalle {
      * Par exemple la présence d'un mod déjà installé, contraint la résolution de version à celle disponible.
      */
     public VersionIntervalle(Version version) {
-        this.minimum = this.maximum = version;
-        this.inclut_min = this.inclut_max = true;
+        this.minimum = version;
+        this.maximum = new Version(version);
+        int p = precision(this.maximum);
+        this.maximum.set(p, this.maximum.get(p) + 1);
+        this.inclut_min = true;
+        this.inclut_max = false;
     }
 
     public static VersionIntervalle read(String contraintes) throws VersionIntervalleFormatException {
@@ -30,7 +35,7 @@ public class VersionIntervalle {
 
         int pos = 0;
         if (!Character.isDigit(pos)) {
-            d.inclut_min = contraintes.charAt(pos) == '[';
+            d.inclut_min = contraintes.charAt(pos) != '(';
             pos++;
         }
 
@@ -88,6 +93,18 @@ public class VersionIntervalle {
     public boolean correspond(Version version) {
         return (minimum == null || version.compareTo(minimum) >= (inclut_min ? 0 : 1))
                 && (maximum == null || version.compareTo(maximum) <= (inclut_max ? 0 : -1));
+    }
+
+    /** Par construction, tous les champs de sous-version sont remplis par 0.
+     * Tous les champs sont utilisés pour l'égalité et la comparaison de Version, cependant dans le cas d'une intervalle,
+     * il est interressant de laisser une certaine souplesse sur les derniers champs nuls.
+     * @return l'index de la dernière sous-version non nulle. */
+    public static int precision(Version version) {
+        for (int i = version.size() - 1; i >= 0; i--) {
+            if (version.get(i) != 0)
+                return i;
+        }
+        return 0;
     }
 
     @Override

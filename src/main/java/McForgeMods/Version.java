@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
  * @since 2020-01-10
  */
 public class Version implements Comparable<Version> {
-    private static final Pattern version = Pattern.compile("^(?<major>\\p{Digit}+)\\.(?<medium>\\p{Digit}+)(\\.(?<minor>\\p{Digit}+)(\\.(?<patch>\\p{Digit}+))?)?");
+    private static final Pattern version = Pattern.compile("^(?<major>\\p{Digit}+)(\\.(?<medium>\\p{Digit}+)(\\.(?<minor>\\p{Digit}+)(\\.(?<patch>\\p{Digit}+))?)?)?");
     /**
      * major, medium, minor, patch
      */
@@ -34,15 +34,29 @@ public class Version implements Comparable<Version> {
         System.arraycopy(v.versions, 0, this.versions, 0, 4);
     }
 
+    public int size() {
+        return 4;
+    }
+
+    public int get(int index) {
+        return this.versions[index];
+    }
+
+    /** À utiliser avec prudence */
+    public void set(int index, int valeur) {
+        this.versions[index] = valeur;
+    }
+
     public static Version read(String version) throws IllegalArgumentException {
         final int[] versions = new int[]{0, 0, 0, 0};
         Matcher m = Version.version.matcher(version);
         if (m.find()) {
             versions[0] = Integer.parseInt(m.group("major"));
-            versions[1] = Integer.parseInt(m.group("medium"));
 
+            String medium = m.group("medium");
             String minor = m.group("minor");
             String patch = m.group("patch");
+            versions[1] = medium != null ? Integer.parseInt(medium) : 0;
             versions[2] = minor != null ? Integer.parseInt(minor) : 0;
             versions[3] = patch != null ? Integer.parseInt(patch) : 0;
 
