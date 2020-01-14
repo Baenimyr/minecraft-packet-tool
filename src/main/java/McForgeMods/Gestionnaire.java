@@ -56,13 +56,20 @@ public class Gestionnaire {
         return this.depot.listeDependances(versions);
     }
 
+    /**
+     * Fait la liste des versions absentes.
+     * Parmis les dépendances fournies par {@link #listeDependances()}, cherche dans le dépot d'installation, si une
+     * version compatible existe.
+     * !!! Ne compare pas les versions minecraft, un interval ouvert sur la droite est une mauvaise idée.
+     *
+     * @return une map modid -> version demandée.
+     */
     public Map<String, VersionIntervalle> dependancesAbsentes() {
         final Map<String, VersionIntervalle> absents = new HashMap<>();
         for (Map.Entry<String, VersionIntervalle> dep : this.listeDependances().entrySet()) {
-            if (this.installation.getModids().contains(dep.getKey())) {
-                if (this.installation.getModVersions(dep.getKey()).stream().noneMatch(m -> dep.getValue().correspond(m.version)))
-                    absents.put(dep.getKey(), dep.getValue());
-            }
+            if (!this.installation.getModids().contains(dep.getKey()) || this.installation.getModVersions(dep.getKey())
+                    .stream().noneMatch(m -> dep.getValue().correspond(m.version)))
+                absents.put(dep.getKey(), dep.getValue());
         }
         return absents;
     }

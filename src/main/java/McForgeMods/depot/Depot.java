@@ -38,6 +38,14 @@ public class Depot {
     }
 
     /**
+     * Cherche une version particulière d'un mod.
+     */
+    public Optional<ModVersion> getModVersion(Mod mod, Version version) {
+        return this.mod_version.containsKey(mod) ? this.mod_version.get(mod).stream()
+                .filter(mv -> mv.version.equals(version)).findAny() : Optional.empty();
+    }
+
+    /**
      * @param mcversion version de minecraft précise.
      * @return la derniere version d'un mod pour une version de minecraft précise.
      */
@@ -92,15 +100,19 @@ public class Depot {
      */
     public HashMap<String, VersionIntervalle> listeDependances(Collection<ModVersion> liste) {
         final HashMap<String, VersionIntervalle> requis = new HashMap<>();
+        requis.put("minecraft", new VersionIntervalle());
 
         final LinkedList<ModVersion> temp = new LinkedList<>(liste);
         while (!temp.isEmpty()) {
             ModVersion mver = temp.removeFirst();
+            Optional<ModVersion> local = this.getModVersion(mver.mod, mver.version);
+            mver = local.orElse(mver);
+
+            requis.get("minecraft").fusion(new VersionIntervalle(mver.mcversion));
             for (Map.Entry<String, VersionIntervalle> depend : mver.requiredMods.entrySet()) {
                 String modid_d = depend.getKey();
                 VersionIntervalle version_d = depend.getValue();
-                if (requis.containsKey(modid_d))
-                    requis.get(modid_d).fusion(version_d);
+                if (requis.containsKey(modid_d)) requis.get(modid_d).fusion(version_d);
                 else {
                     requis.put(modid_d, version_d);
 
@@ -108,8 +120,8 @@ public class Depot {
                         List<ModVersion> versions = new ArrayList<>(this.getModVersions(modid_d));
                         versions.sort(Comparator.comparing(v -> v.version));
                         for (ModVersion candidat : this.getModVersions(modid_d)) {
-                            if (mver.mcversion.equals(candidat.mcversion) &&
-                                    (!requis.containsKey(modid_d) || requis.get(modid_d).correspond(candidat.version))) {
+                            if (mver.mcversion.equals(candidat.mcversion) && (!requis.containsKey(modid_d) || requis
+                                    .get(modid_d).correspond(candidat.version))) {
                                 temp.add(candidat);
                                 break;
                             }
