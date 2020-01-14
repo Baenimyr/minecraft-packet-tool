@@ -8,6 +8,8 @@ import picocli.CommandLine;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.regex.Pattern;
@@ -56,24 +58,22 @@ public class Show implements Runnable {
             Gestionnaire gest = new Gestionnaire(minecraft);
             System.out.println(gest.installation.getModids().size() + " mods");
 
+            Map<String, VersionIntervalle> liste;
             if (show.all) {
-                Map<String, VersionIntervalle> liste = gest.listeDependances();
+                liste = gest.listeDependances();
                 System.out.println(String.format("%d dépendances", liste.size()));
-                for (Map.Entry<String, VersionIntervalle> dep : liste.entrySet()) {
-                    System.out.println(dep.getKey() + " " + dep.getValue());
-                }
             } else if (missing) {
-                Map<String, VersionIntervalle> liste = gest.dependancesAbsentes();
+                liste = gest.dependancesAbsentes();
                 System.out.println(String.format("%d absents", liste.size()));
-                for (Map.Entry<String, VersionIntervalle> dep : liste.entrySet()) {
-                    System.out.println(dep.getKey() + " " + dep.getValue());
-                }
             } else {
-                Map<String, VersionIntervalle> liste = gest.listeDependances();
+                liste = gest.listeDependances();
                 System.out.println(String.format("%d dépendances", liste.size()));
-                for (Map.Entry<String, VersionIntervalle> dep : liste.entrySet()) {
-                    System.out.println(dep.getKey() + " " + dep.getValue());
-                }
+            }
+
+            ArrayList<String> modids = new ArrayList<>(liste.keySet());
+            modids.sort(String::compareTo);
+            for (String dep : modids) {
+                System.out.println(dep + " " + liste.get(dep));
             }
             return 0;
         }
@@ -125,7 +125,9 @@ public class Show implements Runnable {
             }
 
             Pattern regex = recherche != null ? Pattern.compile(recherche) : null;
-            for (String modid : dep.getModids()) {
+            List<String> modids = new ArrayList<>(dep.getModids());
+            modids.sort(String::compareTo);
+            for (String modid : modids) {
                 if (regex != null && !regex.matcher(modid).find()) continue;
 
                 System.out.println(modid);
