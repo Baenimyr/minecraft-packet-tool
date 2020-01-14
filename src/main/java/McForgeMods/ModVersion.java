@@ -32,7 +32,8 @@ public class ModVersion {
 	 * Mods, si présents, à charger avant celui-ci.
 	 * Aucune intervalle de version n'est nécessaire.
 	 */
-	public final List<String>                   dependants   = new ArrayList<>();
+	public final List<String>                   dependants   = new ArrayList<>(0);
+	public final List<String>                   alias        = new ArrayList<>(0);
 
     /*
     List<String> authorList;
@@ -92,6 +93,12 @@ public class ModVersion {
 				this.ajoutDependant(liste.getString(i));
 			}
 		}
+		
+		if (json.has("alias")) {
+			JSONArray liste = json.getJSONArray("alias");
+			for (int i = 0; i < liste.length(); i++)
+				this.ajoutAlias(liste.getString(i));
+		}
 	}
 	
 	/**
@@ -123,6 +130,10 @@ public class ModVersion {
 		if (!this.dependants.contains(modid)) this.dependants.add(modid);
 	}
 	
+	public void ajoutAlias(String alias) {
+		if (!this.alias.contains(alias)) this.alias.add(alias);
+	}
+	
 	/**
 	 * Écrit le contenu du json associé à cette version.
 	 *
@@ -131,6 +142,7 @@ public class ModVersion {
 	public void json(JSONObject json) {
 		this.urls.sort(Comparator.comparing(URL::toString));
 		this.dependants.sort(String::compareTo);
+		this.alias.sort(String::compareTo);
 		
 		json.put("mcversion", this.mcversion);
 		json.put("urls", new JSONArray(this.urls));
@@ -139,21 +151,21 @@ public class ModVersion {
 		this.requiredMods.keySet().stream().sorted().forEach(id -> liste.put(id + "@" + this.requiredMods.get(id)));
 		json.put("requiredMods", liste);
 		
-		if (!this.dependants.isEmpty()) {
-			JSONArray dep = new JSONArray(this.dependants);
-			json.put("dependants", dep);
-		}
+		json.put("dependants", new JSONArray(this.dependants));
+		json.put("alias", new JSONArray(this.alias));
 	}
 	
 	/**
 	 * Importe les nouvelles données à partir d'une instance similaire.
 	 */
 	public void fusion(ModVersion autre) {
-		this.requiredMods.putAll(autre.requiredMods);
+		autre.requiredMods.forEach(this::ajoutModRequis);
 		for (URL url : autre.urls)
 			this.ajoutURL(url);
 		for (String dep : autre.dependants)
 			this.ajoutDependant(dep);
+		for (String alias : autre.alias)
+			this.ajoutAlias(alias);
 	}
 	
 	@Override

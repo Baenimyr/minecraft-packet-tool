@@ -88,9 +88,10 @@ public class Depot {
 
         Collection<ModVersion> liste = this.mod_version.get(mod);
         Optional<ModVersion> present = liste.stream().filter(m -> m.version.equals(modVersion.version)).findFirst();
-        if (present.isPresent())
+        if (present.isPresent()) {
+            present.get().fusion(modVersion);
             return present.get();
-        else {
+        } else {
             // Copie de l'instance pour éviter les modifications partagées entre dépots.
             ModVersion nouveau = new ModVersion(this.ajoutMod(modVersion.mod), modVersion.version, modVersion.mcversion);
             nouveau.fusion(modVersion);
