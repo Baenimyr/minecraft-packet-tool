@@ -84,6 +84,9 @@ public class CommandeDepot implements Runnable {
 			return 1;
 		}
 		
+		System.out.println(
+				String.format("%d mods chargés depuis '%s'.", installation.getModids().size(), installation.dossier));
+		
 		Collection<ModVersion> importation = new ArrayList<>();
 		if (all) {
 			for (String modid : installation.getModids()) {

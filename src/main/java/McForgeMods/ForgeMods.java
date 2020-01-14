@@ -34,10 +34,12 @@ public class ForgeMods implements Runnable {
 		 */
 		@CommandLine.Option(names = {"-m", "--minecraft"}, description = "Dossier minecraft (~/.minecraft)")
 		public Path minecraft;
+		
+		@CommandLine.Option(names = {"--help"}, usageHelp = true)
+		boolean help;
 	}
 	
-	@CommandLine.Command(name = "install", mixinStandardHelpOptions = true,
-			description = "Installe un mod et ses dépendances")
+	@CommandLine.Command(name = "install", description = "Installe un mod et ses dépendances")
 	public int installation(@CommandLine.Mixin DossiersOptions dossiers,
 			@CommandLine.Parameters(arity = "0..*", description = "Liste d'identifiants") String[] modid,
 			@CommandLine.Option(names = {"--dependences"}, negatable = true,
