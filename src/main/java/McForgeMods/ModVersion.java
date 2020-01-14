@@ -111,6 +111,17 @@ public class ModVersion {
         }
     }
 
+    public void fusion(ModVersion autre) {
+        for (URL url : autre.urls)
+            if (!this.urls.contains(url))
+                this.urls.add(url);
+
+        this.requiredMods.putAll(autre.requiredMods);
+        for (String dep : autre.dependants)
+            if (!this.dependants.contains(dep))
+                this.dependants.add(dep);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

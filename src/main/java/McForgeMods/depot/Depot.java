@@ -67,8 +67,9 @@ public class Depot {
             present.fusion(mod);
             return present;
         } else {
-            this.mods.put(mod.modid, mod);
-            return mod;
+            final Mod copie = mod.copy();
+            this.mods.put(mod.modid, copie);
+            return copie;
         }
     }
 
@@ -77,7 +78,7 @@ public class Depot {
      * De préférence, l'instance de mod utilisée à {@link ModVersion#mod} doit correspondre à celle renvoyée par
      * {@link #ajoutMod(Mod)}.
      */
-    public void ajoutModVersion(ModVersion modVersion) {
+    public ModVersion ajoutModVersion(final ModVersion modVersion) {
         Mod mod = this.ajoutMod(modVersion.mod);
         // TODO: remplacer la valeur de ModVersion::mod, si une autre instance existe.
 
@@ -86,7 +87,16 @@ public class Depot {
         }
 
         Collection<ModVersion> liste = this.mod_version.get(mod);
-        if (!liste.contains(modVersion)) liste.add(modVersion);
+        Optional<ModVersion> present = liste.stream().filter(m -> m.version.equals(modVersion.version)).findFirst();
+        if (present.isPresent())
+            return present.get();
+        else {
+            // Copie de l'instance pour éviter les modifications partagées entre dépots.
+            ModVersion nouveau = new ModVersion(this.ajoutMod(modVersion.mod), modVersion.version, modVersion.mcversion);
+            nouveau.fusion(modVersion);
+            liste.add(nouveau);
+            return nouveau;
+        }
     }
 
     /**

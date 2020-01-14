@@ -81,4 +81,12 @@ public class Mod {
                 ", description='" + description + '\'' +
                 '}';
     }
+    
+    public Mod copy() {
+        Mod copie = new Mod(this.modid, this.name);
+        copie.url = this.url;
+        copie.description = this.description;
+        copie.updateJSON = this.updateJSON;
+        return copie;
+    }
 }
