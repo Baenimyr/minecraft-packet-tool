@@ -74,8 +74,6 @@ public class CommandeDepot implements Runnable {
 			return 1;
 		}
 		
-		DepotInstallation installation = new DepotInstallation(minecraft);
-		installation.analyseDossier();
 		DepotLocal depot = new DepotLocal(dossiers.depot);
 		try {
 			depot.importation();
@@ -83,6 +81,8 @@ public class CommandeDepot implements Runnable {
 			System.err.println("Erreur de lecture des informations du dépot.");
 			return 1;
 		}
+		DepotInstallation installation = new DepotInstallation(minecraft);
+		installation.analyseDossier(depot);
 		
 		System.out.println(
 				String.format("%d mods chargés depuis '%s'.", installation.getModids().size(), installation.dossier));

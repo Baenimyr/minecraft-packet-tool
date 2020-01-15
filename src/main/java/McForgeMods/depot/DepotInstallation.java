@@ -58,7 +58,7 @@ public class DepotInstallation extends Depot {
 	 * @return {@code true} si réussite: il s'agit bien d'un mod Minecraft Forge
 	 * @see <a href="https://mcforge.readthedocs.io/en/latest/gettingstarted/structuring/">Fichier mcmod.info</a>
 	 */
-	public boolean importationJar(File fichier) throws IOException, JSONException, IllegalArgumentException {
+	public boolean importationJar(File fichier) throws IOException {
 		try (ZipFile zip = new ZipFile(fichier)) {
 			ZipEntry mcmod = zip.getEntry("mcmod.info");
 			if (mcmod == null) return false;
@@ -108,8 +108,11 @@ public class DepotInstallation extends Depot {
 			modVersion.ajoutAlias(fichier.getName());
 			this.ajoutModVersion(modVersion);
 			this.correspondances.put(fichier, modVersion);
+			return true;
+		} catch (JSONException | IllegalArgumentException ignored) {
+			// System.err.println("[DEBUG] [importation] '" + fichier.getName() + "':\t" + ignored.getMessage());
 		}
-		return true;
+		return false;
 	}
 	
 	static Map<String, VersionIntervalle> lectureDependances(Iterable<Object> entree) throws IllegalFormatException {
@@ -158,7 +161,7 @@ public class DepotInstallation extends Depot {
 	 * Pour chaque fichier jar trouvé, tente d'importer les informations.
 	 * Le moindre échec invalide l'importation.
 	 */
-	public void analyseDossier() {
+	public void analyseDossier(Depot infos) {
 		Queue<File> dossiers = new LinkedList<>();
 		dossiers.add(dossier.toFile().getAbsoluteFile());
 		
@@ -167,15 +170,27 @@ public class DepotInstallation extends Depot {
 			File[] fichiers = doss.listFiles();
 			if (fichiers != null) for (File f : fichiers) {
 				if (f.isHidden()) continue;
-				else if (f.isDirectory()) dossiers.add(f);
+				else if (f.isDirectory() && !f.getName().equals("memory_repo")) dossiers.add(f);
 				else if (f.getName().endsWith(".jar")) {
 					try {
 						boolean succes = importationJar(f);
-					} catch (IllegalArgumentException | JSONException ignored) {
+						if (succes) continue;
+						if (infos != null) {
+							Optional<ModVersion> version_alias = infos.rechercheAlias(f.getName());
+							if (version_alias.isPresent()) {
+								// Ajout d'une version sans informations supplémentaires.
+								ModVersion local = this.ajoutModVersion(
+										new ModVersion(version_alias.get().mod, version_alias.get().version,
+												version_alias.get().mcversion));
+								this.correspondances.put(f, local);
+								continue;
+							}
+						}
+						System.err.println("Fichier jar incompatible: " + f.getName());
 					} catch (IOException i) {
-						System.err.println("Erreur sur '" + f.getName() + '\'');
-						i.printStackTrace();
-					} this.correspondances.putIfAbsent(f, null);
+						System.err.println("Erreur sur '" + f.getName() + "': " + i.getMessage());
+					}
+					this.correspondances.putIfAbsent(f, null);
 				}
 			}
 		}

@@ -21,12 +21,12 @@ public class Gestionnaire {
         this.installation = new DepotInstallation(instance);
         this.depot = new DepotLocal(depot);
 
-        this.installation.analyseDossier();
         try {
             this.depot.importation();
         } catch (IOException i) {
             i.printStackTrace();
         }
+        this.installation.analyseDossier(this.depot);
     }
 
     /**

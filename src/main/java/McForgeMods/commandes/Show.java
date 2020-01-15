@@ -97,18 +97,23 @@ public class Show implements Runnable {
 		
 		@Override
 		public Integer call() {
+			DepotLocal local;
 			Depot dep;
+			Pattern regex = recherche != null ? Pattern.compile(recherche) : null;
+			
+			try {
+				local = new DepotLocal(dossiers.depot);
+				local.importation();
+				System.out.print("Analyse du dossier '" + local.dossier + "'...\t");
+				System.out.println(local.getModids().size() + " mods");
+			} catch (IOException erreur) {
+				System.out.println("Erreur de lecture du dépot.");
+				local = null;
+			}
+			
 			if (all) {
-				try {
-					DepotLocal depot = new DepotLocal(dossiers.depot);
-					System.out.print("Analyse du dossier '" + depot.dossier + "'...\t");
-					depot.importation();
-					System.out.println(depot.getModids().size() + " mods");
-					dep = depot;
-				} catch (IOException erreur) {
-					System.out.println("Erreur de lecture du dépot.");
-					return 1;
-				}
+				if (local == null) return 1;
+				dep = local;
 			} else {
 				Path minecraft = DepotInstallation.resolutionDossierMinecraft(dossiers.minecraft);
 				if (minecraft == null) {
@@ -116,13 +121,13 @@ public class Show implements Runnable {
 					return 1;
 				}
 				DepotInstallation depot = new DepotInstallation(minecraft);
+				depot.analyseDossier(local);
 				System.out.print("Analyse du dossier '" + depot.dossier + "'...\t");
-				depot.analyseDossier();
 				System.out.println(depot.getModids().size() + " mods");
 				dep = depot;
 			}
 			
-			Pattern regex = recherche != null ? Pattern.compile(recherche) : null;
+			
 			List<String> modids = new ArrayList<>(dep.getModids());
 			modids.sort(String::compareTo);
 			for (String modid : modids) {

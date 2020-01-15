@@ -54,6 +54,26 @@ public class Depot {
                 .filter(m -> m.mcversion.equals(mcversion)).max(Comparator.comparing(v -> v.version)) : Optional
                 .empty();
     }
+    
+    public Optional<ModVersion> rechercheAlias(String nom) {
+        int i = nom.indexOf('-');
+        if (i > 0) {
+            String test = nom.substring(0, i).toLowerCase();
+            if (this.getModids().contains(test)) {
+                for (ModVersion version : this.getModVersions(test)) {
+                    if (version.alias.contains(nom))
+                        return Optional.of(version);
+                }
+            }
+        }
+        
+        for (String modid : this.getModids()) {
+            for (ModVersion version : this.getModVersions(modid))
+                if (version.alias.contains(nom))
+                    return Optional.of(version);
+        }
+        return Optional.empty();
+    }
 
     /**
      * Enregistre un nouveau mod dans le dépot.
