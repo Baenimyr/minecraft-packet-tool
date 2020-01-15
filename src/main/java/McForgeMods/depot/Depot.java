@@ -163,4 +163,16 @@ public class Depot {
         }
         return requis;
     }
+    
+    /**
+     * @return le nombre de versions connues par ce dépot.
+     */
+    public int sizeModVersion() {
+        return this.mod_version.values().stream().mapToInt(Set::size).sum();
+    }
+    
+    public void clear() {
+        this.mod_version.clear();
+        this.mods.clear();
+    }
 }
