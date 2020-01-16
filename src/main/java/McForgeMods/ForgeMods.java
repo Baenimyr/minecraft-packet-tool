@@ -2,9 +2,8 @@ package McForgeMods;
 
 import McForgeMods.commandes.CommandeDepot;
 import McForgeMods.commandes.Show;
+import McForgeMods.outils.Dossiers;
 import picocli.CommandLine;
-
-import java.nio.file.Path;
 
 @CommandLine.Command(name = "forgemods", showDefaultValues = true, mixinStandardHelpOptions = true,
 		subcommands = {Show.class, CommandeDepot.class})
@@ -18,35 +17,19 @@ public class ForgeMods implements Runnable {
 		throw new CommandLine.ParameterException(spec.commandLine(), "Missing required subcommand");
 	}
 	
-	
-	/**
-	 * Options commune aux fonctions utilisant un dépot et une installation minecraft.
-	 */
-	public static class DossiersOptions {
-		/**
-		 * Spécifie le dossier de dépot à utiliser.
-		 */
-		@CommandLine.Option(names = {"-d", "--depot"}, description = "Dépot local à utiliser")
-		public Path depot = Path.of(System.getProperty("user.home")).resolve(".minecraft/forgemods");
-		
-		/**
-		 * Spécifie l'installation minecraft à utiliser. Il peut en exister d'autres de ~/.minecraft.
-		 */
-		@CommandLine.Option(names = {"-m", "--minecraft"}, description = "Dossier minecraft (~/.minecraft)")
-		public Path minecraft;
-		
+	public static class Help {
 		@CommandLine.Option(names = {"--help"}, usageHelp = true)
 		boolean help;
 	}
 	
 	@CommandLine.Command(name = "install", description = "Installe un mod et ses dépendances")
-	public int installation(@CommandLine.Mixin DossiersOptions dossiers,
-			@CommandLine.Parameters(arity = "0..*", description = "Liste d'identifiants") String[] modid,
+	public int installation(@CommandLine.Mixin Dossiers.DossiersOptions dossiers, @CommandLine.Mixin Help help,
+			@CommandLine.Parameters(arity = "0..*", description = "Liste d'identifiants") String[] modids,
 			@CommandLine.Option(names = {"--dependences"}, negatable = true,
 					description = "Installe tous les autres mods nécessaires au bon fonctionnement de l'installation.")
 					boolean dependances) {
 		
-		System.err.println("Cette fonction n'est pas prête");
+		
 		return 1;
 	}
 	

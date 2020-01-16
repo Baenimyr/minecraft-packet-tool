@@ -3,6 +3,7 @@ package McForgeMods.depot;
 import McForgeMods.Mod;
 import McForgeMods.ModVersion;
 import McForgeMods.Version;
+import McForgeMods.outils.Dossiers;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
@@ -39,29 +40,20 @@ import java.util.List;
  * @see ModVersion
  */
 public class DepotLocal extends Depot {
-	static final String FICHIER_PRINCIPAL = "Mods.json";
 	
 	public final Path dossier;
 	
 	public DepotLocal(Path dossier) {
-		this.dossier = dossier;
-	}
-	
-	private Path pathMods() {
-		return this.dossier.resolve(FICHIER_PRINCIPAL);
-	}
-	
-	private Path pathMod(String modid) {
-		return this.dossier.resolve(modid.substring(0, 1)).resolve(modid).resolve(modid + ".json");
+		this.dossier = Dossiers.dossierDepot(dossier);
 	}
 	
 	/**
 	 * Importe les informations du dépot à partir du répertoire de sauvegarde.
 	 */
 	public void importation() throws IOException {
-		final File MODS = pathMods().toFile();
+		final File MODS = Dossiers.fichierIndexDepot(this.dossier).toFile();
 		if (!MODS.exists()) {
-			System.err.println("Absence du fichier principal: '" + FICHIER_PRINCIPAL + "'");
+			System.err.println("Absence du fichier principal: 'Mods.json'");
 			return;
 		}
 		
@@ -91,19 +83,12 @@ public class DepotLocal extends Depot {
 	}
 	
 	private void importationMod(final String modid) {
-		final File DATA = pathMod(modid).toFile();
-		if (!DATA.exists()) {
-			System.err.println("Le fichier '" + DATA.toString() + "' n'existe pas.");
-			return;
-		}
-		
-		try (FileInputStream fichier = new FileInputStream(DATA)) {
+		try (InputStream fichier = Dossiers.fichierModDepot(this.dossier.toUri().toURL(), modid).openStream()) {
 			lectureFichierMod(modid, fichier);
-		} catch (JSONException j) {
-			System.err.println("Erreur de lecture du json '" + DATA.toString() + "': " + j.getMessage());
-			return;
-		} catch (IOException f) {
-			return;
+		} catch (FileNotFoundException f) {
+			System.err.println("Le fichier de données pour '" + modid + "' n'existe pas.");
+		} catch (IOException | JSONException f) {
+			System.err.println("Erreur de lecture des informations de '" + modid + "': " + f.getMessage());
 		}
 	}
 	
@@ -130,7 +115,7 @@ public class DepotLocal extends Depot {
 	public void sauvegarde() throws IOException {
 		if (!this.dossier.toFile().exists()) this.dossier.toFile().mkdirs();
 		
-		try (FileOutputStream fichier = new FileOutputStream(dossier.resolve(FICHIER_PRINCIPAL).toFile())) {
+		try (FileOutputStream fichier = new FileOutputStream(Dossiers.fichierIndexDepot(this.dossier).toFile())) {
 			OutputStreamWriter writer = new OutputStreamWriter(new BufferedOutputStream(fichier));
 			
 			JSONObject json = new JSONObject();
@@ -162,7 +147,7 @@ public class DepotLocal extends Depot {
 		final Mod mod = this.getMod(modid);
 		if (!this.mod_version.containsKey(mod)) return;
 		
-		Path dossier_mod = this.dossier.resolve(mod.modid.substring(0, 1)).resolve(mod.modid);
+		Path dossier_mod = Path.of(Dossiers.fichierModDepot(this.dossier.toUri().toURL(), modid).getPath());
 		if (!dossier_mod.toFile().exists()) dossier_mod.toFile().mkdirs();
 		
 		try (FileOutputStream donnees = new FileOutputStream(dossier_mod.resolve(mod.modid + ".json").toFile())) {
@@ -191,13 +176,13 @@ public class DepotLocal extends Depot {
 	 * @throws IOException           à la moindre erreur de lecture des flux réseau.
 	 */
 	void synchronisationDepot(URL depot_url) throws MalformedURLException, IOException {
-		URL url_mods = new URL(depot_url, "Mods.json");
+		URL url_mods = Dossiers.fichierIndexDepot(depot_url);
 		try (InputStream is = url_mods.openStream()) {
 			this.lectureFichierIndex(new BufferedInputStream(is));
 		}
 		
 		for (String modid : this.getModids()) {
-			URL url_modid = new URL(depot_url, modid.substring(0, 1) + "/" + modid + "/" + modid + ".json");
+			URL url_modid = Dossiers.fichierModDepot(depot_url, modid);
 			try (InputStream is = url_modid.openStream()) {
 				this.lectureFichierMod(modid, is);
 			} catch (FileNotFoundException f) {

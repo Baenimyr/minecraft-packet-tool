@@ -4,10 +4,10 @@ import McForgeMods.*;
 import McForgeMods.depot.Depot;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
+import McForgeMods.outils.Dossiers;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -17,8 +17,8 @@ import java.util.regex.Pattern;
 @CommandLine.Command(name = "show", description = "Affichage d'informations",
 		subcommands = {Show.showDependencies.class, Show.Mods.class})
 public class Show implements Runnable {
-	@CommandLine.Option(names = {"--help"}, usageHelp = true)
-	boolean help;
+	@CommandLine.Mixin
+	ForgeMods.Help help;
 	
 	@CommandLine.Spec
 	CommandLine.Model.CommandSpec spec;
@@ -39,24 +39,18 @@ public class Show implements Runnable {
 	@CommandLine.Command(name = "dependencies")
 	static class showDependencies implements Callable<Integer> {
 		@CommandLine.Mixin
-		ShowOptions               show;
+		ForgeMods.Help help;
 		@CommandLine.Mixin
-		ForgeMods.DossiersOptions dossiers;
+		ShowOptions              show;
+		@CommandLine.Mixin
+		Dossiers.DossiersOptions dossiers;
 		
 		@CommandLine.Option(names = {"--absents"}, description = "Affiche les dépendances manquantes.")
 		boolean missing = false;
 		
 		@Override
 		public Integer call() {
-			Path minecraft = DepotInstallation.resolutionDossierMinecraft(dossiers.minecraft);
-			if (minecraft == null) {
-				System.out.println("Impossible de trouver un dossier d'installation minecraft.");
-				return 1;
-			}
-			
-			System.out.print("Analyse du dossier '" + minecraft + "'...\t");
-			Gestionnaire gest = new Gestionnaire(minecraft);
-			System.out.println(gest.installation.getModids().size() + " mods");
+			Gestionnaire gest = new Gestionnaire(dossiers.minecraft);
 			
 			Map<String, VersionIntervalle> liste;
 			if (show.all) {
@@ -82,7 +76,9 @@ public class Show implements Runnable {
 	@CommandLine.Command(name = "mods", description = "Affiche les mods présents.")
 	static class Mods implements Callable<Integer> {
 		@CommandLine.Mixin
-		ForgeMods.DossiersOptions dossiers;
+		ForgeMods.Help help;
+		@CommandLine.Mixin
+		Dossiers.DossiersOptions dossiers;
 		
 		@CommandLine.Parameters(arity = "0..1", index = "0", description = "regex pour la recherche")
 		String recherche = null;
@@ -104,10 +100,8 @@ public class Show implements Runnable {
 			try {
 				local = new DepotLocal(dossiers.depot);
 				local.importation();
-				System.out.print("Analyse du dossier '" + local.dossier + "'...\t");
-				System.out.println(local.getModids().size() + " mods");
 			} catch (IOException erreur) {
-				System.out.println("Erreur de lecture du dépot.");
+				System.err.println("Erreur de lecture du dépot.");
 				local = null;
 			}
 			
@@ -115,15 +109,8 @@ public class Show implements Runnable {
 				if (local == null) return 1;
 				dep = local;
 			} else {
-				Path minecraft = DepotInstallation.resolutionDossierMinecraft(dossiers.minecraft);
-				if (minecraft == null) {
-					System.out.println("Impossible de trouver un dossier d'installation minecraft.");
-					return 1;
-				}
-				DepotInstallation depot = new DepotInstallation(minecraft);
+				DepotInstallation depot = new DepotInstallation(dossiers.minecraft);
 				depot.analyseDossier(local);
-				System.out.print("Analyse du dossier '" + depot.dossier + "'...\t");
-				System.out.println(depot.getModids().size() + " mods");
 				dep = depot;
 			}
 			

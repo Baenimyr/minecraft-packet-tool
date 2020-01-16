@@ -4,6 +4,7 @@ import McForgeMods.Mod;
 import McForgeMods.ModVersion;
 import McForgeMods.Version;
 import McForgeMods.VersionIntervalle;
+import McForgeMods.outils.Dossiers;
 import McForgeMods.outils.NoNewlineReader;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -14,7 +15,6 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -43,7 +43,7 @@ public class DepotInstallation extends Depot {
 	public final        HashMap<File, ModVersion> correspondances   = new HashMap<>();
 	
 	public DepotInstallation(Path dossier) {
-		this.dossier = dossier;
+		this.dossier = Dossiers.dossierMinecraft(dossier);
 	}
 	
 	/**
@@ -54,7 +54,6 @@ public class DepotInstallation extends Depot {
 	 * Chaque mod définit un <i>modid</i>, un <i>name</i>, une <i>version</i> et une <i>mcversion</i>.
 	 * Le format de la version doit être compatible avec le format définit par {@link Version}.
 	 * La version minecraft peut être extraite de la <i>version</i> à la condition d'être sous le format "<i>mcversion</i>-<i>version</i>".
-	 *
 	 * @return {@code true} si réussite: il s'agit bien d'un mod Minecraft Forge
 	 * @see <a href="https://mcforge.readthedocs.io/en/latest/gettingstarted/structuring/">Fichier mcmod.info</a>
 	 */
@@ -163,7 +162,7 @@ public class DepotInstallation extends Depot {
 	 */
 	public void analyseDossier(Depot infos) {
 		Queue<File> dossiers = new LinkedList<>();
-		dossiers.add(dossier.toFile().getAbsoluteFile());
+		dossiers.add(dossier.resolve("mods").toFile().getAbsoluteFile());
 		
 		while (!dossiers.isEmpty()) {
 			File doss = dossiers.poll();
@@ -193,27 +192,6 @@ public class DepotInstallation extends Depot {
 					this.correspondances.putIfAbsent(f, null);
 				}
 			}
-		}
-	}
-	
-	
-	/**
-	 * Cherche un dossier <i>.minecraft</i> où est l'installation minecraft de l'utilisateur.
-	 */
-	public static Path resolutionDossierMinecraft(Path minecraft) {
-		if (minecraft != null) {
-			return minecraft;
-		} else {
-			Path p = Path.of("").toAbsolutePath();
-			int i;
-			for (i = p.getNameCount() - 1; i >= 0 && !p.getName(i).toString().equals(".minecraft"); i--)
-				;
-			
-			if (i == -1) {
-				p = Paths.get(System.getProperty("user.home")).resolve(".minecraft").toAbsolutePath();
-				if (!p.toFile().exists()) return null;
-			}
-			return p.resolve("mods");
 		}
 	}
 }

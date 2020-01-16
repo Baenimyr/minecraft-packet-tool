@@ -4,10 +4,10 @@ import McForgeMods.ForgeMods;
 import McForgeMods.ModVersion;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
+import McForgeMods.outils.Dossiers;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 
@@ -35,7 +35,7 @@ public class CommandeDepot implements Runnable {
 	
 	@CommandLine.Command(name = "refresh", description = "Importe est sauvegarde le dépot.\nPermet de détecter des "
 			+ "erreurs. En cas d'erreur ne sauvegarde pas les informations corrompues.")
-	public int refresh(@CommandLine.Mixin ForgeMods.DossiersOptions dossiers,
+	public int refresh(@CommandLine.Mixin Dossiers.DossiersOptions dossiers, @CommandLine.Mixin ForgeMods.Help help,
 			@CommandLine.Option(names = {"-f", "--force"}, defaultValue = "false",
 					description = "Force la sauvegarde du dépot, même après des erreurs lors de l'importation.")
 					boolean force) {
@@ -67,13 +67,7 @@ public class CommandeDepot implements Runnable {
 	public int importation(@CommandLine.Parameters(index = "0", arity = "0..*", paramLabel = "modid",
 			description = "Liste de mod spécifiques à importer (modid).") String[] modids,
 			@CommandLine.Option(names = {"-a", "--all"}, description = "Importe tout") boolean all,
-			@CommandLine.Mixin ForgeMods.DossiersOptions dossiers) {
-		Path minecraft = DepotInstallation.resolutionDossierMinecraft(dossiers.minecraft);
-		if (minecraft == null) {
-			System.out.println("Impossible de trouver un dossier d'installation minecraft.");
-			return 1;
-		}
-		
+			@CommandLine.Mixin Dossiers.DossiersOptions dossiers, @CommandLine.Mixin ForgeMods.Help help) {
 		DepotLocal depot = new DepotLocal(dossiers.depot);
 		try {
 			depot.importation();
@@ -81,7 +75,7 @@ public class CommandeDepot implements Runnable {
 			System.err.println("Erreur de lecture des informations du dépot.");
 			return 1;
 		}
-		DepotInstallation installation = new DepotInstallation(minecraft);
+		DepotInstallation installation = new DepotInstallation(dossiers.minecraft);
 		installation.analyseDossier(depot);
 		
 		System.out.println(
