@@ -13,6 +13,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -50,7 +51,7 @@ public class DepotLocal extends Depot {
 	/**
 	 * Importe les informations du dépot à partir du répertoire de sauvegarde.
 	 */
-	public void importation() throws IOException {
+	public void importation() throws IOException, JSONException {
 		final File MODS = Dossiers.fichierIndexDepot(this.dossier).toFile();
 		if (!MODS.exists()) {
 			System.err.println("Absence du fichier principal: 'Mods.json'");
@@ -60,7 +61,10 @@ public class DepotLocal extends Depot {
 		try (FileInputStream fichier = new FileInputStream(MODS)) {
 			lectureFichierIndex(fichier);
 		}
-		for (String modid : getModids()) {
+		
+		ArrayList<String> modids = new ArrayList<>(getModids());
+		Collections.sort(modids);
+		for (String modid : modids) {
 			this.importationMod(modid);
 		}
 		System.err.flush();
@@ -71,7 +75,7 @@ public class DepotLocal extends Depot {
 	 * L'index doit être un JSON dont les clés au premier niveau sont les modids.
 	 * @param input contenu du fichier d'index.
 	 */
-	private void lectureFichierIndex(final InputStream input) {
+	private void lectureFichierIndex(final InputStream input) throws JSONException {
 		JSONTokener tokener = new JSONTokener(new BufferedInputStream(input));
 		JSONObject json = new JSONObject(tokener);
 		
@@ -82,12 +86,14 @@ public class DepotLocal extends Depot {
 		}
 	}
 	
-	private void importationMod(final String modid) {
+	private void importationMod(final String modid) throws JSONException {
 		try (InputStream fichier = Dossiers.fichierModDepot(this.dossier.toUri().toURL(), modid).openStream()) {
-			lectureFichierMod(modid, fichier);
+			BufferedInputStream buff = new BufferedInputStream(fichier);
+			if (buff.available() == 0) return;
+			lectureFichierMod(modid, buff);
 		} catch (FileNotFoundException f) {
 			System.err.println("Le fichier de données pour '" + modid + "' n'existe pas.");
-		} catch (IOException | JSONException f) {
+		} catch (IOException f) {
 			System.err.println("Erreur de lecture des informations de '" + modid + "': " + f.getMessage());
 		}
 	}
@@ -127,12 +133,16 @@ public class DepotLocal extends Depot {
 				Mod mod = this.mods.get(modid);
 				mod.json(data);
 				json.put(modid, data);
-				
-				this.sauvegardeMod(modid);
 			}
 			
 			json.write(writer, 2, 0);
 			writer.close();
+		}
+		
+		ArrayList<String> liste = new ArrayList<>(this.getModids());
+		Collections.sort(liste);
+		for (String modid : liste) {
+			this.sauvegardeMod(modid);
 		}
 	}
 	
@@ -145,18 +155,22 @@ public class DepotLocal extends Depot {
 	 */
 	private void sauvegardeMod(String modid) throws IOException {
 		final Mod mod = this.getMod(modid);
-		if (!this.mod_version.containsKey(mod)) return;
 		
-		Path dossier_mod = Path.of(Dossiers.fichierModDepot(this.dossier.toUri().toURL(), modid).getPath());
-		if (!dossier_mod.toFile().exists()) dossier_mod.toFile().mkdirs();
+		// Création du fichier vide dans tous les cas.
+		Path fichier_mod = Path.of(Dossiers.fichierModDepot(this.dossier.toUri().toURL(), modid).getPath());
+		if (!fichier_mod.getParent().toFile().exists()) fichier_mod.getParent().toFile().mkdirs();
 		
-		try (FileOutputStream donnees = new FileOutputStream(dossier_mod.resolve(mod.modid + ".json").toFile())) {
+		
+		try (FileOutputStream donnees = new FileOutputStream(fichier_mod.toFile())) {
+			// Permet de créer un fichier vide, prêt à être remplis.
 			JSONObject json = new JSONObject();
 			
-			for (ModVersion mv : this.mod_version.get(mod)) {
-				JSONObject json_version = new JSONObject();
-				mv.json(json_version);
-				json.put(mv.version.toString(), json_version);
+			if (this.mod_version.containsKey(mod)) {
+				for (ModVersion mv : this.mod_version.get(mod)) {
+					JSONObject json_version = new JSONObject();
+					mv.json(json_version);
+					json.put(mv.version.toString(), json_version);
+				}
 			}
 			
 			OutputStreamWriter writer = new OutputStreamWriter(donnees);

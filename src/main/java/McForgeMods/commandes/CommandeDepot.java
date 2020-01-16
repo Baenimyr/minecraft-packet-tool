@@ -5,6 +5,7 @@ import McForgeMods.ModVersion;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
 import McForgeMods.outils.Dossiers;
+import org.json.JSONException;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -42,9 +43,8 @@ public class CommandeDepot implements Runnable {
 		DepotLocal depot = new DepotLocal(dossiers.depot);
 		try {
 			depot.importation();
-		} catch (IOException i) {
-			System.err.println("Erreur de lecture du dépot: " + i.getMessage());
-			
+		} catch (IOException | JSONException i) {
+			System.err.println("Erreur de lecture du dépot: " + i.getClass() + " " + i.getMessage());
 			if (!force) return 1;
 		}
 		
@@ -53,7 +53,7 @@ public class CommandeDepot implements Runnable {
 		try {
 			depot.sauvegarde();
 		} catch (IOException i) {
-			System.err.println("Erreur d'écriture du dépot: " + i.getMessage());
+			System.err.println("Erreur d'écriture du dépot: " + i.getClass() + " " + i.getMessage());
 			return 1;
 		}
 		
@@ -71,8 +71,8 @@ public class CommandeDepot implements Runnable {
 		DepotLocal depot = new DepotLocal(dossiers.depot);
 		try {
 			depot.importation();
-		} catch (IOException i) {
-			System.err.println("Erreur de lecture des informations du dépot.");
+		} catch (IOException | JSONException i) {
+			System.err.println("Erreur de lecture des informations du dépot: " + i.getClass() + " " + i.getMessage());
 			return 1;
 		}
 		DepotInstallation installation = new DepotInstallation(dossiers.minecraft);
@@ -108,7 +108,9 @@ public class CommandeDepot implements Runnable {
 		try {
 			depot.sauvegarde();
 		} catch (IOException i) {
-			System.err.println("Impossible de sauvegarder le dépot local à '" + depot.dossier + "'");
+			System.err.println(
+					"Impossible de sauvegarder le dépot local à '" + depot.dossier + "': " + i.getClass() + " " + i
+							.getMessage());
 			return 1;
 		}
 		return 0;
