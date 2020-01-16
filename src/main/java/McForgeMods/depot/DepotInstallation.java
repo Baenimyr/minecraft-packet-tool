@@ -119,35 +119,36 @@ public class DepotInstallation extends Depot {
 		for (Object o : entree) {
 			String texte = o.toString();
 			int pos = 0;
-			StringBuilder sb = new StringBuilder();
+			StringBuilder modid = new StringBuilder();
 			VersionIntervalle versionIntervalle = null;
 			
 			while (pos < texte.length()) {
 				char c = texte.charAt(pos);
 				if (c == ',') {
-					resultat.put(sb.toString().toLowerCase(),
+					resultat.put(modid.toString().toLowerCase(),
 							versionIntervalle == null ? new VersionIntervalle() : versionIntervalle);
-					sb = new StringBuilder();
+					modid = new StringBuilder();
 					versionIntervalle = null;
-				} else if (c == '@' && sb.length() > 0) {
-					StringBuilder dep = new StringBuilder();
+				} else if (c == '@' && modid.length() > 0) {
+					StringBuilder intervalle = new StringBuilder();
+					c = texte.charAt(++pos);
 					while (pos < texte.length() && (Character.isDigit(c) || c == ',' || c == '[' || c == ']' || c == '('
 							|| c == ')' || c == '.')) {
-						dep.append(c);
+						intervalle.append(c);
 						c = texte.charAt(++pos);
 					}
-					versionIntervalle = VersionIntervalle.read(dep.toString());
+					versionIntervalle = VersionIntervalle.read(intervalle.toString());
 					
 				} else if (Character.isAlphabetic(c) || Character.isDigit(c)) {
-					sb.append(c);
+					modid.append(c);
 				} else {
 					throw new IllegalArgumentException(texte);
 				}
 				pos++;
 			}
 			
-			if (sb.length() > 0) {
-				resultat.put(sb.toString().toLowerCase(),
+			if (modid.length() > 0) {
+				resultat.put(modid.toString().toLowerCase(),
 						versionIntervalle == null ? new VersionIntervalle() : versionIntervalle);
 			}
 		}

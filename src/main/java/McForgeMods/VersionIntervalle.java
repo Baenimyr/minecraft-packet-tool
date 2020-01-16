@@ -33,10 +33,15 @@ public class VersionIntervalle {
     public static VersionIntervalle read(String contraintes) throws VersionIntervalleFormatException {
         VersionIntervalle d = new VersionIntervalle();
 
+        boolean intervalle = false;
         int pos = 0;
-        if (!Character.isDigit(pos)) {
-            d.inclut_min = contraintes.charAt(pos) != '(';
+        if (!Character.isDigit(contraintes.charAt(pos))) {
+            if (contraintes.charAt(pos) != '(' && contraintes.charAt(pos) != '[')
+                throw new VersionIntervalleFormatException(contraintes + " commence avec un caractère invalide.");
+            
+            d.inclut_min = contraintes.charAt(pos) == '[';
             pos++;
+            intervalle = true;
         }
 
         int virgule = pos;
@@ -48,28 +53,28 @@ public class VersionIntervalle {
             d.minimum = Version.read(contraintes.substring(pos, virgule));
         pos = virgule;
 
-        if (contraintes.charAt(pos) == ',') {
+        if (intervalle) {
+            if (pos >= contraintes.length() || contraintes.charAt(pos) != ',')
+                throw new VersionIntervalleFormatException(String.format("L'intervalle n'est pas fermée: '%s'",
+                        contraintes));
+            
             virgule = ++pos;
             while (virgule < contraintes.length()
                     && (contraintes.charAt(virgule) == '.' || Character.isDigit(contraintes.charAt(virgule))))
                 virgule++;
-
+    
             if (virgule > pos) {
                 d.maximum = Version.read(contraintes.substring(pos, virgule));
                 pos = virgule;
             }
-
-        } else if (d.minimum != null) {
-            d.maximum = new Version(d.minimum);
-        } else {
-            throw new VersionIntervalleFormatException(contraintes);
+    
+            if (pos >= contraintes.length() || (contraintes.charAt(pos) != ')' && contraintes.charAt(pos) != ']'))
+                throw new VersionIntervalleFormatException(
+                        String.format("Mauvaise façon de fermer une intervalle: '%s'", contraintes));
+            d.inclut_max = contraintes.charAt(pos++) == ']';
         }
-
-        if (contraintes.length() != pos + 1)
+        if (contraintes.length() != pos)
             throw new VersionIntervalleFormatException(contraintes);
-        else
-            d.inclut_max = contraintes.charAt(pos) == ']';
-
         return d;
     }
 
