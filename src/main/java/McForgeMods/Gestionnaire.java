@@ -5,10 +5,7 @@ import McForgeMods.depot.DepotLocal;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Le gestionnaire fait la liaison entre l'installation et le depot local chargé de fournir les informations.
@@ -47,13 +44,17 @@ public class Gestionnaire {
         }
         return this.installation.getModids().contains(modid) ? this.installation.getMod(modid) : null;
     }
+    
+    public Map<String, VersionIntervalle> listeDependances(Collection<ModVersion> liste) {
+        return this.depot.listeDependances(liste);
+    }
 
     public Map<String, VersionIntervalle> listeDependances() {
         List<ModVersion> versions = new ArrayList<>();
         for (String modid : this.installation.getModids()) {
             versions.addAll(this.installation.getModVersions(modid));
         }
-        return this.depot.listeDependances(versions);
+        return this.listeDependances(versions);
     }
 
     /**

@@ -30,7 +30,7 @@ public class Depot {
      * Si le mod n'est pas connus, renvoit une liste vide.
      */
     public Set<ModVersion> getModVersions(Mod mod) {
-        return this.mod_version.getOrDefault(mod, Collections.emptySet());
+        return this.mod_version.get(mod);
     }
 
     public Set<ModVersion> getModVersions(String modid) {
@@ -125,38 +125,36 @@ public class Depot {
      * Pour chaque mod présent dans la liste, extrait les dépendances et fusionne les intervalles de version.
      * La fonction utilise les informations du dépot comme source d'informations pour les nouveaux mods rencontrés.
      * Si un mod à étudier est inconnu, ses dépendances sont ignorées.
+	 * Si une dépendance porte sur un modid présent dans la liste à explorer, c'est la version en entrée qui est
+	 * utilisée pour le reste de la résolution.
      *
      * @param liste: liste des mods pour lesquels chercher les dépendances.
      * @return une map{modid -> version}
      */
     public HashMap<String, VersionIntervalle> listeDependances(Collection<ModVersion> liste) {
         final HashMap<String, VersionIntervalle> requis = new HashMap<>();
-        requis.put("minecraft", new VersionIntervalle());
 
         final LinkedList<ModVersion> temp = new LinkedList<>(liste);
         while (!temp.isEmpty()) {
-            ModVersion mver = temp.removeFirst();
-            Optional<ModVersion> local = this.getModVersion(mver.mod, mver.version);
-            mver = local.orElse(mver);
+            ModVersion nouveau = temp.removeFirst();
+            Optional<ModVersion> local = this.getModVersion(nouveau.mod, nouveau.version);
+            final ModVersion mver = local.orElse(nouveau);
 
-            requis.get("minecraft").fusion(new VersionIntervalle(mver.mcversion));
-            for (Map.Entry<String, VersionIntervalle> depend : mver.requiredMods.entrySet()) {
-                String modid_d = depend.getKey();
-                VersionIntervalle version_d = depend.getValue();
-                if (requis.containsKey(modid_d)) requis.get(modid_d).fusion(version_d);
-                else {
+            for (Map.Entry<String, VersionIntervalle> dependance : mver.requiredMods.entrySet()) {
+                String modid_d = dependance.getKey();
+                VersionIntervalle version_d = dependance.getValue();
+                // Si un mod a déjà été rencontré, les intervalles sont fusionnées.
+                if (requis.containsKey(modid_d)) requis.get(modid_d).intersection(version_d);
+                // Si un mod possible est en attente, il servira à la résolution
+                else if (temp.stream().map(mv -> mv.mod.modid).noneMatch(modid -> modid.equals(modid_d))) {
                     requis.put(modid_d, version_d);
 
                     if (this.getModids().contains(modid_d)) {
-                        List<ModVersion> versions = new ArrayList<>(this.getModVersions(modid_d));
-                        versions.sort(Comparator.comparing(v -> v.version));
-                        for (ModVersion candidat : this.getModVersions(modid_d)) {
-                            if (mver.mcversion.equals(candidat.mcversion) && (!requis.containsKey(modid_d) || requis
-                                    .get(modid_d).correspond(candidat.version))) {
-                                temp.add(candidat);
-                                break;
-                            }
-                        }
+                        Optional<ModVersion> candidat =
+                                this.getModVersions(modid_d).stream().filter(modVersion -> modVersion.mcversion.equals(mver.mcversion))
+                                        .filter(modVersion -> version_d.correspond(modVersion.version)).max(
+                                        Comparator.comparing(m -> m.version));
+                        candidat.ifPresent(temp::add);
                     }
                 }
             }

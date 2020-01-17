@@ -114,7 +114,7 @@ public class DepotInstallation extends Depot {
 		return false;
 	}
 	
-	static Map<String, VersionIntervalle> lectureDependances(Iterable<Object> entree) throws IllegalFormatException {
+	public static Map<String, VersionIntervalle> lectureDependances(Iterable<?> entree) throws IllegalFormatException {
 		final Map<String, VersionIntervalle> resultat = new HashMap<>();
 		for (Object o : entree) {
 			String texte = o.toString();
@@ -135,7 +135,9 @@ public class DepotInstallation extends Depot {
 					while (pos < texte.length() && (Character.isDigit(c) || c == ',' || c == '[' || c == ']' || c == '('
 							|| c == ')' || c == '.')) {
 						intervalle.append(c);
-						c = texte.charAt(++pos);
+						pos++;
+						if (pos < texte.length())
+							c = texte.charAt(pos);
 					}
 					versionIntervalle = VersionIntervalle.read(intervalle.toString());
 					
