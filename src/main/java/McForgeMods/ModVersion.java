@@ -117,7 +117,7 @@ public class ModVersion {
 	 */
 	public void ajoutModRequis(String modid, VersionIntervalle intervalle) {
 		modid = modid.toLowerCase().intern();
-		if (this.requiredMods.containsKey(modid)) this.requiredMods.get(modid).fusion(intervalle);
+		if (this.requiredMods.containsKey(modid)) this.requiredMods.get(modid).intersection(intervalle);
 		else this.requiredMods.put(modid, intervalle);
 	}
 	

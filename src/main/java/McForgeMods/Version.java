@@ -37,6 +37,18 @@ public class Version implements Comparable<Version> {
     public int size() {
         return 4;
     }
+    
+    /** Par construction, tous les champs de sous-version sont remplis par 0.
+     * Tous les champs sont utilisés pour l'égalité et la comparaison de Version, cependant dans le cas d'une intervalle,
+     * il est interressant de laisser une certaine souplesse sur les derniers champs nuls.
+     * @return l'index de la dernière sous-version non nulle. */
+    public int precision() {
+        for (int i = size() - 1; i >= 0; i--) {
+            if (get(i) != 0)
+                return i;
+        }
+        return 0;
+    }
 
     public int get(int index) {
         return this.versions[index];
