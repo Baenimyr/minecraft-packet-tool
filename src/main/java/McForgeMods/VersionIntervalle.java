@@ -31,7 +31,8 @@ public class VersionIntervalle {
     }
 
     public static VersionIntervalle read(String contraintes) throws VersionIntervalleFormatException {
-        VersionIntervalle d = new VersionIntervalle();
+        Version minimum = null, maximum = null;
+        boolean inclut_min = true, inclut_max = false;
 
         boolean intervalle = false;
         int pos = 0;
@@ -39,7 +40,7 @@ public class VersionIntervalle {
             if (contraintes.charAt(pos) != '(' && contraintes.charAt(pos) != '[')
                 throw new VersionIntervalleFormatException(contraintes + " commence avec un caractère invalide.");
             
-            d.inclut_min = contraintes.charAt(pos) == '[';
+            inclut_min = contraintes.charAt(pos) == '[';
             pos++;
             intervalle = true;
         }
@@ -50,7 +51,7 @@ public class VersionIntervalle {
             virgule++;
 
         if (virgule > pos)
-            d.minimum = Version.read(contraintes.substring(pos, virgule));
+            minimum = Version.read(contraintes.substring(pos, virgule));
         pos = virgule;
 
         if (intervalle) {
@@ -64,18 +65,27 @@ public class VersionIntervalle {
                 virgule++;
     
             if (virgule > pos) {
-                d.maximum = Version.read(contraintes.substring(pos, virgule));
+                maximum = Version.read(contraintes.substring(pos, virgule));
                 pos = virgule;
             }
     
             if (pos >= contraintes.length() || (contraintes.charAt(pos) != ')' && contraintes.charAt(pos) != ']'))
                 throw new VersionIntervalleFormatException(
                         String.format("Mauvaise façon de fermer une intervalle: '%s'", contraintes));
-            d.inclut_max = contraintes.charAt(pos++) == ']';
+            inclut_max = contraintes.charAt(pos++) == ']';
         }
         if (contraintes.length() != pos)
             throw new VersionIntervalleFormatException(contraintes);
-        return d;
+    
+        if (intervalle) {
+            VersionIntervalle v = new VersionIntervalle(minimum, maximum);
+            v.inclut_min = inclut_min;
+            v.inclut_max = inclut_max;
+            return v;
+        } else  {
+            VersionIntervalle v = new VersionIntervalle(minimum);
+            return v;
+        }
     }
 
     public void fusion(VersionIntervalle d) {

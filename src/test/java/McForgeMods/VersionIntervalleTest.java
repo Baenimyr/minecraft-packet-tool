@@ -49,7 +49,8 @@ class VersionIntervalleTest {
         assertFalse(dep5.inclut_max);
         assertTrue(dep5.inclut_min);
         assertNotNull(dep5.minimum);
-        assertNull(dep5.maximum);
+        assertNotNull(dep5.maximum);
         assertEquals(new Version(1, 0, 0), dep5.minimum);
+        assertEquals(new Version(2, 0, 0), dep5.maximum);
     }
 }
