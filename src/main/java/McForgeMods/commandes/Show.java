@@ -1,6 +1,9 @@
 package McForgeMods.commandes;
 
-import McForgeMods.*;
+import McForgeMods.ForgeMods;
+import McForgeMods.Gestionnaire;
+import McForgeMods.ModVersion;
+import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.Depot;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
@@ -45,7 +48,7 @@ public class Show implements Runnable {
 		@CommandLine.Mixin
 		Dossiers.DossiersOptions dossiers;
 		
-		@CommandLine.Option(names = {"--absents"}, description = "Affiche les dépendances manquantes.")
+		@CommandLine.Option(names = {"--missing"}, description = "Affiche les dépendances manquantes.")
 		boolean missing = false;
 		
 		@Override
@@ -88,7 +91,8 @@ public class Show implements Runnable {
 		boolean all;
 		
 		@CommandLine.Option(names = {"--mcversion"},
-				description = "Limite l'affichage aux mods compatibles avec une version de minecraft.")
+				description = "Limite l'affichage aux mods compatibles avec une version de minecraft. Peut être une "
+						+ "intervalle de version.")
 		String mcversion;
 		
 		@Override
@@ -96,6 +100,7 @@ public class Show implements Runnable {
 			DepotLocal local;
 			Depot dep;
 			Pattern regex = recherche != null ? Pattern.compile(recherche) : null;
+			VersionIntervalle filtre_mc = mcversion != null ? VersionIntervalle.read(mcversion) : null;
 			
 			try {
 				local = new DepotLocal(dossiers.depot);
@@ -120,10 +125,9 @@ public class Show implements Runnable {
 			for (String modid : modids) {
 				if (regex != null && !regex.matcher(modid).find()) continue;
 				
-				System.out.println(modid);
 				for (ModVersion mv : dep.getModVersions(modid)) {
-					if (mcversion == null || Version.read(mcversion).equals(mv.mcversion))
-						System.out.println(String.format("\t+ %s [%s]", mv.version, mv.mcversion));
+					if (filtre_mc == null || filtre_mc.correspond(mv.mcversion))
+						System.out.println(String.format("%-20s %-10s %s", modid, mv.version, mv.mcversion));
 				}
 			}
 			
