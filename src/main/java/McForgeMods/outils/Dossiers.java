@@ -21,16 +21,20 @@ public class Dossiers {
 	 * @param defaut: valeur par défaut à utiliser en priorité.
 	 */
 	public static Path dossierMinecraft(Path defaut) {
-		if (defaut != null) return defaut.toAbsolutePath();
+		if (defaut != null) {
+			if (defaut.getNameCount() > 0 && defaut.getName(0).toString().equals("~"))
+				return Path.of(System.getProperty("user.home")).resolve(defaut.subpath(1, defaut.getNameCount()));
+			return defaut;
+		}
 		
 		Path p = Path.of("").toAbsolutePath();
 		
 		// Si dossier .minecraft existant dans la hiérarchie actuelle.
 		for (int i = p.getNameCount() - 1; i > 0; i--) {
-			if (p.getName(i).toString().equals(".minecraft")) return p.subpath(0, i + 1);
+			if (p.getName(i).toString().equals(".minecraft")) return p.subpath(0, i + 1).resolve("mods");
 		}
 		
-		return Path.of(System.getProperty("user.home")).resolve(".minecraft");
+		return Path.of(System.getProperty("user.home")).resolve(".minecraft").resolve("mods");
 	}
 	
 	/**
