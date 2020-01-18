@@ -1,9 +1,6 @@
 package McForgeMods.commandes;
 
-import McForgeMods.ForgeMods;
-import McForgeMods.Gestionnaire;
-import McForgeMods.ModVersion;
-import McForgeMods.VersionIntervalle;
+import McForgeMods.*;
 import McForgeMods.depot.Depot;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
@@ -11,12 +8,14 @@ import McForgeMods.outils.Dossiers;
 import picocli.CommandLine;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @CommandLine.Command(name = "show", description = "Affichage d'informations",
-		subcommands = {Show.showDependencies.class, Show.Mods.class})
+		subcommands = {Show.showDependencies.class, Show.list.class, Show.description.class})
 public class Show implements Runnable {
 	@CommandLine.Mixin
 	ForgeMods.Help help;
@@ -102,8 +101,8 @@ public class Show implements Runnable {
 		}
 	}
 	
-	@CommandLine.Command(name = "mods", description = "Affiche les mods présents.")
-	static class Mods implements Callable<Integer> {
+	@CommandLine.Command(name = "list", description = "Affiche les mods présents.")
+	static class list implements Callable<Integer> {
 		@CommandLine.Mixin
 		ForgeMods.Help           help;
 		@CommandLine.Mixin
@@ -157,6 +156,64 @@ public class Show implements Runnable {
 					if (filtre_mc == null || filtre_mc.correspond(mv.mcversion))
 						System.out.println(String.format("%-20s %-10s %s", modid, mv.version, mv.mcversion));
 				}
+			}
+			
+			return 0;
+		}
+	}
+	
+	@CommandLine.Command(name = "mod", description = "Affiche les informations d'une liste de mods.")
+	static class description implements Callable<Integer> {
+		@CommandLine.Mixin
+		ForgeMods.Help help;
+		
+		@CommandLine.Option(names = {"-d", "--depot"}, description = "Dépot local à utiliser")
+		public Path depot = null;
+		
+		@CommandLine.Parameters(arity = "1..n", index = "0", paramLabel = "mod[@version]",
+				description = "liste de mods à afficher.")
+		ArrayList<String> recherche = null;
+		
+		@Override
+		public Integer call() throws Exception {
+			final DepotLocal depotLocal = new DepotLocal(depot);
+			depotLocal.importation();
+			final List<Mod> mods = new ArrayList<>();
+			final List<ModVersion> versions = new ArrayList<>();
+			
+			Map<String, VersionIntervalle> demandes = DepotInstallation.lectureDependances(recherche);
+			final VersionIntervalle versionvide = new VersionIntervalle();
+			for (Map.Entry<String, VersionIntervalle> rech : demandes.entrySet()) {
+				Mod mod = depotLocal.getMod(rech.getKey());
+				if (mod == null) System.err.println(String.format("Mod inconnu: '%s'", rech.getKey()));
+				else if (rech.getValue().equals(versionvide)) {
+					mods.add(mod);
+				} else {
+					List<ModVersion> modVersion = depotLocal.getModVersions(mod).stream()
+							.filter(v -> rech.getValue().correspond(v.version))
+							.collect(Collectors.toList());
+					if (modVersion.size() > 0) versions.addAll(modVersion);
+					else System.err.println(
+							String.format("Aucune version disponible pour '%s@%s'", rech.getKey(), rech.getValue()));
+				}
+			}
+			
+			for (Mod mod : mods) {
+				System.out.println(
+						String.format("%s (%s): \"%s\" {url='%s', updateJSON='%s'}", mod.name, mod.modid, mod.description,
+								mod.url, mod.updateJSON));
+			}
+			
+			for (ModVersion version : versions) {
+				System.out.println(String.format("%s %s [%s]:", version.mod.modid, version.version,
+						version.mcversion));
+				System.out.print("requiredMods");
+				version.requiredMods.entrySet().stream().sorted(Map.Entry.comparingByKey())
+						.forEach(e -> System.out.print(" " + e.getKey() + "@" + e.getValue()));
+				System.out.println();
+				System.out.println("urls\t" + Arrays.toString(version.urls.toArray()));
+				System.out.println("alias\t" + Arrays.toString(version.alias.toArray()));
+				System.out.println();
 			}
 			
 			return 0;
