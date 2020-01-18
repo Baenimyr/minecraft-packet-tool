@@ -15,7 +15,10 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Optional;
+import java.util.Queue;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -91,76 +94,26 @@ public class DepotInstallation extends Depot {
 			mod.url = json.has("url") ? json.getString("url") : null;
 			mod.updateJSON = json.has("updateJSON") ? json.getString("updateJSON") : null;
 			
-			ModVersion modVersion = new ModVersion(this.ajoutMod(mod), version, mcversion);
+			final ModVersion modVersion = this.ajoutModVersion(new ModVersion(this.ajoutMod(mod), version, mcversion));
 			modVersion.ajoutURL(fichier.getAbsoluteFile().toURI().toURL());
 			
 			if (json.has("requiredMods")) {
-				lectureDependances(json.getJSONArray("requiredMods")).forEach(modVersion::ajoutModRequis);
+				VersionIntervalle.lectureDependances(json.getJSONArray("requiredMods")).forEach(modVersion::ajoutModRequis);
 			}
 			if (json.has("dependencies")) {
-				lectureDependances(json.getJSONArray("dependencies")).forEach(modVersion::ajoutModRequis);
+				VersionIntervalle.lectureDependances(json.getJSONArray("dependencies")).forEach(modVersion::ajoutModRequis);
 			}
 			if (json.has("dependants")) {
 				JSONArray dependants = json.getJSONArray("dependants");
 				dependants.forEach(d -> modVersion.ajoutDependant((String) d));
 			}
 			modVersion.ajoutAlias(fichier.getName());
-			this.ajoutModVersion(modVersion);
 			this.correspondances.put(fichier, modVersion);
 			return true;
 		} catch (JSONException | IllegalArgumentException ignored) {
 			// System.err.println("[DEBUG] [importation] '" + fichier.getName() + "':\t" + ignored.getMessage());
 		}
 		return false;
-	}
-	
-	public static Map<String, VersionIntervalle> lectureDependances(Iterable<?> entree) throws IllegalFormatException {
-		final Map<String, VersionIntervalle> resultat = new HashMap<>();
-		for (Object o : entree) {
-			String texte = o.toString();
-			int pos = 0;
-			StringBuilder modid = new StringBuilder();
-			VersionIntervalle versionIntervalle = null;
-			
-			while (pos < texte.length()) {
-				char c = texte.charAt(pos);
-				if (c == ',') {
-					resultat.put(modid.toString().toLowerCase(),
-							versionIntervalle == null ? new VersionIntervalle() : versionIntervalle);
-					modid = new StringBuilder();
-					versionIntervalle = null;
-				} else if (c == '@' && modid.length() > 0) {
-					pos++;
-					if (pos >= texte.length()) {
-						versionIntervalle = new VersionIntervalle();
-						continue;
-					}
-					
-					StringBuilder intervalle = new StringBuilder();
-					c = texte.charAt(pos);
-					while (pos < texte.length() && (Character.isDigit(c) || c == ',' || c == '[' || c == ']' || c == '('
-							|| c == ')' || c == '.')) {
-						intervalle.append(c);
-						pos++;
-						if (pos < texte.length())
-							c = texte.charAt(pos);
-					}
-					versionIntervalle = VersionIntervalle.read(intervalle.toString());
-					
-				} else if (Character.isAlphabetic(c) || Character.isDigit(c)) {
-					modid.append(c);
-				} else {
-					throw new IllegalArgumentException(texte);
-				}
-				pos++;
-			}
-			
-			if (modid.length() > 0) {
-				resultat.put(modid.toString().toLowerCase(),
-						versionIntervalle == null ? new VersionIntervalle() : versionIntervalle);
-			}
-		}
-		return resultat;
 	}
 	
 	/**

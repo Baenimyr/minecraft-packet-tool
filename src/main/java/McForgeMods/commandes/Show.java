@@ -59,11 +59,11 @@ public class Show implements Runnable {
 			
 			if (mods != null && mods.size() > 0) {
 				final List<ModVersion> resultat = new ArrayList<>();
-				Map<String, VersionIntervalle> recherche = DepotInstallation.lectureDependances(mods);
+				Map<String, VersionIntervalle> recherche = VersionIntervalle.lectureDependances(mods);
 				for (Map.Entry<String, VersionIntervalle> entry : recherche.entrySet()) {
 					String modid = entry.getKey();
 					VersionIntervalle version = entry.getValue();
-					if (gest.depot.getModids().contains(modid)) {
+					if (gest.depot.contains(modid)) {
 						Optional<ModVersion> trouvee = gest.depot.getModVersions(modid).stream()
 								.filter(modVersion -> version.correspond(modVersion.version))
 								.max(Comparator.comparing(mv -> mv.version));
@@ -181,7 +181,7 @@ public class Show implements Runnable {
 			final List<Mod> mods = new ArrayList<>();
 			final List<ModVersion> versions = new ArrayList<>();
 			
-			Map<String, VersionIntervalle> demandes = DepotInstallation.lectureDependances(recherche);
+			Map<String, VersionIntervalle> demandes = VersionIntervalle.lectureDependances(recherche);
 			final VersionIntervalle versionvide = new VersionIntervalle();
 			for (Map.Entry<String, VersionIntervalle> rech : demandes.entrySet()) {
 				Mod mod = depotLocal.getMod(rech.getKey());
