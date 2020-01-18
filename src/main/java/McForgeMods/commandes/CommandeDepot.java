@@ -79,7 +79,7 @@ public class CommandeDepot implements Runnable {
 		installation.analyseDossier(depot);
 		
 		System.out.println(
-				String.format("%d mods chargés depuis '%s'.", installation.getModids().size(), installation.dossier));
+				String.format("%d mods chargés depuis '%s'.", installation.sizeModVersion(), installation.dossier));
 		
 		Collection<ModVersion> importation = new ArrayList<>();
 		if (all) {
@@ -88,7 +88,7 @@ public class CommandeDepot implements Runnable {
 			}
 		} else if (modids != null && modids.length > 0) {
 			for (String modid : modids) {
-				if (installation.getModids().contains(modid)) {
+				if (installation.contains(modid)) {
 					importation.addAll(installation.getModVersions(modid));
 				} else {
 					System.err.println("Modid non reconnu: '" + modid + "'");

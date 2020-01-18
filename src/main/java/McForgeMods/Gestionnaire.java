@@ -39,10 +39,10 @@ public class Gestionnaire {
      * @return le premier trouvé, null si aucune informations.
      */
     public Mod getMod(String modid) {
-        if (depot.getModids().contains(modid)) {
+        if (depot.contains(modid)) {
             return depot.getMod(modid);
         }
-        return this.installation.getModids().contains(modid) ? this.installation.getMod(modid) : null;
+        return this.installation.contains(modid) ? this.installation.getMod(modid) : null;
     }
     
     public Map<String, VersionIntervalle> listeDependances(Collection<ModVersion> liste) {
@@ -68,7 +68,7 @@ public class Gestionnaire {
     public Map<String, VersionIntervalle> dependancesAbsentes() {
         final Map<String, VersionIntervalle> absents = new HashMap<>();
         for (Map.Entry<String, VersionIntervalle> dep : this.listeDependances().entrySet()) {
-            if (!this.installation.getModids().contains(dep.getKey()) || this.installation.getModVersions(dep.getKey())
+            if (!this.installation.contains(dep.getKey()) || this.installation.getModVersions(dep.getKey())
                     .stream().noneMatch(m -> dep.getValue().correspond(m.version)))
                 absents.put(dep.getKey(), dep.getValue());
         }

@@ -138,7 +138,7 @@ public class Depot {
 		int i = nom.indexOf('-');
 		if (i > 0) {
 			String test = nom.substring(0, i).toLowerCase();
-			if (this.getModids().contains(test)) {
+			if (this.contains(test)) {
 				for (ModVersion version : this.getModVersions(test)) {
 					if (version.alias.contains(nom)) return Optional.of(version);
 				}
@@ -183,7 +183,7 @@ public class Depot {
 				else if (temp.stream().map(mv -> mv.mod.modid).noneMatch(modid -> modid.equals(modid_d))) {
 					requis.put(modid_d, version_d);
 					
-					if (this.getModids().contains(modid_d)) {
+					if (this.contains(modid_d)) {
 						Optional<ModVersion> candidat = this.getModVersions(modid_d).stream()
 								.filter(modVersion -> modVersion.mcversion.equals(mver.mcversion))
 								.filter(modVersion -> version_d.correspond(modVersion.version))
