@@ -130,8 +130,14 @@ public class DepotInstallation extends Depot {
 					modid = new StringBuilder();
 					versionIntervalle = null;
 				} else if (c == '@' && modid.length() > 0) {
+					pos++;
+					if (pos >= texte.length()) {
+						versionIntervalle = new VersionIntervalle();
+						continue;
+					}
+					
 					StringBuilder intervalle = new StringBuilder();
-					c = texte.charAt(++pos);
+					c = texte.charAt(pos);
 					while (pos < texte.length() && (Character.isDigit(c) || c == ',' || c == '[' || c == ']' || c == '('
 							|| c == ')' || c == '.')) {
 						intervalle.append(c);
@@ -165,14 +171,14 @@ public class DepotInstallation extends Depot {
 	 */
 	public void analyseDossier(Depot infos) {
 		Queue<File> dossiers = new LinkedList<>();
-		dossiers.add(dossier.resolve("mods").toFile().getAbsoluteFile());
+		dossiers.add(dossier.toFile().getAbsoluteFile());
 		
 		while (!dossiers.isEmpty()) {
 			File doss = dossiers.poll();
 			File[] fichiers = doss.listFiles();
 			if (fichiers != null) for (File f : fichiers) {
-				if (f.isHidden()) continue;
-				else if (f.isDirectory() && !f.getName().equals("memory_repo")) dossiers.add(f);
+				if (f.isHidden());
+				else if (f.isDirectory() && !f.getName().equals("memory_repo") && f.getName().equals("libraries")) dossiers.add(f);
 				else if (f.getName().endsWith(".jar")) {
 					try {
 						boolean succes = importationJar(f);
