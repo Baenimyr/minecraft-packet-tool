@@ -178,7 +178,7 @@ public class DepotInstallation extends Depot {
 			File[] fichiers = doss.listFiles();
 			if (fichiers != null) for (File f : fichiers) {
 				if (f.isHidden());
-				else if (f.isDirectory() && !f.getName().equals("memory_repo") && f.getName().equals("libraries")) dossiers.add(f);
+				else if (f.isDirectory() && !f.getName().equals("memory_repo") && !f.getName().equals("libraries")) dossiers.add(f);
 				else if (f.getName().endsWith(".jar")) {
 					try {
 						boolean succes = importationJar(f);

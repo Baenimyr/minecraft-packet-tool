@@ -74,6 +74,14 @@ public class Depot {
         }
         return Optional.empty();
     }
+    
+    public boolean contains(Mod mod) {
+        return this.mods.containsValue(mod);
+    }
+    
+    public boolean contains(ModVersion modVersion) {
+        return this.contains(modVersion.mod) && this.mod_version.get(modVersion.mod).contains(modVersion);
+    }
 
     /**
      * Enregistre un nouveau mod dans le dépot.
