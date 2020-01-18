@@ -55,7 +55,7 @@ Cette source d'information est inaccessible.
 S'ajoute à cela les informations comme le lien de téléchargement qui ne sont pas fournies dans le fichier jar.
 L'ensemble des informations vérifiées devront donc être disponibles en ligne, et localement en cache.
 
-\subsection{Dépot internet}
+\subsection{Dépôt internet}
 Une base de données en ligne pose des problèmes de complexité de lecture et de mise en place.
 En s'inspirant des paquets Linux toujours, le téléchargement de fichiers individuels dans une arborescence structurée est plus adéquate.
 Un premier fichier texte compressé, recense les mods disponibles dans un dépôt (voir \texttt{Packages.xz}).
@@ -63,35 +63,35 @@ Pour un mod et une version connue, correspond un emplacement dans l'arbre des ar
 Un système basé sur les dépôt permet aux groupes de développeurs de gérer leur propre dépôt.
 L'utilisation d'un dossier intermédiaire avec la première lettre du modid permet une gestion mémoire physique plus souple sur les grands dépôts.
 
-\subsection{Dépot local}
+\subsection{Dépôt local}
 Sans connexion internet, le programme doit pouvoir fournir les informations détaillées glanées sur internet et concernant les mods couremment installés.
 Il est inutile de s'encombrer des informations non nécessaires.
 Les informations locales peuvent être mises à jour sur demande ou automatiquement de temps en temps.
 
-\subsection{Dépot d'installation}
+\subsection{Dépôt d'installation}
 \label{subsection:depot_installation}
 Une installation minecraft, définie par un dossier \textit{.minecraft}, est importée au besoin grâce aux fichiers \textit{mcmod.info} présents dans l'archive.
-Elle se comporte virtuellement comme un véritable dépot, ce qui permet de le comparer au dépot local et de l'utiliser de manière transparente dans le système.
+Elle se comporte virtuellement comme un véritable dépôt, ce qui permet de le comparer au dépôt local et de l'utiliser de manière transparente dans le système.
 
-\subsection{Structure du dépot}
+\subsection{Structure du dépôt}
 \begin{figure}
 \dirtree{%
 .1 /.
 .2 Mods.json.
-.2 pool.
-.3 a.
-.4 aether.
-.5 aether.json.
-.5 aether\_legacy-1.12.2-v1.4.4.
-.4 appliedenergistics.
-.5 appliedenergistics.json.
-.5 Applied-Energistics-2-Mod-1.12.2.
-.5 ...
-.3 c.
-.4 cofhcore.
-.5 cofhcore.json.
+.2 a.
+.3 aether.
+.4 aether.json.
+.4 aether\_legacy-1.12.2-v1.4.4.
+.3 appliedenergistics.
+.4 appliedenergistics.json.
+.4 Applied-Energistics-2-Mod-1.12.2.
+.4 \dots
+.2 c.
+.3 cofhcore.
+.4 cofhcore.json.
+.2 t.
 }
-\caption{Exemple de hiérarchie d'un dépot}
+\caption{Exemple de hiérarchie d'un dépôt}
 \label{fig:hierarchie}
 \end{figure}
 
@@ -104,10 +104,9 @@ Les informations que l'on peut y trouver sont:
 \begin{itemize}
     \item mcversion: \textbf{obligatoire}
     \item requiredMods: liste des mods et leurs versions requis pour le bon fonctionnement de celui-ci
-    \item dependencies: liste de mods non obligatoires mais recommandés.
     \item dependants: liste de mods qui pourrait utiliser celui-ci.
-    \item file: url pour récupérer le fichier
-    \item alias: peut servir à identifier les mods grâce à leur nom de fichier, dans le cas d'un \textit{mcmod.info}.
+    \item urls: urls pour télécharger le fichier
+    \item alias: peut servir à identifier les mods grâce à leur nom de fichier, dans le cas d'un échec de lecture de \textit{mcmod.info}.
 \end{itemize}
 
 \begin{figure}
@@ -134,10 +133,10 @@ Les informations que l'on peut y trouver sont:
 {
     "<modversion>": {
         "mcversion": <mcversion>
-        "file": "<file url>",
+        "urls": "<file url>",
         "requiredMods": [],
-        "dependencies": [],
-        "dependants": []
+        "dependants": [],
+        "alias": []
     }
 }
 \end{verbatim}
@@ -161,23 +160,22 @@ Si l'utilisateur le permet, un dépôt généralisé peut sauvegarder les fichie
 Paramètres génériques:
 \begin{itemize}
     \item \texttt{----minecraft}: dossier d'installation minecraft (\$USER\_HOME/.minecraft)
-    \item \texttt{----depot}: dossier de dépot local (\$USER\_HOME/.minecraft/forgemods)
+    \item \texttt{----depot}: dossier de dépôt local (\$USER\_HOME/.minecraft/forgemods)
 \end{itemize}
 
 \medskip
 Description de commandes utiles:
 \begin{itemize}
-    \item \texttt{show mods [regex] [--v] [----all] [----installes]} affiche les mods connus: dans l'installation, et/ou dans le dépot.
+    \item \texttt{show list [regex] [--v] [----all] [----installes]} affiche les mods connus: dans l'installation, et/ou dans le dépôt.
 L'option --v permet d'afficher toutes les informations connues (ne pas combiner avec \texttt{----all}).
     \item \texttt{show dependences [----absents]}: affiche la liste des dépendances pour les mods dans l'installation minecraft, ou seulement les absents.
-    \item \texttt{update}: met à jour le dépot local grâce aux dépots distants.
-    \item \texttt{install modid}: installe un nouveau mod grâce aux informations dans le dépot local.
+    \item \texttt{show mod modid[@version]}: affiche les informations du dépôt relatives au mod.
+    \item \texttt{update}: met à jour le dépôt local grâce aux dépôts distants.
+    \item \texttt{install modid}: installe un nouveau mod grâce aux informations dans le dépôt local.
     \item \texttt{uninstall modid}: désinstalle un mod. Ne fait pas la différence entre les mods installés manuellement et les installations automatiques.
-    \item \texttt{depot import [modid] [----all]}: importe les informations extraites des mods dans l'installation vers le dépot local.
+    \item \texttt{depot import [modid] [----all]}: importe les informations extraites des mods dans l'installation vers le dépôt local.
 Necessite une installation minecraft.
     \item \texttt{depot udpate}: similaire à \texttt{update}
-    \item \texttt{depot get modid[@version] cle}: affiche la valeur d'une information dans le système de dépot local.
-    \item \texttt{depot set modid[@version] cle valeur}: modifie les informations dans le dépot local. Si la version n'est pas spécifiée, les clés sont limités aux données globales du mod.
 \end{itemize}
 
 
