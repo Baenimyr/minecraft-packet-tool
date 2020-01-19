@@ -145,6 +145,16 @@ Les informations que l'on peut y trouver sont:
 \end{figure}
 
 
+Tous les liens vers d'autres ressources seront des URLs.
+À la différence d'une simple chaîne de caractères, les URLs fournissent toutes les informations sur la méthode à employer pour récupérer la ressource (http, ftp, \dots).
+Les URLs spécifiés pour le téléchargement de fichier peuvent être seulement relatifs, alors la résolution de l'URL complet se fera par rapport à l'URL menant à la racine du dépôt (virtuel ou local).
+Un URL relatif est même conseillé pour pouvoir déplacer facilement un dépot sur n'importe quel autre support, derrière n'importe quel protocol.
+
+Lors de la synchronisation avec un dépôt distant, l'URL complet est résolus pour pouvoir ensuite ignorer le dépôt ayant fournit cette information et ne pas le confondre avec d'autres liens.
+À l'opposé, principalement pour les dépôt locaux, tout URL partageant une partie commune avec la racine du dépôt sera réduit à l'URL relatif.
+Ce système considère le dépôt local comme un potentiel dépôt distant pour d'autres utilisateurs.
+
+
 \section{Fichiers locaux}
 L'instance de jeu utilisée dépend du lieu de lancement du programme ou des options passées en paramètres.
 Par défaut, le programme remonte jusqu'au dossier \textit{.minecraft} le plus proche.
@@ -153,7 +163,10 @@ S'il n'est existe pas parmis les parents, tente d'utiliser le répertoire par d�
 Les informations sauvegardées localement comme décris au paragraphe \ref{section:depot} sont placées par défaut dans le répertoire \textit{.minecraft/forgemods}.
 Ce répertoire sert de dépôt local et se présente sous la même forme qu'un dépôt en ligne pour simplifier l'importation des données.
 Les informations du dépôt local sont toujours utilisées en premier, mais peuvent être mises à jour par les autres dépôts connus.
-Si l'utilisateur le permet, un dépôt généralisé peut sauvegarder les fichiers originaux qui ont un jour été téléchargés ou détectés pour les mettre à disposition.
+Si l'utilisateur le permet, un dépôt généralisé peut sauvegarder les fichiers originaux qui ont un jour été téléchargés ou détectés pour les mettre à disposition d'autres installations.
+
+Lors de la synchronisations des informations avec un dépôt distant, aucun fichier de mod n'est téléchargé.
+Si le dépôt fournis également les fichiers, leur disponibilité est conservée par l'URL et ils ne seront téléchargés que sur demande de l'utilisateur.
 
 
 \section{Commandes}
