@@ -148,7 +148,11 @@ public class ModVersion {
 		json.put("urls", new JSONArray(this.urls));
 		
 		JSONArray liste = new JSONArray();
-		this.requiredMods.keySet().stream().sorted().forEach(id -> liste.put(id + "@" + this.requiredMods.get(id)));
+		this.requiredMods.keySet().stream().sorted().forEach(id -> {
+			VersionIntervalle intervalle = this.requiredMods.get(id);
+			if (intervalle != null) liste.put(id + "@" + this.requiredMods.get(id));
+			else liste.put(id);
+		});
 		json.put("requiredMods", liste);
 		
 		json.put("dependants", new JSONArray(this.dependants));
