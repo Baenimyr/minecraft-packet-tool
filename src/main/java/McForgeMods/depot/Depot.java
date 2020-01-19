@@ -175,7 +175,8 @@ public class Depot {
 				String modid_d = dependance.getKey();
 				VersionIntervalle version_d = dependance.getValue();
 				// Si un mod a déjà été rencontré, les intervalles sont fusionnées.
-				if (requis.containsKey(modid_d)) requis.get(modid_d).intersection(version_d);
+				if (requis.containsKey(modid_d) && requis.get(modid_d) != null)
+					requis.get(modid_d).intersection(version_d);
 					// Si un mod possible est en attente, il servira à la résolution
 				else if (temp.stream().map(mv -> mv.mod.modid).noneMatch(modid -> modid.equals(modid_d))) {
 					requis.put(modid_d, version_d);

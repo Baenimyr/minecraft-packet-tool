@@ -36,7 +36,7 @@ public class Show implements Runnable {
 		throw new CommandLine.ParameterException(spec.commandLine(), "Missing required subcommand");
 	}
 	
-	@CommandLine.Command(name = "dependencies")
+	@CommandLine.Command(name = "dependencies", description = "Permet de résoudre les dépendences connues.")
 	static class showDependencies implements Callable<Integer> {
 		@CommandLine.Mixin
 		ForgeMods.Help           help;
@@ -182,16 +182,14 @@ public class Show implements Runnable {
 			final List<ModVersion> versions = new ArrayList<>();
 			
 			Map<String, VersionIntervalle> demandes = VersionIntervalle.lectureDependances(recherche);
-			final VersionIntervalle versionvide = new VersionIntervalle();
 			for (Map.Entry<String, VersionIntervalle> rech : demandes.entrySet()) {
 				Mod mod = depotLocal.getMod(rech.getKey());
 				if (mod == null) System.err.println(String.format("Mod inconnu: '%s'", rech.getKey()));
-				else if (rech.getValue().equals(versionvide)) {
+				else if (rech.getValue() == null) {
 					mods.add(mod);
 				} else {
 					List<ModVersion> modVersion = depotLocal.getModVersions(mod).stream()
-							.filter(v -> rech.getValue().correspond(v.version))
-							.collect(Collectors.toList());
+							.filter(v -> rech.getValue().correspond(v.version)).collect(Collectors.toList());
 					if (modVersion.size() > 0) versions.addAll(modVersion);
 					else System.err.println(
 							String.format("Aucune version disponible pour '%s@%s'", rech.getKey(), rech.getValue()));
@@ -199,18 +197,21 @@ public class Show implements Runnable {
 			}
 			
 			for (Mod mod : mods) {
-				System.out.println(
-						String.format("%s (%s): \"%s\" {url='%s', updateJSON='%s'}", mod.name, mod.modid, mod.description,
-								mod.url, mod.updateJSON));
+				System.out.println(String.format("%s (%s):%n%s%n{url='%s', updateJSON='%s'}", mod.name, mod.modid,
+						mod.description, mod.url, mod.updateJSON));
+				System.out.print("versions: ");
+				StringJoiner joiner = new StringJoiner(" ");
+				depotLocal.getModVersions(mod).forEach(mv -> joiner.add(mv.version.toString()));
+				System.out.println(joiner.toString());
+				System.out.println();
 			}
 			
 			for (ModVersion version : versions) {
-				System.out.println(String.format("%s %s [%s]:", version.mod.modid, version.version,
-						version.mcversion));
-				System.out.print("requiredMods");
+				System.out.println(String.format("%s %s [%s]:", version.mod.modid, version.version, version.mcversion));
+				StringJoiner joiner = new StringJoiner(",");
 				version.requiredMods.entrySet().stream().sorted(Map.Entry.comparingByKey())
-						.forEach(e -> System.out.print(" " + e.getKey() + "@" + e.getValue()));
-				System.out.println();
+						.forEach(e -> joiner.add(e.getKey() + "@" + e.getValue()));
+				System.out.println("requiredMods " + joiner.toString());
 				System.out.println("urls\t" + Arrays.toString(version.urls.toArray()));
 				System.out.println("alias\t" + Arrays.toString(version.alias.toArray()));
 				System.out.println();

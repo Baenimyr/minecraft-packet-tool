@@ -107,7 +107,9 @@ public class VersionIntervalle {
 		}
 		if (contraintes.length() != pos) throw new VersionIntervalleFormatException(contraintes);
 		
-		if (intervalle) {
+		if (minimum == null && maximum == null)
+			return null;
+		else if (intervalle) {
 			VersionIntervalle v = new VersionIntervalle(minimum, maximum);
 			v.inclut_min = inclut_min;
 			v.inclut_max = inclut_max;
@@ -150,7 +152,7 @@ public class VersionIntervalle {
 				if (c == ',') {
 					final String modid = modid_builder.toString().toLowerCase();
 					if (resultat.containsKey(modid) && resultat.get(modid) != null) {
-						if (versionIntervalle != null) resultat.get(modid).intersection(versionIntervalle);
+						resultat.get(modid).intersection(versionIntervalle);
 					} else resultat.put(modid, versionIntervalle);
 					
 					modid_builder = new StringBuilder();
@@ -192,7 +194,7 @@ public class VersionIntervalle {
 	 * @param d: une autre intervalle.
 	 */
 	public void intersection(VersionIntervalle d) {
-		if (d == null) return;
+		if (Objects.isNull(d)) return;
 		if (Objects.equals(minimum, d.minimum)) inclut_min = !(!inclut_min || !d.inclut_min);
 		else if (minimum == null || (d.minimum != null && d.minimum.compareTo(minimum) > 0)) {
 			minimum = d.minimum;
