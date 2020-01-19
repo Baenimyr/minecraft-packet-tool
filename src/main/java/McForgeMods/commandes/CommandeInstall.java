@@ -5,10 +5,16 @@ import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
 import McForgeMods.outils.Dossiers;
+import McForgeMods.outils.Telechargement;
+import McForgeMods.outils.TelechargementFichier;
 import picocli.CommandLine;
 
+import java.net.URL;
 import java.util.*;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @CommandLine.Command(name = "install", sortOptions = false, description = {"Permet l'installation de mods.",
 		"Chaque mod de la liste sera installé ou mis à jour vers la "
@@ -125,17 +131,52 @@ public class CommandeInstall implements Callable<Integer> {
 		installations.forEach(mv -> joiner.add(mv.mod.modid + "=" + mv.version));
 		System.out.println(joiner.toString());
 		
-		if (dry_run)
-			return 0;
+		if (dry_run) return 0;
 		
+		final ExecutorService executor = Executors.newSingleThreadExecutor();
+		List<Telechargement> telechargements = new LinkedList<>();
 		for (ModVersion modVersion : installations) {
-			if (modVersion.urls.size() == 0) {
-				System.err.println(String.format("Aucun lien de téléchargement pour '%s=%s'.", modVersion.mod.modid,
+			final Telechargement tele = telechargementMod(modVersion);
+			if (tele == null) {
+				System.err.println(String.format("Aucun lien de téléchargement pour '%s=%s'", modVersion.mod.modid,
 						modVersion.version));
 				return ERREUR_URL;
+			}
+			telechargements.add(tele);
+		}
+		
+		telechargements.forEach(t -> executor.execute(t.future));
+		for (Telechargement telechargement : telechargements) {
+			try {
+				Integer resultat = telechargement.future.get();
+				if (resultat == 0)
+					System.out.println(String.format("%-40s %.1f Ko", telechargement.mod.mod.modid + "=" + telechargement.mod.version,
+							(float) telechargement.telecharge / 1024));
+			} catch (ExecutionException erreur) {
+				erreur.printStackTrace();
 			}
 		}
 		
 		return 0;
+	}
+	
+	private Telechargement telechargementMod(ModVersion modVersion) {
+		Telechargement telechargement = null;
+		
+		Iterator<URL> urls = modVersion.urls.iterator();
+		while (telechargement == null && urls.hasNext()) {
+			URL url = urls.next();
+			
+			if (url.getProtocol().equals("file"))
+				telechargement = new TelechargementFichier(modVersion, url, dossiers.minecraft);
+				/*else if (url.getProtocol().equals("http") || url.getProtocol().equals("https"))
+					telechargement = new TelechargementHttp(url, dossier_cible,
+							String.format("%s-%s.jar", modVersion.mod.modid, modVersion.version));*/
+			else {
+				System.err.println("Protocol non supporté: " + url.getProtocol());
+				continue;
+			}
+		}
+		return telechargement;
 	}
 }
