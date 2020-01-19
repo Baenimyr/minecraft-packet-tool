@@ -45,7 +45,11 @@ public class Dossiers {
 	 * @return la racine du dossier pour le dépot.
 	 */
 	public static Path dossierDepot(Path defaut) {
-		if (defaut != null) return defaut.toAbsolutePath();
+		if (defaut != null) {
+			if (defaut.getNameCount() > 0 && defaut.getName(0).toString().equals("~"))
+				return Path.of(System.getProperty("user.home")).resolve(defaut.subpath(1, defaut.getNameCount()));
+			return defaut;
+		}
 		
 		return Path.of(System.getProperty("user.home")).resolve(".minecraft").resolve("forgemods");
 	}
@@ -68,6 +72,10 @@ public class Dossiers {
 	 */
 	public static URL fichierModDepot(URL depot, String modid) throws MalformedURLException {
 		return new URL(depot, modid.substring(0, 1) + "/" + modid + "/" + modid + ".json");
+	}
+	
+	public static Path fichierModDepot(Path depot, String modid) {
+		return depot.resolve(modid.substring(0, 1)).resolve(modid).resolve(modid + ".json");
 	}
 	
 	/** Dossier de préférence où sauvegarder un nouveau mod.

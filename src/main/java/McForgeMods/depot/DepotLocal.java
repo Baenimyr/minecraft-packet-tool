@@ -119,7 +119,7 @@ public class DepotLocal extends Depot {
 	 * Sauvegarde les informations d'un mod ({@link #sauvegardeMod(String)}) en même temps.
 	 */
 	public void sauvegarde() throws IOException {
-		if (!this.dossier.toFile().exists()) this.dossier.toFile().mkdirs();
+		if (!this.dossier.toFile().exists() && !this.dossier.toFile().mkdirs()) return;
 		
 		try (FileOutputStream fichier = new FileOutputStream(Dossiers.fichierIndexDepot(this.dossier).toFile())) {
 			OutputStreamWriter writer = new OutputStreamWriter(new BufferedOutputStream(fichier));
@@ -156,21 +156,16 @@ public class DepotLocal extends Depot {
 	private void sauvegardeMod(String modid) throws IOException {
 		final Mod mod = this.getMod(modid);
 		
-		// Création du fichier vide dans tous les cas.
-		Path fichier_mod = Path.of(Dossiers.fichierModDepot(this.dossier.toUri().toURL(), modid).getPath());
-		if (!fichier_mod.getParent().toFile().exists()) fichier_mod.getParent().toFile().mkdirs();
-		
+		Path fichier_mod = Dossiers.fichierModDepot(this.dossier, modid);
 		
 		try (FileOutputStream donnees = new FileOutputStream(fichier_mod.toFile())) {
 			// Permet de créer un fichier vide, prêt à être remplis.
 			JSONObject json = new JSONObject();
 			
-			if (this.mod_version.containsKey(mod)) {
-				for (ModVersion mv : this.mod_version.get(mod)) {
-					JSONObject json_version = new JSONObject();
-					mv.json(json_version);
-					json.put(mv.version.toString(), json_version);
-				}
+			for (ModVersion mv : this.mod_version.get(mod)) {
+				JSONObject json_version = new JSONObject();
+				mv.json(json_version);
+				json.put(mv.version.toString(), json_version);
 			}
 			
 			OutputStreamWriter writer = new OutputStreamWriter(donnees);

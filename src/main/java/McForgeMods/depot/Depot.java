@@ -89,7 +89,7 @@ public class Depot {
 	 *
 	 * @return l'instance réellement sauvegardée.
 	 */
-	protected Mod ajoutMod(Mod mod) {
+	public Mod ajoutMod(Mod mod) {
 		if (this.mods.containsKey(mod.modid)) {
 			Mod present = this.mods.get(mod.modid);
 			present.fusion(mod);
@@ -97,6 +97,7 @@ public class Depot {
 		} else {
 			final Mod copie = mod.copy();
 			this.mods.put(mod.modid, copie);
+			this.mod_version.put(copie, new HashSet<>(2));
 			return copie;
 		}
 	}
@@ -111,10 +112,6 @@ public class Depot {
 	 */
 	public ModVersion ajoutModVersion(final ModVersion modVersion) {
 		Mod mod = this.ajoutMod(modVersion.mod);
-		
-		if (!this.mod_version.containsKey(mod)) {
-			this.mod_version.put(mod, new LinkedHashSet<>(2));
-		}
 		
 		final Collection<ModVersion> liste = this.mod_version.get(mod);
 		Optional<ModVersion> present = liste.stream().filter(m -> m.version.equals(modVersion.version)).findFirst();
