@@ -87,7 +87,7 @@ public class DepotLocal extends Depot {
 	}
 	
 	private void importationMod(final String modid) throws JSONException {
-		try (InputStream fichier = Dossiers.fichierModDepot(this.dossier.toUri().toURL(), modid).openStream()) {
+		try (FileInputStream fichier = new FileInputStream(Dossiers.fichierModDepot(this.dossier, modid).toFile())) {
 			BufferedInputStream buff = new BufferedInputStream(fichier);
 			if (buff.available() == 0) return;
 			lectureFichierMod(modid, buff);
