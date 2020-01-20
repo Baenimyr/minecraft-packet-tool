@@ -58,7 +58,7 @@ public class CommandeDepot implements Runnable {
 			if (!force) return 1;
 		}
 		
-		System.out.println("Dépot importé.");
+		System.out.println(String.format("Dépot importé: %d versions disponibles", depot.sizeModVersion()));
 		
 		try {
 			depot.sauvegarde();
@@ -108,7 +108,7 @@ public class CommandeDepot implements Runnable {
 			System.out.println(
 					String.format("%d mods chargés depuis '%s'.", installation.sizeModVersion(), installation.dossier));
 			
-			Collection<ModVersion> importation = new ArrayList<>();
+			final Collection<ModVersion> importation = new ArrayList<>();
 			if (all) {
 				for (String modid : installation.getModids()) {
 					importation.addAll(installation.getModVersions(modid));
@@ -136,19 +136,19 @@ public class CommandeDepot implements Runnable {
 				
 				if (include_file) {
 					final Path nouveau_fichier = copieFichier(depot.dossier, version);
-					if (nouveau_fichier != null) reelle.ajoutURL(new URL(prefix,
-							nouveau_fichier.subpath(nouveau_fichier.getNameCount() - 3, nouveau_fichier.getNameCount())
-									.toString()));
+					if (nouveau_fichier != null)
+						reelle.ajoutURL(new URL(prefix, depot.dossier.relativize(nouveau_fichier).toString()));
 				}
 			}
 			System.out.println(String.format("%d versions importées.", importation.size()));
+			System.out.println(String.format("%d", depot.sizeModVersion()));
 			
 			try {
 				depot.sauvegarde();
 			} catch (IOException i) {
 				System.err.println(
-						"Impossible de sauvegarder le dépot local à '" + depot.dossier + "': " + i.getClass() + " " + i
-								.getMessage());
+						String.format("Impossible de sauvegarder le dépot local à '%s': %s %s", depot.dossier,
+								getClass(), i.getMessage()));
 				return 1;
 			}
 			return 0;
@@ -159,8 +159,8 @@ public class CommandeDepot implements Runnable {
 			if (fichier.isPresent()) {
 				try {
 					final Path source = Path.of(fichier.get().toURI());
-					final Path destination = dossier_depot.resolve(version.mod.modid.substring(0, 1))
-							.resolve(version.mod.modid).resolve(source.getFileName());
+					final Path destination = Dossiers.dossierModDepot(dossier_depot, version.mod.modid)
+							.resolve(source.getFileName());
 					destination.getParent().toFile().mkdirs();
 					Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING);
 					return destination;

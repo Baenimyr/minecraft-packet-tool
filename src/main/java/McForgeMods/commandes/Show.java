@@ -1,6 +1,9 @@
 package McForgeMods.commandes;
 
-import McForgeMods.*;
+import McForgeMods.ForgeMods;
+import McForgeMods.Mod;
+import McForgeMods.ModVersion;
+import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.Depot;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
@@ -14,7 +17,7 @@ import java.util.concurrent.Callable;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-@CommandLine.Command(name = "show", description = "Affichage d'informations",
+@CommandLine.Command(name = "show", description = {"Affichage d'informations."},
 		subcommands = {Show.showDependencies.class, Show.list.class, Show.description.class})
 public class Show implements Runnable {
 	@CommandLine.Mixin
@@ -36,7 +39,8 @@ public class Show implements Runnable {
 		throw new CommandLine.ParameterException(spec.commandLine(), "Missing required subcommand");
 	}
 	
-	@CommandLine.Command(name = "dependencies", description = "Permet de résoudre les dépendences connues.")
+	@CommandLine.Command(name = "dependencies", description = {"Permet de résoudre les dépendences connues. Si une "
+			+ "dépendance n'est pas déclarée, elle ne sera pas détectée."})
 	static class showDependencies implements Callable<Integer> {
 		@CommandLine.Mixin
 		ForgeMods.Help           help;
@@ -46,25 +50,41 @@ public class Show implements Runnable {
 		Dossiers.DossiersOptions dossiers;
 		
 		@CommandLine.Parameters(index = "0", arity = "0..n",
-				description = "Dépendances pour un mods présent spécifique.")
+				description = "Limite l'affichage aux dépendances de certains mods (modid[@version])")
 		ArrayList<String> mods;
 		
-		@CommandLine.Option(names = {"--missing"}, description = "Affiche les dépendances manquantes.")
+		@CommandLine.Option(names = {"--missing"}, description = "Affiche les dépendances manquantes. Peut afficher "
+				+ "des mods comme absents parce que non détectés dans le dossier d'installation.")
 		boolean missing = false;
 		
 		@Override
 		public Integer call() {
-			Gestionnaire gest = new Gestionnaire(dossiers.minecraft);
-			List<ModVersion> filtre = null;
+			final DepotLocal depotLocal = new DepotLocal(dossiers.depot);
+			final DepotInstallation depotInstallation = new DepotInstallation(dossiers.minecraft);
 			
-			if (mods != null && mods.size() > 0) {
+			try {
+				depotLocal.importation();
+			} catch (IOException e) {
+				System.err.println("Erreur de lecture du dépôt.");
+				return 1;
+			}
+			depotInstallation.analyseDossier(depotLocal);
+			
+			// Liste des versions pour lesquels chercher les dépendances.
+			List<ModVersion> listeRecherche;
+			
+			if (show.all) {
+				listeRecherche = depotInstallation.getModids().stream()
+						.flatMap(modid -> depotInstallation.getModVersions(modid).stream())
+						.collect(Collectors.toList());
+			} else if (mods != null && mods.size() > 0) {
 				final List<ModVersion> resultat = new ArrayList<>();
 				Map<String, VersionIntervalle> recherche = VersionIntervalle.lectureDependances(mods);
 				for (Map.Entry<String, VersionIntervalle> entry : recherche.entrySet()) {
 					String modid = entry.getKey();
 					VersionIntervalle version = entry.getValue();
-					if (gest.depot.contains(modid)) {
-						Optional<ModVersion> trouvee = gest.depot.getModVersions(modid).stream()
+					if (depotLocal.contains(modid)) {
+						Optional<ModVersion> trouvee = depotLocal.getModVersions(modid).stream()
 								.filter(modVersion -> version.correspond(modVersion.version))
 								.max(Comparator.comparing(mv -> mv.version));
 						if (trouvee.isPresent()) resultat.add(trouvee.get());
@@ -77,18 +97,20 @@ public class Show implements Runnable {
 						return 3;
 					}
 				}
-				filtre = resultat;
+				listeRecherche = resultat;
+			} else {
+				System.err.println("Nécessite une liste de travail.");
+				return 4;
 			}
 			
+			// Liste complète des dépendances nécessaire pour la liste des mods présent.
+			final Map<String, VersionIntervalle> dependances = depotLocal.listeDependances(listeRecherche);
 			Map<String, VersionIntervalle> liste;
-			if (show.all) {
-				liste = filtre == null ? gest.listeDependances() : gest.listeDependances(filtre);
-				System.out.println(String.format("%d dépendances", liste.size()));
-			} else if (missing) {
-				liste = gest.dependancesAbsentes();
+			if (missing) {
+				liste = depotInstallation.dependancesAbsentes(dependances);
 				System.out.println(String.format("%d absents", liste.size()));
 			} else {
-				liste = filtre == null ? gest.listeDependances() : gest.listeDependances(filtre);
+				liste = dependances;
 				System.out.println(String.format("%d dépendances", liste.size()));
 			}
 			
@@ -122,21 +144,18 @@ public class Show implements Runnable {
 		
 		@Override
 		public Integer call() {
-			DepotLocal local;
+			DepotLocal local = new DepotLocal(dossiers.depot);
 			Depot dep;
 			Pattern regex = recherche != null ? Pattern.compile(recherche) : null;
 			VersionIntervalle filtre_mc = mcversion != null ? VersionIntervalle.read(mcversion) : null;
 			
 			try {
-				local = new DepotLocal(dossiers.depot);
 				local.importation();
 			} catch (IOException erreur) {
 				System.err.println("Erreur de lecture du dépot.");
-				local = null;
 			}
 			
 			if (all) {
-				if (local == null) return 1;
 				System.out.println(
 						String.format("Dépot '%s': %d mods", local.dossier.toString(), local.sizeModVersion()));
 				dep = local;
@@ -175,9 +194,13 @@ public class Show implements Runnable {
 		ArrayList<String> recherche = null;
 		
 		@Override
-		public Integer call() throws Exception {
+		public Integer call() {
 			final DepotLocal depotLocal = new DepotLocal(depot);
-			depotLocal.importation();
+			try {
+				depotLocal.importation();
+			} catch (IOException e) {
+				System.err.println(String.format("Erreur de lecture du dépot: %s %s", e.getClass(), e.getMessage()));
+			}
 			final List<Mod> mods = new ArrayList<>();
 			final List<ModVersion> versions = new ArrayList<>();
 			
@@ -197,12 +220,12 @@ public class Show implements Runnable {
 			}
 			
 			for (Mod mod : mods) {
-				System.out.println(String.format("%s (%s):%n%s%n{url='%s', updateJSON='%s'}", mod.name, mod.modid,
-						mod.description, mod.url, mod.updateJSON));
-				System.out.print("versions: ");
+				System.out.println(
+						String.format("%s (%s):%n%s%n{url='%s', updateJSON='%s'}", mod.name, mod.modid, mod.description,
+								mod.url, mod.updateJSON));
 				StringJoiner joiner = new StringJoiner(" ");
 				depotLocal.getModVersions(mod).forEach(mv -> joiner.add(mv.version.toString()));
-				System.out.println(joiner.toString());
+				System.out.println("versions: " + joiner.toString());
 				System.out.println();
 			}
 			

@@ -81,11 +81,10 @@ public class Depot {
 	
 	/**
 	 * Enregistre un nouveau mod dans le dépot.
-	 *
-	 * Si le mod existe déjà, les informations utiles sont importées.
-	 * La mod est copié avant d'être ajouté au dépôt pour éviter les modifications partagées entres instances.
-	 * Pour modifier les valeurs de l'instance enregistrée, il faut utiliser la valeur de retour de cette fonction ou
-	 * {@link #getMod(String)}.
+	 * <p>
+	 * Si le mod existe déjà, les informations utiles sont importées. Le mod est copié avant d'être ajouté au dépôt pour
+	 * éviter les modifications partagées entres instances. Pour modifier les valeurs de l'instance enregistrée, il faut
+	 * utiliser la valeur de retour de cette fonction ou {@link #getMod(String)}.
 	 *
 	 * @return l'instance réellement sauvegardée.
 	 */
@@ -104,11 +103,10 @@ public class Depot {
 	
 	/**
 	 * Enregistre une nouvelle version d'un mod dans le dépot.
-	 *
-	 * De préférence, l'instance de mod utilisée à {@link
-	 * ModVersion#mod} doit correspondre à celle renvoyée par {@link #ajoutMod(Mod)}.
-	 * Il faut également que l'instance enregistrée ici ne correspondent pas à une instance enregistrée dans un autre
-	 * dépôt afin d'éviter les modifications partagées entre dépôt.
+	 * <p>
+	 * De préférence, l'instance de mod utilisée à {@link ModVersion#mod} doit correspondre à celle renvoyée par {@link
+	 * #ajoutMod(Mod)}. Il faut également que l'instance enregistrée ici ne correspondent pas à une instance enregistrée
+	 * dans un autre dépôt afin d'éviter les modifications partagées entre dépôt.
 	 */
 	public ModVersion ajoutModVersion(final ModVersion modVersion) {
 		Mod mod = this.ajoutMod(modVersion.mod);
@@ -156,8 +154,8 @@ public class Depot {
 	 * ignorées.
 	 * <p>
 	 * Si une dépendance porte sur un modid présent dans la liste à explorer, c'est la version en entrée qui est
-	 * utilisée pour le reste de la résolution. Sinon l'algorithme fait l'hypothèse d'utiliser la version compatible
-	 * la plus <b>récente</b>.
+	 * utilisée pour le reste de la résolution. Sinon l'algorithme fait l'hypothèse d'utiliser la version compatible la
+	 * plus <b>récente</b>.
 	 *
 	 * @param liste: liste des mods pour lesquels chercher les dépendances.
 	 * @return une map{modid -> version}
@@ -192,6 +190,23 @@ public class Depot {
 			}
 		}
 		return requis;
+	}
+	
+	/**
+	 * Fait la liste des versions absentes.
+	 * <p>
+	 * Parmis les dépendances fournies en entrée, cherche dans le dépot, si une version compatible existe. !!! Ne
+	 * compare pas les versions minecraft, un intervalle ouverte sur la droite est une mauvaise idée.
+	 *
+	 * @return une map {modid -> version} des demandes qui n'ont pas trouvée de correspondance.
+	 */
+	public Map<String, VersionIntervalle> dependancesAbsentes(final Map<String, VersionIntervalle> demande) {
+		final Map<String, VersionIntervalle> absents = new HashMap<>();
+		for (Map.Entry<String, VersionIntervalle> dep : demande.entrySet()) {
+			if (!this.contains(dep.getKey()) || this.getModVersions(dep.getKey()).stream()
+					.noneMatch(m -> dep.getValue().correspond(m.version))) absents.put(dep.getKey(), dep.getValue());
+		}
+		return absents;
 	}
 	
 	/**

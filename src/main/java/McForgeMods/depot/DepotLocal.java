@@ -72,15 +72,13 @@ public class DepotLocal extends Depot {
 		ArrayList<String> modids = new ArrayList<>(getModids());
 		Collections.sort(modids);
 		for (String modid : modids) {
-			try (FileInputStream fichier = new FileInputStream(
-					Dossiers.fichierModDepot(this.dossier, modid).toFile())) {
+			final File nom_fichier = Dossiers.fichierModDepot(this.dossier, modid).toFile();
+			if (!nom_fichier.exists()) System.err.println("Le fichier de données pour '" + modid + "' n'existe pas.");
+			
+			try (FileInputStream fichier = new FileInputStream(nom_fichier)) {
 				BufferedInputStream buff = new BufferedInputStream(fichier);
 				if (buff.available() == 0) return;
 				lectureFichierMod(modid, buff);
-			} catch (FileNotFoundException f) {
-				System.err.println("Le fichier de données pour '" + modid + "' n'existe pas.");
-			} catch (IOException f) {
-				System.err.println("Erreur de lecture des informations de '" + modid + "': " + f.getMessage());
 			}
 		}
 		System.err.flush();
@@ -204,8 +202,6 @@ public class DepotLocal extends Depot {
 	 * @param outputStream: flux d'écriture.
 	 */
 	private void ecritureFichierIndex(final OutputStream outputStream) throws IOException {
-		OutputStreamWriter writer = new OutputStreamWriter(outputStream);
-		
 		JSONObject json = new JSONObject();
 		List<String> modids = new ArrayList<>(mods.keySet());
 		modids.sort(String::compareToIgnoreCase);
@@ -220,8 +216,9 @@ public class DepotLocal extends Depot {
 			json.put(modid, data);
 		}
 		
-		json.write(writer, 2, 0);
-		writer.close();
+		try (OutputStreamWriter writer = new OutputStreamWriter(outputStream)) {
+			json.write(writer, 2, 0);
+		}
 	}
 	
 	/**
@@ -262,9 +259,9 @@ public class DepotLocal extends Depot {
 			json_total.put(mv.version.toString(), json);
 		}
 		
-		OutputStreamWriter writer = new OutputStreamWriter(outputStream);
-		json_total.write(writer, 2, 0);
-		writer.close();
+		try (OutputStreamWriter writer = new OutputStreamWriter(outputStream)) {
+			json_total.write(writer, 2, 0);
+		}
 	}
 	
 	/**

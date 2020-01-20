@@ -15,7 +15,6 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Optional;
 import java.util.Queue;
@@ -38,12 +37,6 @@ public class DepotInstallation extends Depot {
 	public static final Pattern                   minecraft_version = Pattern.compile(
 			"^1\\.(14(\\.[1-4])?|13(\\.[1-2])?|12(\\.[1-2])?|11(\\.1)?|10(\\.[1-2])?|9(\\.[1-4])?|8(\\.1)?|7(\\.[1-9]|(10))?)-");
 	public final        Path                      dossier;
-	/**
-	 * Fait la correspondance entre un fichier et une version de mod.
-	 * Si la version est nulle, cela signifie que le fichier n'a pas pu être chargé, probablement parce qu'il ne
-	 * contenait pas de fichier <i>mcmod.info</i>.
-	 */
-	public final        HashMap<File, ModVersion> correspondances   = new HashMap<>();
 	
 	public DepotInstallation(Path dossier) {
 		this.dossier = Dossiers.dossierMinecraft(dossier);
@@ -108,7 +101,6 @@ public class DepotInstallation extends Depot {
 				dependants.forEach(d -> modVersion.ajoutDependant((String) d));
 			}
 			modVersion.ajoutAlias(fichier.getName());
-			this.correspondances.put(fichier, modVersion);
 			return true;
 		} catch (JSONException | IllegalArgumentException ignored) {
 			// System.err.println("[DEBUG] [importation] '" + fichier.getName() + "':\t" + ignored.getMessage());
@@ -143,7 +135,8 @@ public class DepotInstallation extends Depot {
 								ModVersion local = this.ajoutModVersion(
 										new ModVersion(version_alias.get().mod, version_alias.get().version,
 												version_alias.get().mcversion));
-								this.correspondances.put(f, local);
+								local.fusion(version_alias.get()); // confiance d'avoir identifier le fichier
+								local.ajoutURL(f.getAbsoluteFile().toURI().toURL());
 								continue;
 							}
 						}
@@ -151,7 +144,6 @@ public class DepotInstallation extends Depot {
 					} catch (IOException i) {
 						System.err.println("Erreur sur '" + f.getName() + "': " + i.getMessage());
 					}
-					this.correspondances.putIfAbsent(f, null);
 				}
 			}
 		}
