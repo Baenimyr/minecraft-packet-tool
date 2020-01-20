@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 
@@ -172,5 +173,46 @@ public class CommandeDepot implements Runnable {
 			}
 			return null;
 		}
+	}
+	
+	@CommandLine.Command(name = "update", description = "Met à jour les informations du dépot à partir d'un autre.")
+	public int update(@CommandLine.Mixin ForgeMods.Help help,
+			
+			@CommandLine.Option(names = {"-d", "--depot"}, description = "Dépot local") Path adresseDepot,
+			
+			@CommandLine.Option(names = {"-f", "--from"}, arity = "1..n", description = "Dépot distant spécifique")
+					List<String> urlDistant,
+			
+			@CommandLine.Option(names = {"-c", "--clear"}, defaultValue = "false",
+					description = "Remplace totalement le dépot initial par les informations téléchargées.")
+					boolean clear) {
+		final DepotLocal depotLocal = new DepotLocal(adresseDepot);
+		if (!clear) {
+			try {
+				depotLocal.importation();
+			} catch (IOException | JSONException e) {
+				System.err.println("Erreur de chargement du dépot local: " + e.getClass() + " " + e.getMessage());
+				return 1;
+			}
+		}
+		
+		for (String depot : urlDistant) {
+			try {
+				URL url = new URL(Path.of(".").toUri().toURL(), depot);
+				depotLocal.synchronisationDepot(url);
+			} catch (MalformedURLException u) {
+				System.err.println("URL invalide: " + u.getMessage());
+			} catch (IOException io) {
+				System.err.println("Erreur lecture du dépot distant: " + io.getClass() + " " + io.getMessage());
+			}
+		}
+		
+		try {
+			depotLocal.sauvegarde();
+			System.out.println("Dépot sauvegardé en " + depotLocal.dossier);
+		} catch (IOException | JSONException e) {
+			System.err.println("Erreur de sauvegarde du dépot local: " + e.getClass() + " " + e.getMessage());
+		}
+		return 0;
 	}
 }
