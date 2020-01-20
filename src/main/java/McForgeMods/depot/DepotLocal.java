@@ -186,6 +186,7 @@ public class DepotLocal extends Depot {
 		Collections.sort(liste);
 		for (String modid : liste) {
 			Path fichier_mod = Dossiers.fichierModDepot(this.dossier, modid);
+			if (!fichier_mod.getParent().toFile().exists()) fichier_mod.getParent().toFile().mkdirs();
 			try (FileOutputStream donnees = new FileOutputStream(fichier_mod.toFile());
 				 BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(donnees)) {
 				this.ecritureFichierMod(modid, bufferedOutputStream);
@@ -277,7 +278,7 @@ public class DepotLocal extends Depot {
 	 * @throws MalformedURLException si l'url n'est pas conpatible avec l'exploration d'arborescence de fichier
 	 * @throws IOException           à la moindre erreur de lecture des flux réseau.
 	 */
-	void synchronisationDepot(URL depot_url) throws MalformedURLException, IOException {
+	public void synchronisationDepot(URL depot_url) throws MalformedURLException, IOException {
 		URL url_mods = Dossiers.fichierIndexDepot(depot_url);
 		try (InputStream is = url_mods.openStream()) {
 			this.lectureFichierIndex(new BufferedInputStream(is));
