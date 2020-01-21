@@ -5,16 +5,16 @@ import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
 import McForgeMods.outils.Dossiers;
-import McForgeMods.outils.Telechargement;
-import McForgeMods.outils.TelechargementFichier;
+import McForgeMods.outils.Transfert;
 import picocli.CommandLine;
 
+import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 /**
  * La commande <i>install</i> permet de récupérer les fichiers de mod présents sur le réseau.
@@ -67,7 +67,7 @@ public class CommandeInstall implements Callable<Integer> {
 	
 	
 	@Override
-	public Integer call() throws Exception {
+	public Integer call() {
 		final DepotLocal depotLocal = new DepotLocal(dossiers.depot);
 		final DepotInstallation depotInstallation = new DepotInstallation(dossiers.minecraft);
 		/* Liste des mods à installer. */
@@ -79,8 +79,13 @@ public class CommandeInstall implements Callable<Integer> {
 			return 1;
 		}
 		
-		depotLocal.importation();
-		depotInstallation.analyseDossier(depotLocal);
+		try {
+			depotLocal.importation();
+			depotInstallation.analyseDossier(depotLocal);
+		} catch (IOException i) {
+			System.err.println("Erreur de lecture du dépot !");
+			return 1;
+		}
 		
 		for (Map.Entry<String, VersionIntervalle> demande : VersionIntervalle.lectureDependances(this.mods)
 				.entrySet()) {
@@ -144,25 +149,31 @@ public class CommandeInstall implements Callable<Integer> {
 		if (dry_run) return 0;
 		
 		final ExecutorService executor = Executors.newSingleThreadExecutor();
-		List<Telechargement> telechargements = new LinkedList<>();
+		final Map<ModVersion, Transfert> telechargements = new LinkedHashMap<>();
 		for (ModVersion modVersion : installations) {
-			final Telechargement tele = telechargementMod(modVersion);
-			if (tele == null) {
-				System.err.println(String.format("Aucun lien de téléchargement pour '%s=%s'", modVersion.mod.modid,
-						modVersion.version));
-				return ERREUR_URL;
+			try {
+				final Transfert tele = telechargementMod(depotInstallation.dossier, modVersion);
+				if (tele == null) {
+					System.err.println(String.format("Aucun lien de téléchargement pour '%s=%s'", modVersion.mod.modid,
+							modVersion.version));
+					return ERREUR_URL;
+				}
+				telechargements.put(modVersion, tele);
+			} catch (MalformedURLException u) {
+				u.printStackTrace();
 			}
-			telechargements.add(tele);
 		}
 		
-		telechargements.forEach(t -> executor.execute(t.future));
-		for (Telechargement telechargement : telechargements) {
+		final Map<Transfert, Future<Long>> futures = telechargements.values().stream()
+				.collect(Collectors.toMap(t -> t, executor::submit));
+		for (Map.Entry<ModVersion, Transfert> transfert : telechargements.entrySet()) {
 			try {
-				Integer resultat = telechargement.future.get();
-				if (resultat == 0)
-					System.out.println(String.format("%-40s %.1f Ko", telechargement.mod.mod.modid + "=" + telechargement.mod.version,
-							(float) telechargement.telecharge / 1024));
-			} catch (ExecutionException erreur) {
+				Future<Long> future = futures.get(transfert.getValue());
+				Long resultat = future.get();
+				if (resultat >= 0) System.out.println(
+						String.format("%-40s %.1f Ko", transfert.getKey().mod.modid + "=" + transfert.getKey().version,
+								(float) transfert.getValue().getTransfere() / 1024));
+			} catch (ExecutionException | InterruptedException erreur) {
 				erreur.printStackTrace();
 			}
 		}
@@ -170,21 +181,20 @@ public class CommandeInstall implements Callable<Integer> {
 		return 0;
 	}
 	
-	private Telechargement telechargementMod(ModVersion modVersion) {
-		Telechargement telechargement = null;
+	private Transfert telechargementMod(final Path depot, ModVersion modVersion) throws MalformedURLException {
+		Transfert telechargement = null;
+		final Path fichier_cible = Dossiers.dossierInstallationMod(depot, modVersion)
+				.resolve(modVersion.mod.modid + "-" + modVersion.version + ".jar");
 		
 		Iterator<URL> urls = modVersion.urls.iterator();
 		while (telechargement == null && urls.hasNext()) {
 			URL url = urls.next();
 			
-			if (url.getProtocol().equals("file"))
-				telechargement = new TelechargementFichier(modVersion, url, dossiers.minecraft);
-				/*else if (url.getProtocol().equals("http") || url.getProtocol().equals("https"))
-					telechargement = new TelechargementHttp(url, dossier_cible,
-							String.format("%s-%s.jar", modVersion.mod.modid, modVersion.version));*/
-			else {
+			if (url.getProtocol().equals("file") || url.getProtocol().equals("http") || url.getProtocol()
+					.equals("https")) {
+				telechargement = new Transfert(url, fichier_cible.toUri().toURL());
+			} else {
 				System.err.println("Protocol non supporté: " + url.getProtocol());
-				continue;
 			}
 		}
 		return telechargement;
