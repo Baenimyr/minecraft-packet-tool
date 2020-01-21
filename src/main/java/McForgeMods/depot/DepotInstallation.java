@@ -15,7 +15,9 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.LinkedList;
+import java.util.Optional;
+import java.util.Queue;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -35,12 +37,6 @@ public class DepotInstallation extends Depot {
 	public static final Pattern                   minecraft_version = Pattern.compile(
 			"^1\\.(14(\\.[1-4])?|13(\\.[1-2])?|12(\\.[1-2])?|11(\\.1)?|10(\\.[1-2])?|9(\\.[1-4])?|8(\\.1)?|7(\\.[1-9]|(10))?)-");
 	public final        Path                      dossier;
-	/**
-	 * Fait la correspondance entre un fichier et une version de mod.
-	 * Si la version est nulle, cela signifie que le fichier n'a pas pu être chargé, probablement parce qu'il ne
-	 * contenait pas de fichier <i>mcmod.info</i>.
-	 */
-	public final        HashMap<File, ModVersion> correspondances   = new HashMap<>();
 	
 	public DepotInstallation(Path dossier) {
 		this.dossier = Dossiers.dossierMinecraft(dossier);
@@ -91,76 +87,25 @@ public class DepotInstallation extends Depot {
 			mod.url = json.has("url") ? json.getString("url") : null;
 			mod.updateJSON = json.has("updateJSON") ? json.getString("updateJSON") : null;
 			
-			ModVersion modVersion = new ModVersion(this.ajoutMod(mod), version, mcversion);
+			final ModVersion modVersion = this.ajoutModVersion(new ModVersion(this.ajoutMod(mod), version, mcversion));
 			modVersion.ajoutURL(fichier.getAbsoluteFile().toURI().toURL());
 			
 			if (json.has("requiredMods")) {
-				lectureDependances(json.getJSONArray("requiredMods")).forEach(modVersion::ajoutModRequis);
+				VersionIntervalle.lectureDependances(json.getJSONArray("requiredMods")).forEach(modVersion::ajoutModRequis);
 			}
 			if (json.has("dependencies")) {
-				lectureDependances(json.getJSONArray("dependencies")).forEach(modVersion::ajoutModRequis);
+				VersionIntervalle.lectureDependances(json.getJSONArray("dependencies")).forEach(modVersion::ajoutModRequis);
 			}
 			if (json.has("dependants")) {
 				JSONArray dependants = json.getJSONArray("dependants");
 				dependants.forEach(d -> modVersion.ajoutDependant((String) d));
 			}
 			modVersion.ajoutAlias(fichier.getName());
-			this.ajoutModVersion(modVersion);
-			this.correspondances.put(fichier, modVersion);
 			return true;
 		} catch (JSONException | IllegalArgumentException ignored) {
 			// System.err.println("[DEBUG] [importation] '" + fichier.getName() + "':\t" + ignored.getMessage());
 		}
 		return false;
-	}
-	
-	public static Map<String, VersionIntervalle> lectureDependances(Iterable<?> entree) throws IllegalFormatException {
-		final Map<String, VersionIntervalle> resultat = new HashMap<>();
-		for (Object o : entree) {
-			String texte = o.toString();
-			int pos = 0;
-			StringBuilder modid = new StringBuilder();
-			VersionIntervalle versionIntervalle = null;
-			
-			while (pos < texte.length()) {
-				char c = texte.charAt(pos);
-				if (c == ',') {
-					resultat.put(modid.toString().toLowerCase(),
-							versionIntervalle == null ? new VersionIntervalle() : versionIntervalle);
-					modid = new StringBuilder();
-					versionIntervalle = null;
-				} else if (c == '@' && modid.length() > 0) {
-					pos++;
-					if (pos >= texte.length()) {
-						versionIntervalle = new VersionIntervalle();
-						continue;
-					}
-					
-					StringBuilder intervalle = new StringBuilder();
-					c = texte.charAt(pos);
-					while (pos < texte.length() && (Character.isDigit(c) || c == ',' || c == '[' || c == ']' || c == '('
-							|| c == ')' || c == '.')) {
-						intervalle.append(c);
-						pos++;
-						if (pos < texte.length())
-							c = texte.charAt(pos);
-					}
-					versionIntervalle = VersionIntervalle.read(intervalle.toString());
-					
-				} else if (Character.isAlphabetic(c) || Character.isDigit(c)) {
-					modid.append(c);
-				} else {
-					throw new IllegalArgumentException(texte);
-				}
-				pos++;
-			}
-			
-			if (modid.length() > 0) {
-				resultat.put(modid.toString().toLowerCase(),
-						versionIntervalle == null ? new VersionIntervalle() : versionIntervalle);
-			}
-		}
-		return resultat;
 	}
 	
 	/**
@@ -190,7 +135,8 @@ public class DepotInstallation extends Depot {
 								ModVersion local = this.ajoutModVersion(
 										new ModVersion(version_alias.get().mod, version_alias.get().version,
 												version_alias.get().mcversion));
-								this.correspondances.put(f, local);
+								local.fusion(version_alias.get()); // confiance d'avoir identifier le fichier
+								local.ajoutURL(f.getAbsoluteFile().toURI().toURL());
 								continue;
 							}
 						}
@@ -198,7 +144,6 @@ public class DepotInstallation extends Depot {
 					} catch (IOException i) {
 						System.err.println("Erreur sur '" + f.getName() + "': " + i.getMessage());
 					}
-					this.correspondances.putIfAbsent(f, null);
 				}
 			}
 		}

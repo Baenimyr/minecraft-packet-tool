@@ -10,42 +10,46 @@ import java.nio.file.Path;
 /**
  * Cette classe doit rassembler tous les outils pour trouver ou décider des répertoires.
  * <p>
- * Permet de trouver une installation minecraft relative ou non à la position actuelle.
- * Décide du dossier d'installation des mods téléchargés, de préférence, chaque mod ira dans le dossiers
- * mods/<i>mcversion</i>.
+ * Permet de trouver une installation minecraft relative ou non à la position actuelle. Décide du dossier d'installation
+ * des mods téléchargés, de préférence, chaque mod ira dans le dossiers mods/<i>mcversion</i>.
  */
 public class Dossiers {
 	
+	public static Path autocompletion(Path chemin) {
+		if (chemin.getNameCount() > 0 && chemin.getName(0).toString().equals("~"))
+			return Path.of(System.getProperty("user.home")).resolve(chemin.subpath(1, chemin.getNameCount()));
+		return chemin;
+	}
+	
 	/**
 	 * Cherche un dossier d'installation minecraft.
+	 *
 	 * @param defaut: valeur par défaut à utiliser en priorité.
 	 */
 	public static Path dossierMinecraft(Path defaut) {
 		if (defaut != null) {
-			if (defaut.getNameCount() > 0 && defaut.getName(0).toString().equals("~"))
-				return Path.of(System.getProperty("user.home")).resolve(defaut.subpath(1, defaut.getNameCount()));
-			return defaut;
+			return autocompletion(defaut);
 		}
 		
 		Path p = Path.of("").toAbsolutePath();
-		
 		// Si dossier .minecraft existant dans la hiérarchie actuelle.
 		for (int i = p.getNameCount() - 1; i > 0; i--) {
 			if (p.getName(i).toString().equals(".minecraft")) return p.subpath(0, i + 1).resolve("mods");
 		}
-		
 		return Path.of(System.getProperty("user.home")).resolve(".minecraft").resolve("mods");
 	}
 	
 	/**
-	 * Cherche un dossier pour le dépot local.
-	 * Par défaut, ce dossier se situe dans le répertoire ~/.minecraft/forgemods, peut importe si le dossier
-	 * d'installation minecraft utilisé est autrepart.
+	 * Cherche un dossier pour le dépot local. Par défaut, ce dossier se situe dans le répertoire
+	 * ~/.minecraft/forgemods, peut importe si le dossier d'installation minecraft utilisé est autrepart.
+	 *
 	 * @param defaut: valeur par défaut à utiliser en priorité
 	 * @return la racine du dossier pour le dépot.
 	 */
 	public static Path dossierDepot(Path defaut) {
-		if (defaut != null) return defaut.toAbsolutePath();
+		if (defaut != null) {
+			return autocompletion(defaut);
+		}
 		
 		return Path.of(System.getProperty("user.home")).resolve(".minecraft").resolve("forgemods");
 	}
@@ -54,7 +58,17 @@ public class Dossiers {
 		return depot.resolve("Mods.json");
 	}
 	
-	/** Localise le fichier d'index général relatif à la racine du dépot.
+	public static Path dossierModDepot(final Path depot, String modid) {
+		return depot.resolve(modid.substring(0, 1)).resolve(modid);
+	}
+	
+	public static Path fichierModDepot(Path depot, String modid) {
+		return dossierModDepot(depot, modid).resolve(modid + ".json");
+	}
+	
+	/**
+	 * Localise le fichier d'index général relatif à la racine du dépot.
+	 *
 	 * @param depot: racine du dépot
 	 */
 	public static URL fichierIndexDepot(URL depot) throws MalformedURLException {
@@ -63,6 +77,7 @@ public class Dossiers {
 	
 	/**
 	 * Localise le fichier d'information de mod relatif à la racine du dépot.
+	 *
 	 * @param depot: racine du dépot
 	 * @param modid: identifiant unique du mod cherché.
 	 */
@@ -70,9 +85,11 @@ public class Dossiers {
 		return new URL(depot, modid.substring(0, 1) + "/" + modid + "/" + modid + ".json");
 	}
 	
-	/** Dossier de préférence où sauvegarder un nouveau mod.
+	/**
+	 * Dossier de préférence où sauvegarder un nouveau mod.
+	 *
 	 * @param minecraft: chemin vers le dossier .minecraft/mods
-	 * @param mod: informations de la version
+	 * @param mod:       informations de la version
 	 * @return .minecraft/mods/<i>mcversion</i>/
 	 */
 	public static Path dossierInstallationMod(Path minecraft, ModVersion mod) {

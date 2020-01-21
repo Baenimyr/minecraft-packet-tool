@@ -1,8 +1,5 @@
 package McForgeMods;
 
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import java.util.Objects;
 
 /**
@@ -20,34 +17,6 @@ public class Mod {
     public Mod(String modid, String name) {
         this.modid = modid.toLowerCase().intern();
         this.name = name;
-    }
-
-    /**
-     * Importe un mod à partir des informations sauvegardées dans un JSON.
-     *
-     * @throws JSONException en cas d'échec (absence de clé ou mauvais format).
-     */
-    public Mod(String modid, JSONObject json) throws JSONException {
-        this(modid, json.getString("name"));
-        if (json.has("url")) {
-            String url = json.getString("url");
-            this.url = url.length() == 0 ? null : url;
-        }
-        if (json.has("description")) {
-            String description = json.getString("description");
-            this.description = description.length() == 0 ? null : description;
-        }
-        if (json.has("updateJSON")) {
-            String updateJSON = json.getString("updateJSON");
-            this.updateJSON = updateJSON.length() == 0 ? null : updateJSON;
-        }
-    }
-
-    public void json(JSONObject json) {
-        json.put("name", this.name);
-        if (this.url != null) json.put("url", this.url);
-        if (this.description != null) json.put("description", this.description);
-        if (this.updateJSON != null) json.put("updateJSON", this.updateJSON);
     }
 
     /**

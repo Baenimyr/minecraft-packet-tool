@@ -16,6 +16,12 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * La commande <i>install</i> permet de récupérer les fichiers de mod présents sur le réseau.
+ * Pour l'installation d'un nouveau mod, l'utilisateur peut spécifier la version de son choix. Elle sera interpretée
+ * comme un intervalle et la version maximale possible sera installée. Si l'utilisateur spécifie une version de
+ * minecraft, spécifier la version du mod devient facultatif et c'est la version maximale
+ */
 @CommandLine.Command(name = "install", sortOptions = false, description = {"Permet l'installation de mods.",
 		"Chaque mod de la liste sera installé ou mis à jour vers la "
 				+ "dernière version compatibles avec le reste des mods."},
@@ -68,11 +74,15 @@ public class CommandeInstall implements Callable<Integer> {
 		final List<ModVersion> installations = new ArrayList<>();
 		
 		final VersionIntervalle mcversion = VersionIntervalle.read(this.mcversion);
+		if (mcversion == null) {
+			System.err.println("Vous devez spécifier une version de minecraft.");
+			return 1;
+		}
 		
 		depotLocal.importation();
 		depotInstallation.analyseDossier(depotLocal);
 		
-		for (Map.Entry<String, VersionIntervalle> demande : DepotInstallation.lectureDependances(this.mods)
+		for (Map.Entry<String, VersionIntervalle> demande : VersionIntervalle.lectureDependances(this.mods)
 				.entrySet()) {
 			if (!depotLocal.getModids().contains(demande.getKey())) {
 				System.out.println(String.format("Modid inconnu: '%s'", demande.getKey()));
