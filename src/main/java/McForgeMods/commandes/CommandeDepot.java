@@ -8,17 +8,14 @@ import McForgeMods.outils.Dossiers;
 import org.json.JSONException;
 import picocli.CommandLine;
 
-import java.io.IOException;
+import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.Callable;
 
 /**
@@ -177,12 +174,9 @@ public class CommandeDepot implements Runnable {
 	
 	@CommandLine.Command(name = "update", description = "Met à jour les informations du dépot à partir d'un autre.")
 	public int update(@CommandLine.Mixin ForgeMods.Help help,
-			
 			@CommandLine.Option(names = {"-d", "--depot"}, description = "Dépot local") Path adresseDepot,
-			
-			@CommandLine.Option(names = {"-f", "--from"}, arity = "1..n", description = "Dépot distant spécifique")
+			@CommandLine.Option(names = {"-f", "--from"}, arity = "0..n", description = "Dépot distant spécifique")
 					List<String> urlDistant,
-			
 			@CommandLine.Option(names = {"-c", "--clear"}, defaultValue = "false",
 					description = "Remplace totalement le dépot initial par les informations téléchargées.")
 					boolean clear) {
@@ -193,6 +187,18 @@ public class CommandeDepot implements Runnable {
 			} catch (IOException | JSONException e) {
 				System.err.println("Erreur de chargement du dépot local: " + e.getClass() + " " + e.getMessage());
 				return 1;
+			}
+		}
+		
+		if (urlDistant == null) {
+			urlDistant = new LinkedList<>();
+			final File fichier = depotLocal.dossier.resolve("sources.txt").toFile();
+			if (fichier.exists()) {
+				try (FileInputStream input = new FileInputStream(fichier); BufferedReader reader = new BufferedReader(new InputStreamReader(input))) {
+					reader.lines().map(String::toLowerCase).forEach(urlDistant::add);
+				} catch (IOException ignored) {
+					return -1;
+				}
 			}
 		}
 		

@@ -5,6 +5,12 @@ import McForgeMods.commandes.Show;
 import McForgeMods.outils.Dossiers;
 import picocli.CommandLine;
 
+import java.io.*;
+import java.nio.file.Path;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+
 @CommandLine.Command(name = "forgemods", showDefaultValues = true, mixinStandardHelpOptions = true,
 		subcommands = {Show.class, CommandeDepot.class})
 public class ForgeMods implements Runnable {
@@ -31,6 +37,38 @@ public class ForgeMods implements Runnable {
 		
 		
 		return 1;
+	}
+	
+	@CommandLine.Command(name = "add-repository")
+	public int ajout_repo(@CommandLine.Parameters(index = "0", arity = "1..n", paramLabel = "url") List<String> url,
+			@CommandLine.Option(names = {"-d", "--depot"}) Path depot) {
+		depot = Dossiers.dossierDepot(depot);
+		final Collection<String> sources = new HashSet<>();
+		
+		final File fichier = depot.resolve("sources.txt").toFile();
+		if (fichier.exists()) {
+			try (FileInputStream input = new FileInputStream(fichier);
+				 BufferedReader reader = new BufferedReader(new InputStreamReader(input))) {
+				reader.lines().map(String::toLowerCase).forEach(sources::add);
+			} catch (IOException ignored) {
+				return -1;
+			}
+		}
+		
+		url.stream().map(String::toLowerCase).forEach(sources::add);
+		
+		try (FileOutputStream output = new FileOutputStream(fichier);
+			 OutputStreamWriter buff = new OutputStreamWriter(output);
+			 BufferedWriter writer = new BufferedWriter(buff)) {
+			for (String src : sources) {
+				writer.write(src);
+				writer.write("\n");
+			}
+		} catch (IOException ignored) {
+			return -1;
+		}
+		
+		return 0;
 	}
 	
 	public static void main(String[] args) {

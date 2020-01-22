@@ -281,14 +281,22 @@ public class DepotLocal extends Depot {
 			this.lectureFichierIndex(new BufferedInputStream(is));
 		}
 		
-		for (String modid : this.getModids()) {
+		System.out.println("Récupérations des mods de " + depot_url);
+		final List<String> modids = new ArrayList<>(this.getModids());
+		for (int i = 0; i < modids.size(); i++) {
+			String modid = modids.get(i);
 			URL url_modid = Dossiers.fichierModDepot(depot_url, modid);
 			try (InputStream is = url_modid.openStream()) {
 				this.lectureFichierMod(modid, is);
+				float progres = (float) i / modids.size();
+				System.out.print(String.format("\r[%s>%s] %d/%d     ", "=".repeat((int) (50. * progres)),
+						" ".repeat((int) (50 * (1. - progres))), (i + 1), modids.size()));
 			} catch (FileNotFoundException f) {
 				System.err.println(
 						String.format("Les données de version pour le mod '%s' ne sont pas disponibles.", modid));
 			}
 		}
+		System.out.println();
+		System.out.println(String.format("%d mods récupérés.", modids.size()));
 	}
 }
