@@ -23,11 +23,10 @@ import java.util.concurrent.*;
  */
 @CommandLine.Command(name = "install", sortOptions = false, description = {"Permet l'installation de mods.",
 		"Chaque mod de la liste sera installé ou mis à jour vers la dernière version compatibles avec le reste des "
-				+ "mods."}, exitCodeListHeading = "%nListe des codes d'erreur:%n", exitCodeList = {
-		CommandeInstall.ERREUR_NOM + ":erreur de nom",
-		CommandeInstall.ERREUR_MODID + ":modid inconnu",
-		CommandeInstall.ERREUR_RESSOURCE + ":erreur de ressource",
-		CommandeInstall.ERREUR_URL + ":aucun lien disponible"})
+				+ "mods."}, exitCodeListHeading = "%nListe des codes d'erreur:%n",
+		exitCodeList = {CommandeInstall.ERREUR_NOM + ":erreur de nom", CommandeInstall.ERREUR_MODID + ":modid inconnu",
+				CommandeInstall.ERREUR_RESSOURCE + ":erreur de ressource",
+				CommandeInstall.ERREUR_URL + ":aucun lien disponible"})
 public class CommandeInstall implements Callable<Integer> {
 	static final int ERREUR_NOM       = 10;
 	static final int ERREUR_MODID     = ERREUR_NOM + 1;
@@ -144,10 +143,12 @@ public class CommandeInstall implements Callable<Integer> {
 		return telechargementMods(installations, depotInstallation.dossier);
 	}
 	
-	/** Téléchargement effectif de la liste des mods.
-	 *
+	/**
+	 * Téléchargement effectif de la liste des mods.
+	 * <p>
 	 * Tous les éléments de la liste sont traités indépendemment.
-	 * @param installations: liste des mods à télécharger
+	 *
+	 * @param installations:       liste des mods à télécharger
 	 * @param dossier_destination: dossier dans lequel placé les fichiers
 	 * @return 0 si tout s'est bien passé.
 	 */
@@ -163,10 +164,21 @@ public class CommandeInstall implements Callable<Integer> {
 		final List<TelechargementMod> telechargements = new ArrayList<>();
 		for (ModVersion modVersion : installations) {
 			try {
-				telechargements.add(new TelechargementMod(modVersion, dossier_destination));
+				URL url_final = null;
+				for (URL url : modVersion.urls) {
+					if (url.getProtocol().equals("file") || url.getProtocol().equals("http") || url.getProtocol()
+							.equals("https")) {
+						url_final = url;
+						break;
+					}
+				}
+				if (url_final == null) System.err.println(
+						String.format("Aucun lien de téléchargement pour '%s=%s'", modVersion.mod.modid,
+								modVersion.version));
+				else telechargements.add(new TelechargementMod(modVersion, dossier_destination, url_final));
 			} catch (MalformedURLException u) {
-				System.err.println(String.format("Aucun lien de téléchargement pour '%s=%s'", modVersion.mod.modid,
-						modVersion.version));
+				System.err.println(
+						String.format("Erreur de lien pour '%s=%s'", modVersion.mod.modid, modVersion.version));
 				return ERREUR_URL;
 			}
 		}
@@ -196,30 +208,26 @@ public class CommandeInstall implements Callable<Integer> {
 		 * Dossier .minecraft
 		 */
 		final Path             minecraft;
+		final URL              url;
 		final Transfert        transfert;
 		final FutureTask<Long> task;
 		
-		TelechargementMod(ModVersion modVersion, Path minecraft) throws MalformedURLException {
+		TelechargementMod(ModVersion modVersion, Path minecraft, URL url) throws MalformedURLException {
 			this.modVersion = modVersion;
 			this.minecraft = minecraft;
-			
-			Transfert transfert = null;
-			for (URL url : this.modVersion.urls) {
-				if (url.getProtocol().equals("file") || url.getProtocol().equals("http") || url.getProtocol()
-						.equals("https")) {
-					transfert = new Transfert(url, this.fichierCible());
-				}
-			}
-			if (transfert == null) throw new IllegalArgumentException("Aucun url valide");
-			
-			this.transfert = transfert;
+			this.url = url;
+			this.transfert = new Transfert(url, this.fichierCible());
 			this.task = new FutureTask<>(this.transfert);
 		}
 		
 		private URL fichierCible() throws MalformedURLException {
-			return Dossiers.dossierInstallationMod(minecraft, modVersion).resolve(
-					String.format("%s-%s-[%s].jar", modVersion.mod.modid, modVersion.version, modVersion.mcversion))
-					.toUri().toURL();
+			String nom = String
+					.format("%s-%s-%s.jar", modVersion.mod.modid, modVersion.mcversion, modVersion.version);
+			if (this.url.getPath().endsWith(".jar")) {
+				nom = this.url.getPath().substring(this.url.getPath().lastIndexOf('/') + 1);
+			}
+			
+			return Dossiers.dossierInstallationMod(minecraft, modVersion).resolve(nom).toUri().toURL();
 		}
 	}
 }
