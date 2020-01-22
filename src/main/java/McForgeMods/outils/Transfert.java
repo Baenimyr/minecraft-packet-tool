@@ -9,10 +9,10 @@ import java.nio.file.Path;
 import java.util.concurrent.Callable;
 
 public class Transfert implements Callable<Long> {
-	public final URL  source;
-	public final URL  destination;
-	protected    long total     = 0;
-	protected    long transfere = -1;
+	protected URL  source;
+	protected URL  destination;
+	protected long total     = 0;
+	protected long transfere = -1;
 	
 	public Transfert(URL source, URL destination) {
 		super();
@@ -24,7 +24,7 @@ public class Transfert implements Callable<Long> {
 		return total;
 	}
 	
-	public long getTransfere() {
+	public long getTransfered() {
 		return transfere;
 	}
 	
@@ -49,13 +49,12 @@ public class Transfert implements Callable<Long> {
 			try (final InputStream input = openInputStream(source);
 				 final OutputStream output = openOutputStream(destination)) {
 				if (input == null) {
-					return -1L;
-				} else if (output == null) {
+					System.err.println("Pas de flux entrant.");
 					return -1L;
 				} else {
 					int read;
 					for (byte[] buffer = new byte[8192];
-						 (read = input.read(buffer, 0, 8192)) >= 0; this.ajoutTransfere(read)) {
+							(read = input.read(buffer, 0, 8192)) >= 0; this.ajoutTransfere(read)) {
 						output.write(buffer, 0, read);
 					}
 				}
@@ -64,7 +63,7 @@ public class Transfert implements Callable<Long> {
 		return transfere;
 	}
 	
-	private InputStream openInputStream(URL source) throws URISyntaxException, FileNotFoundException, IOException {
+	private InputStream openInputStream(URL source) throws URISyntaxException, IllegalArgumentException, IOException {
 		if (source.getProtocol().equals("file")) {
 			final Path path = Path.of(source.toURI());
 			this.total = Files.size(path);
@@ -85,17 +84,20 @@ public class Transfert implements Callable<Long> {
 			this.total = connexion.getContentLengthLong();
 			return connexion.getInputStream();
 		} else {
-			return null;
+			throw new IllegalArgumentException("Protocol de sortie non géré: '" + source.getProtocol() + "'");
 		}
 	}
 	
-	private OutputStream openOutputStream(URL destination) throws URISyntaxException, FileNotFoundException {
-		if (source.getProtocol().equals("file")) {
+	private OutputStream openOutputStream(URL destination)
+			throws URISyntaxException, FileNotFoundException, IllegalArgumentException {
+		if (destination.getProtocol().equals("file")) {
 			final File fichier = Path.of(destination.toURI()).toFile();
 			if (fichier.getParentFile().exists() || fichier.getParentFile().mkdirs())
 				return new FileOutputStream(fichier);
-			else return null;
-		} else return null;
+			else throw new FileNotFoundException(fichier.toPath().toString() + ": dossier non inscriptible");
+		} else {
+			throw new IllegalArgumentException("Protocol de sortie non géré: '" + destination.getProtocol() + "'");
+		}
 	}
 	
 	public static long transfertFichierFichier(Path source, Path destination) throws IOException {

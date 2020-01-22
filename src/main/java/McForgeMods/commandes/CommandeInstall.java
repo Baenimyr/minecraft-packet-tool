@@ -14,13 +14,12 @@ import java.net.URL;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.stream.Collectors;
 
 /**
- * La commande <i>install</i> permet de récupérer les fichiers de mod présents sur le réseau.
- * Pour l'installation d'un nouveau mod, l'utilisateur peut spécifier la version de son choix. Elle sera interpretée
- * comme un intervalle et la version maximale possible sera installée. Si l'utilisateur spécifie une version de
- * minecraft, spécifier la version du mod devient facultatif et c'est la version maximale
+ * La commande <i>install</i> permet de récupérer les fichiers de mod présents sur le réseau. Pour l'installation d'un
+ * nouveau mod, l'utilisateur peut spécifier la version de son choix. Elle sera interpretée comme un intervalle et la
+ * version maximale possible sera installée. Si l'utilisateur spécifie une version de minecraft, spécifier la version du
+ * mod devient facultatif et c'est la version maximale
  */
 @CommandLine.Command(name = "install", sortOptions = false, description = {"Permet l'installation de mods.",
 		"Chaque mod de la liste sera installé ou mis à jour vers la "
@@ -87,7 +86,7 @@ public class CommandeInstall implements Callable<Integer> {
 			return 1;
 		}
 		
-		for (Map.Entry<String, VersionIntervalle> demande : VersionIntervalle.lectureDependances(this.mods)
+		for (final Map.Entry<String, VersionIntervalle> demande : VersionIntervalle.lectureDependances(this.mods)
 				.entrySet()) {
 			if (!depotLocal.getModids().contains(demande.getKey())) {
 				System.out.println(String.format("Modid inconnu: '%s'", demande.getKey()));
@@ -95,7 +94,7 @@ public class CommandeInstall implements Callable<Integer> {
 			}
 			Optional<ModVersion> candidat = depotLocal.getModVersions(demande.getKey()).stream()
 					.filter(mv -> mcversion.correspond(mv.mcversion))
-					.filter(mv -> demande.getValue().correspond(mv.version))
+					.filter(mv -> demande.getValue() == null || demande.getValue().correspond(mv.version))
 					.max(Comparator.comparing(mv -> mv.version));
 			if (candidat.isPresent()) {
 				installations.add(candidat.get());
@@ -149,54 +148,66 @@ public class CommandeInstall implements Callable<Integer> {
 		if (dry_run) return 0;
 		
 		final ExecutorService executor = Executors.newSingleThreadExecutor();
-		final Map<ModVersion, Transfert> telechargements = new LinkedHashMap<>();
+		final List<TelechargementMod> telechargements = new ArrayList<>();
 		for (ModVersion modVersion : installations) {
 			try {
-				final Transfert tele = telechargementMod(depotInstallation.dossier, modVersion);
-				if (tele == null) {
-					System.err.println(String.format("Aucun lien de téléchargement pour '%s=%s'", modVersion.mod.modid,
-							modVersion.version));
-					return ERREUR_URL;
-				}
-				telechargements.put(modVersion, tele);
+				telechargements.add(new TelechargementMod(modVersion, depotInstallation.dossier));
 			} catch (MalformedURLException u) {
-				u.printStackTrace();
+				System.err.println(String.format("Aucun lien de téléchargement pour '%s=%s'", modVersion.mod.modid,
+						modVersion.version));
+				return ERREUR_URL;
 			}
 		}
 		
-		final Map<Transfert, Future<Long>> futures = telechargements.values().stream()
-				.collect(Collectors.toMap(t -> t, executor::submit));
-		for (Map.Entry<ModVersion, Transfert> transfert : telechargements.entrySet()) {
+		telechargements.forEach(t -> executor.submit(t.task));
+		for (TelechargementMod tele : telechargements) {
 			try {
-				Future<Long> future = futures.get(transfert.getValue());
-				Long resultat = future.get();
+				Long resultat = tele.task.get();
 				if (resultat >= 0) System.out.println(
-						String.format("%-40s %.1f Ko", transfert.getKey().mod.modid + "=" + transfert.getKey().version,
-								(float) transfert.getValue().getTransfere() / 1024));
+						String.format("%-40s %.1f Ko", tele.modVersion.mod.modid + "=" + tele.modVersion.version,
+								(float) tele.transfert.getTransfered() / 1024));
+				else {
+					System.err.println(String.format("Erreur téléchargement de %s", tele.modVersion));
+				}
 			} catch (ExecutionException | InterruptedException erreur) {
-				erreur.printStackTrace();
+				System.err.println(String.format("Erreur téléchargement de '%s': %s", tele.modVersion, erreur.getMessage()));
+				// erreur.printStackTrace(System.err);
 			}
 		}
 		
 		return 0;
 	}
 	
-	private Transfert telechargementMod(final Path depot, ModVersion modVersion) throws MalformedURLException {
-		Transfert telechargement = null;
-		final Path fichier_cible = Dossiers.dossierInstallationMod(depot, modVersion)
-				.resolve(modVersion.mod.modid + "-" + modVersion.version + ".jar");
+	private static class TelechargementMod {
+		final ModVersion       modVersion;
+		/**
+		 * Dossier .minecraft
+		 */
+		final Path             minecraft;
+		final Transfert        transfert;
+		final FutureTask<Long> task;
 		
-		Iterator<URL> urls = modVersion.urls.iterator();
-		while (telechargement == null && urls.hasNext()) {
-			URL url = urls.next();
+		TelechargementMod(ModVersion modVersion, Path minecraft) throws MalformedURLException {
+			this.modVersion = modVersion;
+			this.minecraft = minecraft;
 			
-			if (url.getProtocol().equals("file") || url.getProtocol().equals("http") || url.getProtocol()
-					.equals("https")) {
-				telechargement = new Transfert(url, fichier_cible.toUri().toURL());
-			} else {
-				System.err.println("Protocol non supporté: " + url.getProtocol());
+			Transfert transfert = null;
+			for (URL url : this.modVersion.urls) {
+				if (url.getProtocol().equals("file") || url.getProtocol().equals("http") || url.getProtocol()
+						.equals("https")) {
+					transfert = new Transfert(url, this.fichierCible());
+				}
 			}
+			if (transfert == null) throw new IllegalArgumentException("Aucun url valide");
+			
+			this.transfert = transfert;
+			this.task = new FutureTask<>(this.transfert);
 		}
-		return telechargement;
+		
+		private URL fichierCible() throws MalformedURLException {
+			return Dossiers.dossierInstallationMod(minecraft, modVersion).resolve(
+					String.format("%s-%s-[%s].jar", modVersion.mod.modid, modVersion.version, modVersion.mcversion))
+					.toUri().toURL();
+		}
 	}
 }
