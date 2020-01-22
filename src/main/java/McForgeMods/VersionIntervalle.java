@@ -78,39 +78,39 @@ public class VersionIntervalle {
 			intervalle = true;
 		}
 		
-		int virgule = pos;
-		while (virgule < contraintes.length() && (contraintes.charAt(virgule) == '.' || Character
-				.isDigit(contraintes.charAt(virgule)))) {
-			if (contraintes.charAt(virgule) == '.') precision_minimum++;
-			virgule++;
+		if (!intervalle || contraintes.charAt(pos) != ',') {
+			Version.VersionBuilder b1 = new Version.VersionBuilder(contraintes, pos);
+			int fin = b1.read();
+			if (fin > pos) minimum = b1.version();
+			precision_minimum = b1.precision;
+			pos = fin;
 		}
-		
-		if (virgule > pos) minimum = Version.read(contraintes.substring(pos, virgule));
-		pos = virgule;
 		
 		if (intervalle) {
 			if (pos >= contraintes.length() || contraintes.charAt(pos) != ',')
 				throw new VersionIntervalleFormatException(
 						String.format("L'intervalle n'est pas fermée: '%s'", contraintes));
 			
-			virgule = ++pos;
-			while (virgule < contraintes.length() && (contraintes.charAt(virgule) == '.' || Character
-					.isDigit(contraintes.charAt(virgule)))) virgule++;
-			
-			if (virgule > pos) {
-				maximum = Version.read(contraintes.substring(pos, virgule));
-				pos = virgule;
+			pos++;
+			if (contraintes.charAt(pos) == ')') {
+				inclut_max = false;
+				pos++;
+			} else if (contraintes.charAt(pos) == ']') {
+				inclut_max = true;
+				pos++;
+			} else {
+				Version.VersionBuilder b2 = new Version.VersionBuilder(contraintes, pos);
+				int fin = b2.read();
+				if (fin > pos) maximum = b2.version();
+				pos = fin;
+				if (pos >= contraintes.length() || (contraintes.charAt(pos) != ')' && contraintes.charAt(pos) != ']'))
+					throw new VersionIntervalleFormatException(
+							String.format("Mauvaise façon de fermer une intervalle: '%s'", contraintes));
+				inclut_max = contraintes.charAt(pos++) == ']';
 			}
-			
-			if (pos >= contraintes.length() || (contraintes.charAt(pos) != ')' && contraintes.charAt(pos) != ']'))
-				throw new VersionIntervalleFormatException(
-						String.format("Mauvaise façon de fermer une intervalle: '%s'", contraintes));
-			inclut_max = contraintes.charAt(pos++) == ']';
-		}
-		if (contraintes.length() != pos) throw new VersionIntervalleFormatException(contraintes);
+		} if (contraintes.length() != pos) throw new VersionIntervalleFormatException(contraintes);
 		
-		if (minimum == null && maximum == null)
-			return null;
+		if (minimum == null && maximum == null) return null;
 		else if (intervalle) {
 			VersionIntervalle v = new VersionIntervalle(minimum, maximum);
 			v.inclut_min = inclut_min;
@@ -168,7 +168,7 @@ public class VersionIntervalle {
 					StringBuilder intervalle = new StringBuilder();
 					c = texte.charAt(pos);
 					while (pos < texte.length() && (Character.isDigit(c) || c == ',' || c == '[' || c == ']' || c == '('
-							|| c == ')' || c == '.')) {
+							|| c == ')' || c == '.' || c == '-' || c == '+')) {
 						intervalle.append(c);
 						pos++;
 						if (pos < texte.length()) c = texte.charAt(pos);
