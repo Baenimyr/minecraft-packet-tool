@@ -182,7 +182,7 @@ public class Depot {
 					if (this.contains(modid_d)) {
 						Optional<ModVersion> candidat = this.getModVersions(modid_d).stream()
 								.filter(modVersion -> modVersion.mcversion.equals(mver.mcversion))
-								.filter(modVersion -> version_d.correspond(modVersion.version))
+								.filter(modVersion -> version_d == VersionIntervalle.ouvert || version_d.correspond(modVersion.version))
 								.max(Comparator.comparing(m -> m.version));
 						candidat.ifPresent(temp::add);
 					}
@@ -204,7 +204,8 @@ public class Depot {
 		final Map<String, VersionIntervalle> absents = new HashMap<>();
 		for (Map.Entry<String, VersionIntervalle> dep : demande.entrySet()) {
 			if (!this.contains(dep.getKey()) || this.getModVersions(dep.getKey()).stream()
-					.noneMatch(m -> dep.getValue().correspond(m.version))) absents.put(dep.getKey(), dep.getValue());
+					.noneMatch(m -> dep.getValue() == VersionIntervalle.ouvert || dep.getValue().correspond(m.version))) absents.put(dep.getKey(),
+					dep.getValue());
 		}
 		return absents;
 	}

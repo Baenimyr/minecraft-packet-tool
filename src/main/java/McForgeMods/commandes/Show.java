@@ -85,8 +85,8 @@ public class Show implements Runnable {
 					VersionIntervalle version = entry.getValue();
 					if (depotLocal.contains(modid)) {
 						Optional<ModVersion> trouvee = depotLocal.getModVersions(modid).stream()
-								.filter(modVersion -> version.correspond(modVersion.version))
-								.max(Comparator.comparing(mv -> mv.version));
+								.filter(modVersion -> version == VersionIntervalle.ouvert || version
+										.correspond(modVersion.version)).max(Comparator.comparing(mv -> mv.version));
 						if (trouvee.isPresent()) resultat.add(trouvee.get());
 						else {
 							System.err.println(String.format("Version inconnue pour '%s': '%s'", modid, version));
@@ -208,7 +208,7 @@ public class Show implements Runnable {
 			for (Map.Entry<String, VersionIntervalle> rech : demandes.entrySet()) {
 				Mod mod = depotLocal.getMod(rech.getKey());
 				if (mod == null) System.err.println(String.format("Mod inconnu: '%s'", rech.getKey()));
-				else if (rech.getValue() == null) {
+				else if (rech.getValue() == VersionIntervalle.ouvert) {
 					mods.add(mod);
 				} else {
 					List<ModVersion> modVersion = depotLocal.getModVersions(mod).stream()

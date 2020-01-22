@@ -18,6 +18,8 @@ import java.util.Objects;
  * </ul>
  */
 public class VersionIntervalle {
+	public static final VersionIntervalle ouvert = null;
+	
 	Version minimum, maximum;
 	boolean inclut_min, inclut_max;
 	
@@ -145,7 +147,7 @@ public class VersionIntervalle {
 			final String texte = o.toString();
 			int pos = 0;
 			StringBuilder modid_builder = new StringBuilder();
-			VersionIntervalle versionIntervalle = null;
+			VersionIntervalle versionIntervalle = VersionIntervalle.ouvert;
 			
 			while (pos < texte.length()) {
 				char c = texte.charAt(pos);
