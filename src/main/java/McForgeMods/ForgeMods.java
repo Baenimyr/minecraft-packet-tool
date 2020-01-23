@@ -1,6 +1,7 @@
 package McForgeMods;
 
 import McForgeMods.commandes.CommandeDepot;
+import McForgeMods.commandes.CommandeInstall;
 import McForgeMods.commandes.Show;
 import McForgeMods.outils.Dossiers;
 import picocli.CommandLine;
@@ -12,7 +13,7 @@ import java.util.HashSet;
 import java.util.List;
 
 @CommandLine.Command(name = "forgemods", showDefaultValues = true, mixinStandardHelpOptions = true,
-		subcommands = {Show.class, CommandeDepot.class})
+		subcommands = {Show.class, CommandeDepot.class, CommandeInstall.class})
 public class ForgeMods implements Runnable {
 	
 	@CommandLine.Spec
@@ -26,17 +27,6 @@ public class ForgeMods implements Runnable {
 	public static class Help {
 		@CommandLine.Option(names = {"--help"}, usageHelp = true)
 		boolean help;
-	}
-	
-	@CommandLine.Command(name = "install", description = "Installe un mod et ses dépendances")
-	public int installation(@CommandLine.Mixin Dossiers.DossiersOptions dossiers, @CommandLine.Mixin Help help,
-			@CommandLine.Parameters(arity = "0..*", description = "Liste d'identifiants") String[] modids,
-			@CommandLine.Option(names = {"--dependences"}, negatable = true,
-					description = "Installe tous les autres mods nécessaires au bon fonctionnement de l'installation.")
-					boolean dependances) {
-		
-		
-		return 1;
 	}
 	
 	@CommandLine.Command(name = "add-repository")
