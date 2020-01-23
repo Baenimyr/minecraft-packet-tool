@@ -10,7 +10,9 @@ import picocli.CommandLine;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
@@ -183,7 +185,7 @@ public class CommandeInstall implements Callable<Integer> {
 					if (url_final == null) System.err.println(
 							String.format("Aucun lien de téléchargement pour '%s=%s'", modVersion.mod.modid,
 									modVersion.version));
-					else telechargements.add(new TelechargementMod(modVersion, depotInstallation.dossier, url_final));
+					else telechargements.add(new TelechargementMod(modVersion, depotInstallation, url_final));
 				} catch (MalformedURLException u) {
 					System.err.println(
 							String.format("Erreur de lien pour '%s=%s'", modVersion.mod.modid, modVersion.version));
@@ -193,42 +195,59 @@ public class CommandeInstall implements Callable<Integer> {
 		}
 		
 		if (dry_run) return 0;
-		telechargements.forEach(t -> executor.submit(t.task));
-		for (TelechargementMod tele : telechargements) {
+		
+		final Map<TelechargementMod, Future<Boolean>> tasks = new LinkedHashMap<>();
+		telechargements.forEach(t -> tasks.put(t, executor.submit(t)));
+		for (Map.Entry<TelechargementMod, Future<Boolean>> task : tasks.entrySet()) {
+			final TelechargementMod tele = task.getKey();
+			final Future<Boolean> future = task.getValue();
 			try {
-				Long resultat = tele.task.get();
-				// TODO: supprimer l'ancienne version
-				if (resultat >= 0) System.out.println(
-						String.format("%-20s %-20s %.1f Ko", tele.modVersion.mod.modid, tele.modVersion.version,
-								(float) tele.transfert.getTransfered() / 1024));
-				else {
-					System.err.println(String.format("Erreur téléchargement de %s", tele.modVersion));
-				}
+				future.get();
 			} catch (ExecutionException | InterruptedException erreur) {
 				System.err.println(
 						String.format("Erreur téléchargement de '%s': %s", tele.modVersion, erreur.getMessage()));
-				// erreur.printStackTrace(System.err);
+				erreur.printStackTrace(System.err);
 			}
 		}
 		return 0;
 	}
 	
-	private static class TelechargementMod {
-		final ModVersion       modVersion;
-		/**
-		 * Dossier .minecraft
-		 */
-		final Path             minecraft;
-		final URL              url;
-		final Transfert        transfert;
-		final FutureTask<Long> task;
+	private static class TelechargementMod implements Callable<Boolean> {
+		final ModVersion        modVersion;
+		final DepotInstallation minecraft;
+		final URL               url;
+		final Transfert         transfert;
 		
-		TelechargementMod(ModVersion modVersion, Path minecraft, URL url) throws MalformedURLException {
+		TelechargementMod(ModVersion modVersion, DepotInstallation minecraft, URL url) throws MalformedURLException {
 			this.modVersion = modVersion;
 			this.minecraft = minecraft;
 			this.url = url;
 			this.transfert = new Transfert(url, this.fichierCible());
-			this.task = new FutureTask<>(this.transfert);
+		}
+		
+		@Override
+		public Boolean call() throws Exception {
+			final long resultat = this.transfert.call();
+			if (resultat >= 0) {
+				synchronized (this.minecraft) {
+					this.minecraft.getModVersions(this.modVersion.mod).stream().filter(v -> !v.equals(this.modVersion))
+							.forEach(mv -> {
+								try {
+									Files.deleteIfExists(Path.of(mv.urls.get(0).toURI()));
+								} catch (URISyntaxException | IOException e) {
+									e.printStackTrace();
+								}
+							});
+				}
+				synchronized (System.out) {
+					System.out.println(String.format("%-20s %-20s %.1f Ko", modVersion.mod.modid, modVersion.version,
+							(float) transfert.getTransfered() / 1024));
+				}
+			} else {
+				System.err.println(String.format("Téléchargement échoué de %s", modVersion));
+				return false;
+			}
+			return true;
 		}
 		
 		private URL fichierCible() throws MalformedURLException {
@@ -237,7 +256,7 @@ public class CommandeInstall implements Callable<Integer> {
 				nom = this.url.getPath().substring(this.url.getPath().lastIndexOf('/') + 1);
 			}
 			
-			return Dossiers.dossierInstallationMod(minecraft, modVersion).resolve(nom).toUri().toURL();
+			return Dossiers.dossierInstallationMod(minecraft.dossier, modVersion).resolve(nom).toUri().toURL();
 		}
 	}
 }
