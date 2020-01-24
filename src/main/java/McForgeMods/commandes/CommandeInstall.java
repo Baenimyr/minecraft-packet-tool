@@ -230,14 +230,15 @@ public class CommandeInstall implements Callable<Integer> {
 			final long resultat = this.transfert.call();
 			if (resultat >= 0) {
 				synchronized (this.minecraft) {
-					this.minecraft.getModVersions(this.modVersion.mod).stream().filter(v -> !v.equals(this.modVersion))
-							.forEach(mv -> {
-								try {
-									Files.deleteIfExists(Path.of(mv.urls.get(0).toURI()));
-								} catch (URISyntaxException | IOException e) {
-									e.printStackTrace();
-								}
-							});
+					if (this.minecraft.contains(this.modVersion.mod))
+						this.minecraft.getModVersions(this.modVersion.mod).stream()
+								.filter(v -> !v.equals(this.modVersion)).forEach(mv -> {
+							try {
+								Files.deleteIfExists(Path.of(mv.urls.get(0).toURI()));
+							} catch (URISyntaxException | IOException e) {
+								e.printStackTrace();
+							}
+						});
 				}
 				synchronized (System.out) {
 					System.out.println(String.format("%-20s %-20s %.1f Ko", modVersion.mod.modid, modVersion.version,
