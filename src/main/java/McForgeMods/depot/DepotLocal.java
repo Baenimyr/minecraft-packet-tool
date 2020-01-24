@@ -210,9 +210,9 @@ public class DepotLocal extends Depot {
 			final JSONObject data = new JSONObject();
 			final Mod mod = this.mods.get(modid);
 			data.put("name", mod.name);
-			if (mod.url != null) data.put("url", mod.url);
-			if (mod.description != null) data.put("description", mod.description);
-			if (mod.updateJSON != null) data.put("updateJSON", mod.updateJSON);
+			if (mod.url != null && mod.url.length() > 0) data.put("url", mod.url);
+			if (mod.description != null && mod.description.length() > 0) data.put("description", mod.description);
+			if (mod.updateJSON != null && mod.updateJSON.length() > 0) data.put("updateJSON", mod.updateJSON);
 			json.put(modid, data);
 		}
 		

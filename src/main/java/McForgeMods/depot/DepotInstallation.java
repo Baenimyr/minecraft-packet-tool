@@ -34,9 +34,10 @@ import java.util.zip.ZipFile;
  * détecter cette erreur.
  */
 public class DepotInstallation extends Depot {
-	public static final Pattern                   minecraft_version = Pattern.compile(
-			"^1\\.(14(\\.[1-4])?|13(\\.[1-2])?|12(\\.[1-2])?|11(\\.1)?|10(\\.[1-2])?|9(\\.[1-4])?|8(\\.1)?|7(\\.[1-9]|(10))?)-");
-	public final        Path                      dossier;
+	public static final Pattern minecraft_version = Pattern.compile(
+			"^(1\\.14(\\.[1-4])?|1\\.13(\\.[1-2])?|1\\.12(\\.[1-2])?|1\\.11(\\.[1-2])?|1\\.10(\\.[1-2])?|1\\.9(\\"
+					+ ".[1-4])?|1\\.8(\\.1)?|1\\.7(\\.[1-9]|(10))?|1\\.6\\.[1-4]|1\\.5(\\.[1-2])?)-");
+	public final        Path    dossier;
 	
 	public DepotInstallation(Path dossier) {
 		this.dossier = Dossiers.dossierMinecraft(dossier);
@@ -86,6 +87,10 @@ public class DepotInstallation extends Depot {
 			mod.description = json.has("description") ? json.getString("description") : null;
 			mod.url = json.has("url") ? json.getString("url") : null;
 			mod.updateJSON = json.has("updateJSON") ? json.getString("updateJSON") : null;
+			
+			if (mod.description != null && mod.description.length() == 0) mod.description = null;
+			if (mod.url != null && mod.url.length() == 0) mod.url = null;
+			if (mod.updateJSON != null && mod.updateJSON.length() == 0) mod.updateJSON = null;
 			
 			final ModVersion modVersion = this.ajoutModVersion(new ModVersion(this.ajoutMod(mod), version, mcversion));
 			modVersion.ajoutURL(fichier.getAbsoluteFile().toURI().toURL());
@@ -137,10 +142,9 @@ public class DepotInstallation extends Depot {
 												version_alias.get().mcversion));
 								local.fusion(version_alias.get()); // confiance d'avoir identifier le fichier
 								local.ajoutURL(f.getAbsoluteFile().toURI().toURL());
-								continue;
 							}
 						}
-						System.err.println("Fichier jar incompatible: " + f.getName());
+						// System.err.println("Fichier jar incompatible: " + f.getName());
 					} catch (IOException i) {
 						System.err.println("Erreur sur '" + f.getName() + "': " + i.getMessage());
 					}
