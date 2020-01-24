@@ -85,7 +85,11 @@ public class Version implements Comparable<Version> {
 			if (this.versions[1] == version.versions[1]) {
 				if (this.versions[2] == version.versions[2]) {
 					if (this.versions[3] == version.versions[3]) {
-						return Arrays.compare((String[]) this.release.toArray(), (String[]) version.release.toArray());
+						for (int i = 0; i < this.release.size() && i < version.release.size(); i++) {
+							int diff = this.release.get(i).compareTo(version.release.get(i));
+							if (diff != 0) return diff;
+						}
+						return Integer.compare(this.release.size(), version.release.size());
 					} else return Integer.compare(this.versions[3], version.versions[3]);
 				} else return Integer.compare(this.versions[2], version.versions[2]);
 			} else return Integer.compare(this.versions[1], version.versions[1]);
