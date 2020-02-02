@@ -67,6 +67,8 @@ public class DepotLocal extends Depot {
 		
 		try (FileInputStream fichier = new FileInputStream(MODS)) {
 			lectureFichierIndex(fichier);
+		} catch (JSONException je) {
+			throw new JSONException("Erreur lecture fichier 'Mods.json'", je);
 		}
 		
 		ArrayList<String> modids = new ArrayList<>(getModids());
@@ -79,6 +81,8 @@ public class DepotLocal extends Depot {
 				BufferedInputStream buff = new BufferedInputStream(fichier);
 				if (buff.available() == 0) return;
 				lectureFichierMod(modid, buff);
+			} catch (JSONException je) {
+				throw new JSONException("Erreur lecture fichier '" + nom_fichier + "'", je);
 			}
 		}
 		System.err.flush();
@@ -117,7 +121,7 @@ public class DepotLocal extends Depot {
 	 * Analyse le fichier associé à un mod particulier pour extraire les informations de version.
 	 *
 	 * @param modid: identifiant du mod associé à ses informations.
-	 * @param input  contenu du fichier
+	 * @param input contenu du fichier
 	 */
 	private void lectureFichierMod(final String modid, final InputStream input) {
 		JSONTokener tokener = new JSONTokener(input);
@@ -273,7 +277,7 @@ public class DepotLocal extends Depot {
 	 *
 	 * @param depot_url : adresse à laquelle se trouve le dépot.
 	 * @throws MalformedURLException si l'url n'est pas conpatible avec l'exploration d'arborescence de fichier
-	 * @throws IOException           à la moindre erreur de lecture des flux réseau.
+	 * @throws IOException à la moindre erreur de lecture des flux réseau.
 	 */
 	public void synchronisationDepot(URL depot_url) throws MalformedURLException, IOException {
 		URL url_mods = Dossiers.fichierIndexDepot(depot_url);

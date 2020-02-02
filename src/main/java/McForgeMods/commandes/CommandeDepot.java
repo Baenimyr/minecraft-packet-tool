@@ -51,7 +51,7 @@ public class CommandeDepot implements Runnable {
 		try {
 			depot.importation();
 		} catch (IOException | JSONException i) {
-			System.err.println("Erreur de lecture du dépot: " + i.getClass() + " " + i.getMessage());
+			System.err.println("Erreur de lecture du dépot: " + i.getClass() + ": " + i.getMessage());
 			if (!force) return 1;
 		}
 		
@@ -60,7 +60,7 @@ public class CommandeDepot implements Runnable {
 		try {
 			depot.sauvegarde();
 		} catch (IOException i) {
-			System.err.println("Erreur d'écriture du dépot: " + i.getClass() + " " + i.getMessage());
+			System.err.println("Erreur d'écriture du dépot: " + i.getClass() + ": " + i.getMessage());
 			return 1;
 		}
 		
