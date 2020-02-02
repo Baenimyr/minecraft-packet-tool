@@ -2,6 +2,7 @@ package McForgeMods.commandes;
 
 import McForgeMods.ForgeMods;
 import McForgeMods.ModVersion;
+import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
 import McForgeMods.outils.Dossiers;
@@ -27,7 +28,8 @@ import java.util.concurrent.Callable;
  * <i>mcmod.info</i> des fichiers jar trouvés.
  */
 @CommandLine.Command(name = "depot", subcommands = {CommandeDepot.importation.class},
-		description = {"Outil de gestion d'un dépot.", "Une installation minecraft peut être utilisée comme source de fichiers."})
+		description = {"Outil de gestion d'un dépot.",
+				"Une installation minecraft peut être utilisée comme source de fichiers."})
 public class CommandeDepot implements Runnable {
 	
 	@CommandLine.Option(names = {"--help"}, usageHelp = true)
@@ -46,7 +48,8 @@ public class CommandeDepot implements Runnable {
 	public int refresh(@CommandLine.Mixin Dossiers.DossiersOptions dossiers, @CommandLine.Mixin ForgeMods.Help help,
 			@CommandLine.Option(names = {"-f", "--force"}, defaultValue = "false",
 					description = "Force la sauvegarde du dépot, même après des erreurs lors de l'importation.")
-					boolean force) {
+					boolean force, @CommandLine.Option(names = {"-v", "--verbose"}, defaultValue = "false",
+			description = "Affiche plus d'informations sur les erreurs.") boolean verbose) {
 		DepotLocal depot = new DepotLocal(dossiers.depot);
 		try {
 			depot.importation();
@@ -56,6 +59,36 @@ public class CommandeDepot implements Runnable {
 		}
 		
 		System.out.println(String.format("Dépot importé: %d versions disponibles", depot.sizeModVersion()));
+		
+		if (verbose) {
+			ArrayList<String> modids = new ArrayList<>(depot.getModids());
+			modids.sort(String::compareTo);
+			for (String modid : modids) {
+				for (ModVersion version : depot.getModVersions(modid)) {
+					if (version.urls.isEmpty()) {
+						System.out
+								.println(String.format("%s: aucun urls de téléchargement", version.toStringStandard()));
+					}
+				}
+			}
+			
+			for (final String modid : modids) {
+				for (final ModVersion version : depot.getModVersions(modid)) {
+					Map<String, VersionIntervalle> dependance = depot.listeDependances(Collections.singleton(version));
+					for (final String dep_id : dependance.keySet()) {
+						if (!dep_id.equals("forge")) {
+							final VersionIntervalle dep_int = dependance.get(dep_id);
+							if (!depot.contains(dep_id) || depot.getModVersions(dep_id).stream().noneMatch(
+									v -> dep_int == VersionIntervalle.ouvert || dep_int.correspond(v.version))) {
+								System.out.println(String.format(
+										"'%s' a besoin de '%s@%s', mais il n'est pas disponible dans le dépôt !",
+										version.toStringStandard(), dep_id, dependance.get(dep_id)));
+							}
+						}
+					}
+				}
+			}
+		}
 		
 		try {
 			depot.sauvegarde();
@@ -176,10 +209,8 @@ public class CommandeDepot implements Runnable {
 	public int update(@CommandLine.Mixin ForgeMods.Help help,
 			@CommandLine.Option(names = {"-d", "--depot"}, description = "Dépot local") Path adresseDepot,
 			@CommandLine.Option(names = {"-f", "--from"}, arity = "0..n", description = "Dépot distant spécifique")
-					List<String> urlDistant,
-			@CommandLine.Option(names = {"-c", "--clear"}, defaultValue = "false",
-					description = "Remplace totalement le dépot initial par les informations téléchargées.")
-					boolean clear) {
+					List<String> urlDistant, @CommandLine.Option(names = {"-c", "--clear"}, defaultValue = "false",
+			description = "Remplace totalement le dépot initial par les informations téléchargées.") boolean clear) {
 		final DepotLocal depotLocal = new DepotLocal(adresseDepot);
 		if (!clear) {
 			try {
@@ -194,7 +225,8 @@ public class CommandeDepot implements Runnable {
 			urlDistant = new LinkedList<>();
 			final File fichier = depotLocal.dossier.resolve("sources.txt").toFile();
 			if (fichier.exists()) {
-				try (FileInputStream input = new FileInputStream(fichier); BufferedReader reader = new BufferedReader(new InputStreamReader(input))) {
+				try (FileInputStream input = new FileInputStream(fichier);
+					 BufferedReader reader = new BufferedReader(new InputStreamReader(input))) {
 					reader.lines().map(String::toLowerCase).forEach(urlDistant::add);
 				} catch (IOException ignored) {
 					return -1;

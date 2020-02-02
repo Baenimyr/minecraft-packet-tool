@@ -106,6 +106,10 @@ public class ModVersion {
 	
 	@Override
 	public String toString() {
-		return "ModVersion{" + "mod=" + mod.name + ", version=" + version + ", mcversion=" + mcversion + '}';
+		return String.format("%s %s [%s]", mod.name, version, mcversion);
+	}
+	
+	public String toStringStandard() {
+		return String.format("%s-%s-[%s]", mod.modid, version, mcversion);
 	}
 }
