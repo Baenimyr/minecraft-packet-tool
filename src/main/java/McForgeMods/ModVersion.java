@@ -48,7 +48,10 @@ public class ModVersion {
 	 * Ajoute un url sans doublons.
 	 */
 	public void ajoutURL(URL url) {
-		if (!this.urls.contains(url)) this.urls.add(url);
+		for (URL u : this.urls)
+			if (u.toString().equals(url.toString()))
+				return;
+		this.urls.add(url);
 	}
 	
 	/**
