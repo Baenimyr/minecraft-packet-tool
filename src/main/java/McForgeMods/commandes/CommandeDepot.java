@@ -2,11 +2,13 @@ package McForgeMods.commandes;
 
 import McForgeMods.ForgeMods;
 import McForgeMods.ModVersion;
+import McForgeMods.depot.DepotDistant;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
 import McForgeMods.outils.Dossiers;
 import org.json.JSONException;
 import picocli.CommandLine;
+import tar.FichierTar;
 
 import java.io.*;
 import java.net.MalformedURLException;
@@ -194,7 +196,8 @@ public class CommandeDepot implements Runnable {
 			urlDistant = new LinkedList<>();
 			final File fichier = depotLocal.dossier.resolve("sources.txt").toFile();
 			if (fichier.exists()) {
-				try (FileInputStream input = new FileInputStream(fichier); BufferedReader reader = new BufferedReader(new InputStreamReader(input))) {
+				try (FileInputStream input = new FileInputStream(fichier);
+					 BufferedReader reader = new BufferedReader(new InputStreamReader(input))) {
 					reader.lines().map(String::toLowerCase).forEach(urlDistant::add);
 				} catch (IOException ignored) {
 					return -1;
@@ -203,9 +206,42 @@ public class CommandeDepot implements Runnable {
 		}
 		
 		for (String depot : urlDistant) {
+			if (depot.startsWith("#")) continue;
+			
 			try {
-				URL url = new URL(Path.of(".").toUri().toURL(), depot);
-				depotLocal.synchronisationDepot(url);
+				final URL url = new URL(Path.of(".").toUri().toURL(), depot);
+				System.out.println("Lecture du dépot '" + url + "'");
+				if (url.getPath().endsWith(".tar")) {
+					try (InputStream s = url.openStream()) {
+						final FichierTar tar = new FichierTar(s);
+						depotLocal.synchronisationDepot(new DepotDistant() {
+							@Override
+							public InputStream fichierIndexDepot() throws FileNotFoundException {
+								return tar.fichier("Mods.json").getInputStream();
+							}
+							
+							@Override
+							public InputStream fichierModDepot(String modid) throws FileNotFoundException {
+								return tar.fichier(modid.substring(0, 1) + "/" + modid + "/" + modid + ".json")
+										.getInputStream();
+							}
+						});
+					} catch (FileNotFoundException fnfe) {
+						System.err.println("Fichier absent dans l'archive : '" + fnfe.getMessage() + "'");
+					}
+				} else {
+					depotLocal.synchronisationDepot(new DepotDistant() {
+						@Override
+						public InputStream fichierIndexDepot() throws IOException {
+							return Dossiers.fichierIndexDepot(url).openStream();
+						}
+						
+						@Override
+						public InputStream fichierModDepot(String modid) throws IOException {
+							return Dossiers.fichierModDepot(url, modid).openStream();
+						}
+					});
+				}
 			} catch (MalformedURLException u) {
 				System.err.println("URL invalide: " + u.getMessage());
 			} catch (IOException io) {

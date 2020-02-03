@@ -1,6 +1,8 @@
 package tar;
 
-import java.io.*;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -12,8 +14,9 @@ public class FichierTar {
 	public FichierTar(InputStream fichier) throws IOException {
 		while (fichier.available() > 0) {
 			final byte[] teteb = new byte[512];
-			if (fichier.read(teteb, 0, 512) != 512)
-				throw new IOException();
+			int lu = 0;
+			while (lu < 512)
+				lu += fichier.read(teteb, lu, 512 - lu);
 			if (teteb[0] != 0) {
 				EntreeTar entree = new EntreeTar(teteb, fichier);
 				// System.out.println(entree);
@@ -44,11 +47,5 @@ public class FichierTar {
 	
 	public EntreeTar fichier(Path fichier) throws FileNotFoundException {
 		return this.fichier(fichier.toString());
-	}
-	
-	public static void main(String[] args) throws IOException {
-		try (FileInputStream fichier = new FileInputStream(new File("build.tar"))) {
-			FichierTar tar = new FichierTar(fichier);
-		}
 	}
 }
