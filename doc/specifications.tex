@@ -113,7 +113,7 @@ Les informations que l'on peut y trouver sont:
 \centering
 \begin{verbatim}
 [
-    "<modid>"{
+    "<modid>": {
         "name": <name>,
         "description": <description>,
         "url": <url>,
@@ -149,10 +149,12 @@ Tous les liens vers d'autres ressources seront des URLs.
 À la différence d'une simple chaîne de caractères, les URLs fournissent toutes les informations sur la méthode à employer pour récupérer la ressource (http, ftp, \dots).
 Les URLs spécifiés pour le téléchargement de fichier peuvent être seulement relatifs, alors la résolution de l'URL complet se fera par rapport à l'URL menant à la racine du dépôt (virtuel ou local).
 Un URL relatif est même conseillé pour pouvoir déplacer facilement un dépot sur n'importe quel autre support, derrière n'importe quel protocol.
-
-Lors de la synchronisation avec un dépôt distant, l'URL complet est résolus pour pouvoir ensuite ignorer le dépôt ayant fournit cette information et ne pas le confondre avec d'autres liens.
-À l'opposé, principalement pour les dépôt locaux, tout URL partageant une partie commune avec la racine du dépôt sera réduit à l'URL relatif.
+Tout URL partageant une partie commune avec la racine du dépôt sera réduit à l'URL relatif.
 Ce système considère le dépôt local comme un potentiel dépôt distant pour d'autres utilisateurs.
+
+La synchronisation se fait en lisant les fichiers du dépôt distants et en ajoutant au dépot actuel les nouvelles informations, ainsi en cas de conflit entre différents dépôt, le premier de la liste est utilisé.
+De préférence, les fichiers du dépôt doivent être rassemblé dans un fichier tar pour accélérer le téléchargement: une seule connexion seulement doit être établie au lieu d'une connexion par fichier.
+Pour un dépôt correct, le dépôt local doit être effacé pour être remplacé par la compilation des dépôt distants, cependant l'utilisateur peut choisir de conserver les informations déjà présentes en les supposant à jour.
 
 
 \section{Fichiers locaux}
@@ -181,14 +183,14 @@ Description de commandes utiles:
 \begin{itemize}
     \item \texttt{show list [regex] [--v] [----all] [----installes]} affiche les mods connus: dans l'installation, et/ou dans le dépôt.
 L'option --v permet d'afficher toutes les informations connues (ne pas combiner avec \texttt{----all}).
-    \item \texttt{show dependences [----absents]}: affiche la liste des dépendances pour les mods dans l'installation minecraft, ou seulement les absents.
+    \item \texttt{show dependencies [----absents]}: affiche la liste des dépendances pour les mods dans l'installation minecraft, ou seulement les absents.
     \item \texttt{show mod modid[@version]}: affiche les informations du dépôt relatives au mod.
-    \item \texttt{update}: met à jour le dépôt local grâce aux dépôts distants.
     \item \texttt{install modid}: installe un nouveau mod grâce aux informations dans le dépôt local.
-    \item \texttt{uninstall modid}: désinstalle un mod. Ne fait pas la différence entre les mods installés manuellement et les installations automatiques.
+    \item \texttt{depot refresh}: importe et sauvegarde le dépôt pour vérifier son intégrité.
     \item \texttt{depot import [modid] [----all]}: importe les informations extraites des mods dans l'installation vers le dépôt local.
 Necessite une installation minecraft.
-    \item \texttt{depot udpate}: similaire à \texttt{update}
+    \item \texttt{depot udpate}: met à jour le dépôt en téléchargeant les informations sur les dépôts internet.
+    \item \texttt{add--repository}: enregistre une nouvelle adresse internet de dépôt
 \end{itemize}
 
 
