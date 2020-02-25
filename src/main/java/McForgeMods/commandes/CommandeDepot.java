@@ -6,6 +6,7 @@ import McForgeMods.depot.DepotDistant;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
 import McForgeMods.outils.Dossiers;
+import McForgeMods.outils.Sources;
 import org.json.JSONException;
 import picocli.CommandLine;
 import tar.FichierTar;
@@ -192,26 +193,37 @@ public class CommandeDepot implements Runnable {
 			}
 		}
 		
+		Sources sources;
 		if (urlDistant == null) {
 			urlDistant = new LinkedList<>();
 			final File fichier = depotLocal.dossier.resolve("sources.txt").toFile();
 			if (fichier.exists()) {
-				try (FileInputStream input = new FileInputStream(fichier);
-					 BufferedReader reader = new BufferedReader(new InputStreamReader(input))) {
-					reader.lines().map(String::toLowerCase).forEach(urlDistant::add);
+				try (FileInputStream input = new FileInputStream(fichier)) {
+					sources = new Sources(input);
 				} catch (IOException ignored) {
 					return -1;
+				}
+			} else {
+				System.err.println("Aucune sources disponible.");
+				return 2;
+			}
+		} else {
+			sources = new Sources();
+			for (String url : urlDistant) {
+				try {
+					sources.add(new URL(url));
+				} catch (MalformedURLException m) {
+					System.err.println(String.format("MalformedURL: '%s'", url));
 				}
 			}
 		}
 		
-		for (String depot : urlDistant) {
-			if (depot.startsWith("#")) continue;
-			
+		int i = 0;
+		Map<URL, Sources.SourceType> src = sources.urls();
+		for (URL url : src.keySet()) {
+			System.out.println(String.format("%d/%d\t%s", ++i, sources.size(), url));
 			try {
-				final URL url = new URL(Path.of(".").toUri().toURL(), depot);
-				System.out.println("Lecture du dépot '" + url + "'");
-				if (url.getPath().endsWith(".tar")) {
+				if (src.get(url) == Sources.SourceType.TAR) {
 					try (InputStream s = url.openStream()) {
 						final FichierTar tar = new FichierTar(s);
 						depotLocal.synchronisationDepot(new DepotDistant() {
@@ -233,12 +245,13 @@ public class CommandeDepot implements Runnable {
 					depotLocal.synchronisationDepot(new DepotDistant() {
 						@Override
 						public InputStream fichierIndexDepot() throws IOException {
-							return Dossiers.fichierIndexDepot(url).openStream();
+							return new URL(url, "Mods.json").openStream();
 						}
 						
 						@Override
 						public InputStream fichierModDepot(String modid) throws IOException {
-							return Dossiers.fichierModDepot(url, modid).openStream();
+							return new URL(url, modid.substring(0, 1) + "/" + modid + "/" + modid + ".json")
+									.openStream();
 						}
 					});
 				}
