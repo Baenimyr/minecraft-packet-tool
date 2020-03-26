@@ -28,6 +28,13 @@ public class VersionIntervalle {
 		this.inclut_min = this.inclut_max = false;
 	}
 	
+	public VersionIntervalle(final VersionIntervalle v) {
+		this.minimum = v.minimum;
+		this.maximum = v.maximum;
+		this.inclut_min = v.inclut_min;
+		this.inclut_max = v.inclut_max;
+	}
+	
 	public VersionIntervalle(Version minimum, Version maximum) {
 		this.minimum = minimum;
 		this.maximum = maximum;
