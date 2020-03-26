@@ -4,6 +4,7 @@ import McForgeMods.ForgeMods;
 import McForgeMods.Mod;
 import McForgeMods.ModVersion;
 import McForgeMods.VersionIntervalle;
+import McForgeMods.depot.ArbreDependance;
 import McForgeMods.depot.Depot;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
@@ -104,20 +105,20 @@ public class Show implements Runnable {
 			}
 			
 			// Liste complète des dépendances nécessaire pour la liste des mods présent.
-			final Map<String, VersionIntervalle> dependances = depotLocal.listeDependances(listeRecherche);
-			Map<String, VersionIntervalle> liste;
+			ArbreDependance arbre_dependances = new ArbreDependance(depotLocal, listeRecherche);
+			Map<Mod, VersionIntervalle> liste;
 			if (missing) {
-				liste = depotInstallation.dependancesAbsentes(dependances);
+				liste = depotInstallation.dependancesAbsentes(arbre_dependances.requis());
 				System.out.println(String.format("%d absents", liste.size()));
 			} else {
-				liste = dependances;
+				liste = arbre_dependances.requis();
 				System.out.println(String.format("%d dépendances", liste.size()));
 			}
 			
-			ArrayList<String> modids = new ArrayList<>(liste.keySet());
-			modids.sort(String::compareTo);
-			for (String dep : modids) {
-				System.out.println(dep + " " + liste.get(dep));
+			ArrayList<Mod> modids = new ArrayList<>(liste.keySet());
+			modids.sort(Mod::compareTo);
+			for (Mod dep : modids) {
+				System.out.println(dep.modid + " " + liste.get(dep));
 			}
 			return 0;
 		}

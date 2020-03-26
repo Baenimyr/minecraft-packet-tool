@@ -148,51 +148,6 @@ public class Depot {
 	}
 	
 	/**
-	 * Construit la liste des dépendances. Pour chaque mod présent dans la liste, extrait les dépendances et réalise
-	 * l'intersection entre les intervalles de version. La fonction utilise les informations du dépot comme source
-	 * d'informations pour les nouveaux mods rencontrés. Si un mod à étudier est inconnu, ses dépendances sont
-	 * ignorées.
-	 * <p>
-	 * Si une dépendance porte sur un modid présent dans la liste à explorer, c'est la version en entrée qui est
-	 * utilisée pour le reste de la résolution. Sinon l'algorithme fait l'hypothèse d'utiliser la version compatible la
-	 * plus <b>récente</b>.
-	 *
-	 * @param liste: liste des mods pour lesquels chercher les dépendances.
-	 * @return une map{modid -> version}
-	 */
-	public HashMap<String, VersionIntervalle> listeDependances(Collection<ModVersion> liste) {
-		final HashMap<String, VersionIntervalle> requis = new HashMap<>();
-		
-		final LinkedList<ModVersion> temp = new LinkedList<>(liste);
-		while (!temp.isEmpty()) {
-			ModVersion nouveau = temp.removeFirst();
-			Optional<ModVersion> local = this.getModVersion(nouveau.mod, nouveau.version);
-			final ModVersion mver = local.orElse(nouveau);
-			
-			for (Map.Entry<String, VersionIntervalle> dependance : mver.requiredMods.entrySet()) {
-				String modid_d = dependance.getKey();
-				VersionIntervalle version_d = dependance.getValue();
-				// Si un mod a déjà été rencontré, les intervalles sont fusionnées.
-				if (requis.containsKey(modid_d) && requis.get(modid_d) != null)
-					requis.get(modid_d).intersection(version_d);
-					// Si un mod possible est en attente, il servira à la résolution
-				else if (temp.stream().map(mv -> mv.mod.modid).noneMatch(modid -> modid.equals(modid_d))) {
-					requis.put(modid_d, version_d);
-					
-					if (this.contains(modid_d)) {
-						Optional<ModVersion> candidat = this.getModVersions(modid_d).stream()
-								.filter(modVersion -> modVersion.mcversion.equals(mver.mcversion))
-								.filter(modVersion -> version_d == VersionIntervalle.ouvert || version_d.correspond(modVersion.version))
-								.max(Comparator.comparing(m -> m.version));
-						candidat.ifPresent(temp::add);
-					}
-				}
-			}
-		}
-		return requis;
-	}
-	
-	/**
 	 * Fait la liste des versions absentes.
 	 * <p>
 	 * Parmis les dépendances fournies en entrée, cherche dans le dépot, si une version compatible existe. !!! Ne
@@ -200,9 +155,9 @@ public class Depot {
 	 *
 	 * @return une map {modid -> version} des demandes qui n'ont pas trouvée de correspondance.
 	 */
-	public Map<String, VersionIntervalle> dependancesAbsentes(final Map<String, VersionIntervalle> demande) {
-		final Map<String, VersionIntervalle> absents = new HashMap<>();
-		for (Map.Entry<String, VersionIntervalle> dep : demande.entrySet()) {
+	public Map<Mod, VersionIntervalle> dependancesAbsentes(final Map<Mod, VersionIntervalle> demande) {
+		final Map<Mod, VersionIntervalle> absents = new HashMap<>();
+		for (Map.Entry<Mod, VersionIntervalle> dep : demande.entrySet()) {
 			if (!this.contains(dep.getKey()) || this.getModVersions(dep.getKey()).stream()
 					.noneMatch(m -> dep.getValue() == VersionIntervalle.ouvert || dep.getValue().correspond(m.version))) absents.put(dep.getKey(),
 					dep.getValue());

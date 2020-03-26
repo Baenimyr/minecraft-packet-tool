@@ -15,9 +15,7 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.LinkedList;
-import java.util.Optional;
-import java.util.Queue;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -34,13 +32,24 @@ import java.util.zip.ZipFile;
  * détecter cette erreur.
  */
 public class DepotInstallation extends Depot {
-	public static final Pattern minecraft_version = Pattern.compile(
+	public static final Pattern                             minecraft_version = Pattern.compile(
 			"^(1\\.14(\\.[1-4])?|1\\.13(\\.[1-2])?|1\\.12(\\.[1-2])?|1\\.11(\\.[1-2])?|1\\.10(\\.[1-2])?|1\\.9(\\"
 					+ ".[1-4])?|1\\.8(\\.1)?|1\\.7(\\.[1-9]|(10))?|1\\.6\\.[1-4]|1\\.5(\\.[1-2])?)-");
-	public final        Path    dossier;
+	public final        Path                                dossier;
+	private final       Map<ModVersion, StatusInstallation> installation = new WeakHashMap<>();
 	
 	public DepotInstallation(Path dossier) {
 		this.dossier = Dossiers.dossierMinecraft(dossier);
+	}
+	
+	public static class StatusInstallation {
+		public final ModVersion mod;
+		/** Ce mod a-t-il été installé automatiquement en temps que dependance. */
+		public boolean automatique = false;
+		
+		public StatusInstallation(ModVersion mod) {
+			this.mod = mod;
+		}
 	}
 	
 	/**

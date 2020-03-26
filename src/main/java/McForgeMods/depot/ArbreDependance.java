@@ -105,4 +105,24 @@ public class ArbreDependance {
 	public Map<Mod, VersionIntervalle> requis() {
 		return this.mods;
 	}
+	
+	/** Isole les mods nécessaire pour les ancres.
+	 * Tous les mods non choisis sont donc inutiles.
+	 */
+	public Set<Mod> sousgraphe(Set<Mod> ancres) {
+		Set<Mod> selection = new HashSet<>();
+		LinkedList<Mod> nouveaux = new LinkedList<>(ancres);
+		
+		while (!nouveaux.isEmpty()) {
+			Mod mod = nouveaux.removeFirst();
+			selection.add(mod);
+			
+			if (this.dependances.containsKey(mod))
+				for (Mod dep : this.dependances.get(mod))
+					if (!selection.contains(dep) && !nouveaux.contains(dep))
+						nouveaux.add(dep);
+		}
+		
+		return selection;
+	}
 }

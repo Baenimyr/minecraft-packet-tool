@@ -1,7 +1,9 @@
 package McForgeMods.commandes;
 
+import McForgeMods.Mod;
 import McForgeMods.ModVersion;
 import McForgeMods.VersionIntervalle;
+import McForgeMods.depot.ArbreDependance;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
 import McForgeMods.outils.Dossiers;
@@ -111,12 +113,13 @@ public class CommandeInstall implements Callable<Integer> {
 		}
 		
 		if (this.dependances) {
-			final Map<String, VersionIntervalle> dependances = depotLocal.listeDependances(installations);
-			for (final Map.Entry<String, VersionIntervalle> dependance : dependances.entrySet()) {
-				if (dependance.getKey().equalsIgnoreCase("forge")) continue;
+			ArbreDependance arbre_dependances = new ArbreDependance(depotLocal, installations);
+			final Map<Mod, VersionIntervalle> dependances = arbre_dependances.requis();
+			for (final Map.Entry<Mod, VersionIntervalle> dependance : dependances.entrySet()) {
+				if (dependance.getKey().modid.equalsIgnoreCase("forge")) continue;
 				
 				Optional<ModVersion> conflit = installations.stream()
-						.filter(mv -> mv.mod.modid.equals(dependance.getKey()))
+						.filter(mv -> mv.mod.equals(dependance.getKey()))
 						.filter(mv -> !dependance.getValue().correspond(mv.version)).findAny();
 				if (conflit.isPresent()) {
 					System.err.println(String.format("Le mod requis '%s@%s' est en concurrence avec '%s@=%s'.",

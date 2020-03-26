@@ -7,7 +7,7 @@ import java.util.Objects;
  * Elle contient toutes les informations indépendantes des versions associées à un <i>modid</i>.
  * Ces informations se retrouveront sauvegardées dans le fichier <i>Mods.xz</i> en tête de dépôt.
  */
-public class Mod {
+public class Mod implements Comparable<Mod> {
     public final String modid;
     public final String name;
     public String url = null;
@@ -49,6 +49,11 @@ public class Mod {
                 ", name='" + name + '\'' +
                 ", description='" + description + '\'' +
                 '}';
+    }
+    
+    @Override
+    public int compareTo(Mod mod) {
+        return this.modid.compareTo(mod.modid);
     }
     
     public Mod copy() {
