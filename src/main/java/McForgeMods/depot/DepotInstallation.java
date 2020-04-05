@@ -4,7 +4,6 @@ import McForgeMods.Mod;
 import McForgeMods.ModVersion;
 import McForgeMods.Version;
 import McForgeMods.VersionIntervalle;
-import McForgeMods.outils.Dossiers;
 import McForgeMods.outils.NoNewlineReader;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -38,8 +37,16 @@ public class DepotInstallation extends Depot {
 	public final        Path                                dossier;
 	private final       Map<ModVersion, StatusInstallation> installation = new WeakHashMap<>();
 	
+	/** Ouvre un dossier pour l'installation des mods.
+	 * Par défaut, ce dossier est ~/.minecraft/mods.
+	 * @param dossier d'installation ou {@code null}
+	 */
 	public DepotInstallation(Path dossier) {
-		this.dossier = Dossiers.dossierMinecraft(dossier);
+		if (dossier != null)
+			this.dossier = dossier.toAbsolutePath();
+		else {
+			this.dossier = Path.of(System.getProperty("user.home")).resolve(".minecraft").resolve("mods");
+		}
 	}
 	
 	public static class StatusInstallation {

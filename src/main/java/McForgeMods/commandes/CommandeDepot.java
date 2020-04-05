@@ -50,7 +50,7 @@ public class CommandeDepot implements Runnable {
 	
 	@CommandLine.Command(name = "refresh", description = "Importe est sauvegarde le dépot.\nPermet de détecter des "
 			+ "erreurs. En cas d'erreur ne sauvegarde pas les informations corrompues.")
-	public int refresh(@CommandLine.Mixin Dossiers.DossiersOptions dossiers, @CommandLine.Mixin ForgeMods.Help help,
+	public int refresh(@CommandLine.Mixin ForgeMods.DossiersOptions dossiers, @CommandLine.Mixin ForgeMods.Help help,
 			@CommandLine.Option(names = {"-f", "--force"}, defaultValue = "false",
 					description = "Force la sauvegarde du dépot, même après des erreurs lors de l'importation.")
 					boolean force, @CommandLine.Option(names = {"-v", "--verbose"}, defaultValue = "false",
@@ -124,9 +124,9 @@ public class CommandeDepot implements Runnable {
 		String   prefix = null;
 		
 		@CommandLine.Mixin
-		Dossiers.DossiersOptions dossiers;
+		ForgeMods.DossiersOptions dossiers;
 		@CommandLine.Mixin
-		ForgeMods.Help           help;
+		ForgeMods.Help            help;
 		
 		public Integer call() throws MalformedURLException {
 			DepotLocal depot = new DepotLocal(dossiers.depot);

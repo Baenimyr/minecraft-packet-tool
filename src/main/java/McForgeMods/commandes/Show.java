@@ -8,7 +8,6 @@ import McForgeMods.depot.ArbreDependance;
 import McForgeMods.depot.Depot;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
-import McForgeMods.outils.Dossiers;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -46,9 +45,9 @@ public class Show implements Runnable {
 		@CommandLine.Mixin
 		ForgeMods.Help           help;
 		@CommandLine.Mixin
-		ShowOptions              show;
+		ShowOptions               show;
 		@CommandLine.Mixin
-		Dossiers.DossiersOptions dossiers;
+		ForgeMods.DossiersOptions dossiers;
 		
 		@CommandLine.Parameters(index = "0", arity = "0..n",
 				description = "Limite l'affichage aux dépendances de certains mods (modid[@version])")
@@ -127,9 +126,9 @@ public class Show implements Runnable {
 	@CommandLine.Command(name = "list", description = "Affiche les mods présents.")
 	static class list implements Callable<Integer> {
 		@CommandLine.Mixin
-		ForgeMods.Help           help;
+		ForgeMods.Help            help;
 		@CommandLine.Mixin
-		Dossiers.DossiersOptions dossiers;
+		ForgeMods.DossiersOptions dossiers;
 		
 		@CommandLine.Parameters(arity = "0..1", index = "0", description = "regex pour la recherche")
 		String recherche = null;

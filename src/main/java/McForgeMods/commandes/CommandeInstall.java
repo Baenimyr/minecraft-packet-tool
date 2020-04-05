@@ -1,5 +1,6 @@
 package McForgeMods.commandes;
 
+import McForgeMods.ForgeMods;
 import McForgeMods.Mod;
 import McForgeMods.ModVersion;
 import McForgeMods.VersionIntervalle;
@@ -45,7 +46,7 @@ public class CommandeInstall implements Callable<Integer> {
 	ArrayList<String> mods;
 	
 	@CommandLine.Mixin
-	Dossiers.DossiersOptions dossiers;
+	ForgeMods.DossiersOptions dossiers;
 	
 	@CommandLine.Option(names = {"--mcversion"}, arity = "1",
 			description = "Permet de choisir un version de minecraft. Recommandé.")

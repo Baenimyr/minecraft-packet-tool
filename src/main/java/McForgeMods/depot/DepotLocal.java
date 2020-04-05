@@ -51,8 +51,16 @@ public class DepotLocal extends Depot {
 	
 	public final Path dossier;
 	
+	/** Ouvre un dépôt local.
+	 * Si aucun chemin n'est spécifié, l'emplacement par défaut est ~/.minecraft/forgemods
+	 * @param dossier du dépôt ou {@code null}
+	 */
 	public DepotLocal(Path dossier) {
-		this.dossier = Dossiers.dossierDepot(dossier);
+		if (dossier != null)
+			this.dossier = dossier.toAbsolutePath();
+		else {
+			this.dossier = Path.of(System.getProperty("user.home")).resolve(".minecraft").resolve("forgemods");
+		}
 	}
 	
 	/**

@@ -3,7 +3,7 @@ package McForgeMods;
 import McForgeMods.commandes.CommandeDepot;
 import McForgeMods.commandes.CommandeInstall;
 import McForgeMods.commandes.Show;
-import McForgeMods.outils.Dossiers;
+import McForgeMods.depot.DepotLocal;
 import McForgeMods.outils.Sources;
 import picocli.CommandLine;
 
@@ -36,10 +36,10 @@ public class ForgeMods implements Runnable {
 	@CommandLine.Command(name = "add-repository")
 	public int ajout_repo(@CommandLine.Parameters(index = "0", arity = "1..n", paramLabel = "url") List<String> urls,
 			@CommandLine.Option(names = {"-d", "--depot"}) Path depot) {
-		depot = Dossiers.dossierDepot(depot);
+		final DepotLocal depotLocal = new DepotLocal(depot);
 		Sources sources;
 		
-		final File fichier = depot.resolve("sources.txt").toFile();
+		final File fichier = depotLocal.dossier.resolve("sources.txt").toFile();
 		if (fichier.exists()) {
 			try (FileInputStream input = new FileInputStream(fichier)) {
 				sources = new Sources(input);
@@ -71,5 +71,22 @@ public class ForgeMods implements Runnable {
 	public static void main(String[] args) {
 		CommandLine cl = new CommandLine(new ForgeMods());
 		System.exit(cl.execute(args));
+	}
+	
+	/**
+	 * Options commune aux fonctions utilisant un dépot et une installation minecraft.
+	 */
+	public static class DossiersOptions {
+		/**
+		 * Spécifie le dossier de dépot à utiliser.
+		 */
+		@CommandLine.Option(names = {"-d", "--depot"}, description = "Dépot local à utiliser")
+		public Path depot = null;
+		
+		/**
+		 * Spécifie l'installation minecraft à utiliser. Il peut en exister d'autres de ~/.minecraft.
+		 */
+		@CommandLine.Option(names = {"-m", "--minecraft"}, description = "Dossier minecraft (~/.minecraft)")
+		public Path minecraft = null;
 	}
 }
