@@ -42,6 +42,11 @@ public class VersionIntervalle {
 		this.inclut_max = false;
 	}
 	
+	public VersionIntervalle(Version v) {
+		this.minimum = this.maximum = v;
+		this.inclut_min = this.inclut_max = true;
+	}
+	
 	/**
 	 * Crée une dépendance n'acceptant qu'une seule version. Par exemple la présence d'un mod déjà installé, contraint
 	 * la résolution de version à celle disponible.

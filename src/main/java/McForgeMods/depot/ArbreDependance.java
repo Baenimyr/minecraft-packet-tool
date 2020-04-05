@@ -29,7 +29,7 @@ public class ArbreDependance {
 	public void ajoutDependanceRecursif(final Depot depot, Collection<ModVersion> mods) {
 		final LinkedList<ModVersion> temp = new LinkedList<>(mods);
 		for (ModVersion version : mods) {
-			this.mods.put(version.mod, new VersionIntervalle(version.version, version.version));
+			this.mods.put(version.mod, new VersionIntervalle(version.version));
 		}
 		
 		while (!temp.isEmpty()) {

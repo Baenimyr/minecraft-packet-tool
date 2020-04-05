@@ -19,6 +19,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * La commande <i>install</i> permet de récupérer les fichiers de mod présents sur le réseau. Pour l'installation d'un
@@ -38,6 +40,9 @@ public class CommandeInstall implements Callable<Integer> {
 	static final int ERREUR_VERSION   = ERREUR_NOM + 2;
 	static final int ERREUR_RESSOURCE = 20;
 	static final int ERREUR_URL       = ERREUR_RESSOURCE + 1;
+	
+	static final ExecutorService executor = new ThreadPoolExecutor(0, 4, 1L, TimeUnit.SECONDS,
+			new LinkedBlockingQueue<>());
 	
 	@CommandLine.Option(names = {"-h", "--help"}, usageHelp = true)
 	boolean help;
@@ -74,9 +79,11 @@ public class CommandeInstall implements Callable<Integer> {
 		final DepotLocal depotLocal = new DepotLocal(dossiers.depot);
 		final DepotInstallation depotInstallation = new DepotInstallation(dossiers.minecraft);
 		/* Liste des mods à installer. */
-		final List<ModVersion> installations = new ArrayList<>();
+		final List<ModVersion> installation_manuelle = new ArrayList<>();
+		final List<ModVersion> installation_automatique = new ArrayList<>();
 		
-		final VersionIntervalle mcversion = this.mcversion != null ? VersionIntervalle.read(this.mcversion) : null;
+		final VersionIntervalle mcversion = this.mcversion != null ? VersionIntervalle.read(this.mcversion)
+				: VersionIntervalle.ouvert;
 		
 		try {
 			depotLocal.importation();
@@ -93,19 +100,18 @@ public class CommandeInstall implements Callable<Integer> {
 				return ERREUR_MODID;
 			}
 			// Vérification que l'intervalle n'est pas trop large.
-			if (demande.getValue() == null && mcversion == null) {
-				// TODO: remplacer par l'instance ouvert de VersionIntervalle
+			if (demande.getValue() == VersionIntervalle.ouvert && mcversion == null) {
 				System.err.println(String.format("Vous devez spécifier une version, pour le mod '%s' ou minecraft.",
 						demande.getKey()));
 				return ERREUR_VERSION;
 			}
 			
 			Optional<ModVersion> candidat = depotLocal.getModVersions(demande.getKey()).stream()
-					.filter(mv -> mcversion == null || mcversion.correspond(mv.mcversion))
-					.filter(mv -> demande.getValue() == null || demande.getValue().correspond(mv.version))
-					.max(Comparator.comparing(mv -> mv.version));
+					.filter(mv -> mcversion == VersionIntervalle.ouvert || mcversion.correspond(mv.mcversion))
+					.filter(mv -> demande.getValue() == VersionIntervalle.ouvert || demande.getValue()
+							.correspond(mv.version)).max(Comparator.comparing(mv -> mv.version));
 			if (candidat.isPresent()) {
-				installations.add(candidat.get());
+				installation_manuelle.add(candidat.get());
 			} else {
 				System.err.println(
 						String.format("Aucune version disponible pour '%s@%s'.", demande.getKey(), demande.getValue()));
@@ -113,34 +119,38 @@ public class CommandeInstall implements Callable<Integer> {
 			}
 		}
 		
+		// Ajout de toutes les installations manuelles dans l'installation
+		for (String modid : depotInstallation.getModids()) {
+			for (ModVersion mversion : depotInstallation.getModVersions(modid)) {
+				if (depotInstallation.statusMod(mversion) != DepotInstallation.StatusInstallation.AUTO) {
+					installation_manuelle.add(mversion);
+				}
+			}
+		}
+		
 		if (this.dependances) {
-			ArbreDependance arbre_dependances = new ArbreDependance(depotLocal, installations);
+			ArbreDependance arbre_dependances = new ArbreDependance(depotLocal, installation_manuelle);
 			final Map<Mod, VersionIntervalle> dependances = arbre_dependances.requis();
 			for (final Map.Entry<Mod, VersionIntervalle> dependance : dependances.entrySet()) {
 				if (dependance.getKey().modid.equalsIgnoreCase("forge")) continue;
 				
-				Optional<ModVersion> conflit = installations.stream()
-						.filter(mv -> mv.mod.equals(dependance.getKey()))
-						.filter(mv -> !dependance.getValue().correspond(mv.version)).findAny();
-				if (conflit.isPresent()) {
-					System.err.println(String.format("Le mod requis '%s@%s' est en concurrence avec '%s@=%s'.",
-							dependance.getKey(), dependance.getValue() == null ? "" : dependance.getValue(),
-							conflit.get().mod.modid, conflit.get().version));
-					return ERREUR_NOM;
+				if (installation_manuelle.stream().anyMatch(
+						mv -> mv.mod == dependance.getKey() && (dependance.getValue() == VersionIntervalle.ouvert
+								|| dependance.getValue().correspond(mv.version)))) {
 				} else if (!depotLocal.contains(dependance.getKey())) {
 					System.err.println(String.format("Modid requis inconnu: '%s'", dependance.getKey()));
 					return ERREUR_MODID;
 				} else {
 					Optional<ModVersion> candidat = depotLocal.getModVersions(dependance.getKey()).stream()
-							.filter(mv -> mcversion == null || mcversion.correspond(mv.mcversion))
-							.filter(mv -> dependance.getValue() == null || dependance.getValue().correspond(mv.version))
-							.max(Comparator.comparing(mv -> mv.version));
+							.filter(mv -> mcversion == VersionIntervalle.ouvert || mcversion.correspond(mv.mcversion))
+							.filter(mv -> dependance.getValue() == VersionIntervalle.ouvert || dependance.getValue()
+									.correspond(mv.version)).max(Comparator.comparing(mv -> mv.version));
 					if (candidat.isPresent()) {
 						if (!this.only_update || !(!depotInstallation.contains(candidat.get().mod) || depotInstallation
 								.getModVersions(candidat.get().mod).stream()
 								.noneMatch(mv -> mv.mcversion.equals(candidat.get().mcversion))))
 							// Ignore les nouveaux mods: mod absent ou aucune version de la même version de minecraft
-							installations.add(candidat.get());
+							installation_automatique.add(candidat.get());
 					} else {
 						System.err.println(String.format("Aucune version disponible pour le mod requis '%s@%s'.",
 								dependance.getKey(), dependance.getValue()));
@@ -150,7 +160,19 @@ public class CommandeInstall implements Callable<Integer> {
 			}
 		}
 		
-		return telechargementMods(installations, depotInstallation);
+		if (!dry_run) {
+			for (ModVersion mversion : installation_automatique)
+				depotInstallation.statusChange(mversion, DepotInstallation.StatusInstallation.AUTO);
+			for (ModVersion mversion : installation_manuelle)
+				depotInstallation.statusChange(mversion, DepotInstallation.StatusInstallation.MANUELLE);
+		}
+		depotInstallation.statusSauvegarde();
+		
+		Stream<ModVersion> telechargements = Stream
+				.concat(installation_manuelle.stream(), installation_automatique.stream())
+				.filter(mv -> !depotInstallation.contains(mv));
+		
+		return telechargementMods(telechargements, depotInstallation);
 	}
 	
 	/**
@@ -159,42 +181,35 @@ public class CommandeInstall implements Callable<Integer> {
 	 * Tous les éléments de la liste sont traités indépendemments. Si un mod demandé est déjà présent dans
 	 * l'installation, son téléchargement est ignoré.
 	 *
-	 * @param installations: liste des mods à télécharger
+	 * @param liste: liste des mods à télécharger
 	 * @param depotInstallation: dépôt lié à l'installation
 	 * @return 0 si tout s'est bien passé.
 	 */
-	private int telechargementMods(Iterable<ModVersion> installations, final DepotInstallation depotInstallation) {
-		System.out.println("Installation des mods:");
-		StringJoiner joiner = new StringJoiner(", ");
-		installations.forEach(mv -> joiner.add(mv.mod.modid + "=" + mv.version));
-		System.out.println(joiner.toString());
+	private int telechargementMods(Stream<ModVersion> liste, final DepotInstallation depotInstallation) {
+		List<ModVersion> installations = liste.collect(Collectors.toList());
+		if (installations.size() != 0) {
+			System.out.println("Installation des nouveaux mods:");
+			StringJoiner joiner = new StringJoiner(", ");
+			installations.forEach(mv -> joiner.add(mv.mod.modid + "=" + mv.version));
+			System.out.println(joiner.toString());
+		} else {
+			System.out.println("Pas de nouveaux mods à télécharger.");
+			return 0;
+		}
 		
-		
-		final ExecutorService executor = new ThreadPoolExecutor(0, 2, 1L, TimeUnit.SECONDS,
-				new LinkedBlockingQueue<>());
 		final List<TelechargementMod> telechargements = new ArrayList<>();
 		for (ModVersion modVersion : installations) {
-			if (depotInstallation.contains(modVersion)) {
-				System.out.println(String.format("%-20s %-20s OK", modVersion.mod.modid, modVersion.version));
-			} else {
-				try {
-					URL url_final = null;
-					for (URL url : modVersion.urls) {
-						if (url.getProtocol().equals("file") || url.getProtocol().equals("http") || url.getProtocol()
-								.equals("https")) {
-							url_final = url;
-							break;
-						}
-					}
-					if (url_final == null) System.err.println(
-							String.format("Aucun lien de téléchargement pour '%s=%s'", modVersion.mod.modid,
-									modVersion.version));
-					else telechargements.add(new TelechargementMod(modVersion, depotInstallation, url_final));
-				} catch (MalformedURLException u) {
-					System.err.println(
-							String.format("Erreur de lien pour '%s=%s'", modVersion.mod.modid, modVersion.version));
-					return ERREUR_URL;
-				}
+			try {
+				if (modVersion.urls.stream().noneMatch(
+						url -> url.getProtocol().equals("file") || url.getProtocol().equals("http") || url.getProtocol()
+								.equals("https"))) System.err.println(
+						String.format("Aucun lien de téléchargement pour '%s=%s'", modVersion.mod.modid,
+								modVersion.version));
+				else telechargements.add(new TelechargementMod(modVersion, depotInstallation));
+			} catch (MalformedURLException u) {
+				System.err.println(
+						String.format("Erreur de lien pour '%s=%s'", modVersion.mod.modid, modVersion.version));
+				return ERREUR_URL;
 			}
 		}
 		
@@ -210,7 +225,7 @@ public class CommandeInstall implements Callable<Integer> {
 			} catch (ExecutionException | InterruptedException erreur) {
 				System.err.println(
 						String.format("Erreur téléchargement de '%s': %s", tele.modVersion, erreur.getMessage()));
-				erreur.printStackTrace(System.err);
+				// erreur.printStackTrace(System.err);
 			}
 		}
 		return 0;
@@ -219,49 +234,49 @@ public class CommandeInstall implements Callable<Integer> {
 	private static class TelechargementMod implements Callable<Boolean> {
 		final ModVersion        modVersion;
 		final DepotInstallation minecraft;
-		final URL               url;
-		final Transfert         transfert;
 		
-		TelechargementMod(ModVersion modVersion, DepotInstallation minecraft, URL url) throws MalformedURLException {
+		TelechargementMod(ModVersion modVersion, DepotInstallation minecraft) throws MalformedURLException {
 			this.modVersion = modVersion;
 			this.minecraft = minecraft;
-			this.url = url;
-			this.transfert = new Transfert(url, this.fichierCible());
 		}
 		
 		@Override
 		public Boolean call() throws Exception {
-			final long resultat = this.transfert.call();
-			if (resultat >= 0) {
-				synchronized (this.minecraft) {
-					if (this.minecraft.contains(this.modVersion.mod))
-						this.minecraft.getModVersions(this.modVersion.mod).stream()
-								.filter(v -> !v.equals(this.modVersion)).forEach(mv -> {
-							try {
-								Files.deleteIfExists(Path.of(mv.urls.get(0).toURI()));
-							} catch (URISyntaxException | IOException e) {
-								e.printStackTrace();
-							}
-						});
+			for (URL url : modVersion.urls) {
+				String nom = String
+						.format("%s-%s-%s.jar", modVersion.mod.modid, modVersion.mcversion, modVersion.version);
+				if (url.getPath().endsWith(".jar")) {
+					nom = url.getPath().substring(url.getPath().lastIndexOf('/') + 1);
 				}
-				synchronized (System.out) {
-					System.out.println(String.format("%-20s %-20s %.1f Ko", modVersion.mod.modid, modVersion.version,
-							(float) transfert.getTransfered() / 1024));
+				final Transfert transfert = new Transfert(url,
+						Dossiers.dossierInstallationMod(minecraft.dossier, modVersion).resolve(nom).toUri().toURL());
+				try {
+					final long resultat = transfert.call();
+					if (resultat >= 0) {
+						synchronized (this.minecraft) {
+							if (this.minecraft.contains(this.modVersion.mod))
+								this.minecraft.getModVersions(this.modVersion.mod).stream().filter(v -> !v.equals(this.modVersion)).forEach(mv -> {
+									try {
+										Files.deleteIfExists(Path.of(mv.urls.get(0).toURI()));
+									} catch (URISyntaxException | IOException e) {
+										System.err.println(e.getClass() + ": " + e.getMessage());
+									}
+								});
+						}
+						synchronized (System.out) {
+							System.out.println(
+									String.format("%-20s %-20s %.1f Ko", modVersion.mod.modid, modVersion.version,
+											(float) transfert.getTransfered() / 1024));
+						}
+						return true;
+					}
+				} catch (IOException e) {
+					System.err.println(e.getMessage());
 				}
-			} else {
-				System.err.println(String.format("Téléchargement échoué de %s", modVersion));
-				return false;
-			}
-			return true;
-		}
-		
-		private URL fichierCible() throws MalformedURLException {
-			String nom = String.format("%s-%s-%s.jar", modVersion.mod.modid, modVersion.mcversion, modVersion.version);
-			if (this.url.getPath().endsWith(".jar")) {
-				nom = this.url.getPath().substring(this.url.getPath().lastIndexOf('/') + 1);
 			}
 			
-			return Dossiers.dossierInstallationMod(minecraft.dossier, modVersion).resolve(nom).toUri().toURL();
+			System.err.println(String.format("Téléchargement échoué de %s", modVersion));
+			return false;
 		}
 	}
 }
