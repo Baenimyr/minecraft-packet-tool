@@ -10,9 +10,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
-import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -21,56 +19,47 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /**
- * Ce dépot lit les informations directement dans les fichiers qu'il rencontre.
- * Il permet d'analyser une instance minecraft (un dossier .minecraft) pour déduire les mods présents.
- * Ensuite toutes les actions d'un dépot sont applicables: présence de mod, présence de version, ...
+ * Ce dépot lit les informations directement dans les fichiers qu'il rencontre. Il permet d'analyser une instance
+ * minecraft (un dossier .minecraft) pour déduire les mods présents. Ensuite toutes les actions d'un dépot sont
+ * applicables: présence de mod, présence de version, ...
  * <p>
- * L'unique contrainte avec un dépot d'installation, est qu'il ne peut pas y avoir plus d'un seul fichier par modid
- * et version minecraft dans les dossiers <i>mods</i> ou <i>mods/mcversion</i>. Autrement, il y a conflit lors du
+ * L'unique contrainte avec un dépot d'installation, est qu'il ne peut pas y avoir plus d'un seul fichier par modid et
+ * version minecraft dans les dossiers <i>mods</i> ou <i>mods/mcversion</i>. Autrement, il y a conflit lors du
  * chargement du jeu. Seulement si les versions de mod sont différentes, le dépot d'installation sera capable de
  * détecter cette erreur.
  */
 public class DepotInstallation extends Depot {
-	public static final Pattern                             minecraft_version = Pattern.compile(
+	public static final Pattern                         minecraft_version = Pattern.compile(
 			"^(1\\.14(\\.[1-4])?|1\\.13(\\.[1-2])?|1\\.12(\\.[1-2])?|1\\.11(\\.[1-2])?|1\\.10(\\.[1-2])?|1\\.9(\\"
 					+ ".[1-4])?|1\\.8(\\.1)?|1\\.7(\\.[1-9]|(10))?|1\\.6\\.[1-4]|1\\.5(\\.[1-2])?)-");
-	public final        Path                                dossier;
-	private final       Map<ModVersion, StatusInstallation> installation = new WeakHashMap<>();
+	public final        Path                            dossier;
+	private final       Map<String, StatusInstallation> installation      = new WeakHashMap<>();
 	
-	/** Ouvre un dossier pour l'installation des mods.
-	 * Par défaut, ce dossier est ~/.minecraft/mods.
+	/**
+	 * Ouvre un dossier pour l'installation des mods. Par défaut, ce dossier est ~/.minecraft/mods.
+	 *
 	 * @param dossier d'installation ou {@code null}
 	 */
 	public DepotInstallation(Path dossier) {
-		if (dossier != null)
-			this.dossier = dossier.toAbsolutePath();
+		if (dossier != null) this.dossier = dossier.toAbsolutePath();
 		else {
 			this.dossier = Path.of(System.getProperty("user.home")).resolve(".minecraft").resolve("mods");
-		}
-	}
-	
-	public static class StatusInstallation {
-		public final ModVersion mod;
-		/** Ce mod a-t-il été installé automatiquement en temps que dependance. */
-		public boolean automatique = false;
-		
-		public StatusInstallation(ModVersion mod) {
-			this.mod = mod;
 		}
 	}
 	
 	/**
 	 * Cette fonction lit un fichier et tente d'extraire les informations relatives au mod.
 	 * <p>
-	 * Un mod est un fichier jar contenant dans sa racine un fichier <b>mcmod.info</b>.
-	 * Ce fichier contient une <b>liste</b> des mods que le fichier contient.
-	 * Chaque mod définit un <i>modid</i>, un <i>name</i>, une <i>version</i> et une <i>mcversion</i>.
-	 * Le format de la version doit être compatible avec le format définit par {@link Version}.
-	 * La version minecraft peut être extraite de la <i>version</i> à la condition d'être sous le format "<i>mcversion</i>-<i>version</i>".
+	 * Un mod est un fichier jar contenant dans sa racine un fichier <b>mcmod.info</b>. Ce fichier contient une
+	 * <b>liste</b> des mods que le fichier contient. Chaque mod définit un <i>modid</i>, un <i>name</i>, une
+	 * <i>version</i> et une <i>mcversion</i>. Le format de la version doit être compatible avec le format définit par
+	 * {@link Version}. La version minecraft peut être extraite de la <i>version</i> à la condition d'être sous le
+	 * format "<i>mcversion</i>-<i>version</i>".
+	 *
 	 * @return {@code true} si réussite: il s'agit bien d'un mod Minecraft Forge
 	 * @see <a href="https://mcforge.readthedocs.io/en/latest/gettingstarted/structuring/">Fichier mcmod.info</a>
 	 */
-	public boolean importationJar(File fichier) throws IOException {
+	private boolean importationJar(File fichier) throws IOException {
 		try (ZipFile zip = new ZipFile(fichier)) {
 			ZipEntry mcmod = zip.getEntry("mcmod.info");
 			if (mcmod == null) return false;
@@ -112,10 +101,12 @@ public class DepotInstallation extends Depot {
 			modVersion.ajoutURL(fichier.getAbsoluteFile().toURI().toURL());
 			
 			if (json.has("requiredMods")) {
-				VersionIntervalle.lectureDependances(json.getJSONArray("requiredMods")).forEach(modVersion::ajoutModRequis);
+				VersionIntervalle.lectureDependances(json.getJSONArray("requiredMods"))
+						.forEach(modVersion::ajoutModRequis);
 			}
 			if (json.has("dependencies")) {
-				VersionIntervalle.lectureDependances(json.getJSONArray("dependencies")).forEach(modVersion::ajoutModRequis);
+				VersionIntervalle.lectureDependances(json.getJSONArray("dependencies"))
+						.forEach(modVersion::ajoutModRequis);
 			}
 			if (json.has("dependants")) {
 				JSONArray dependants = json.getJSONArray("dependants");
@@ -132,8 +123,9 @@ public class DepotInstallation extends Depot {
 	/**
 	 * Parcours un dossier et les sous-dossiers à la recherche de fichier de mod forge.
 	 * <p>
-	 * Pour chaque fichier jar trouvé, tente d'importer les informations.
-	 * Le moindre échec invalide l'importation.
+	 * Pour chaque fichier jar trouvé, tente d'importer les informations. Le moindre échec invalide l'importation.
+	 *
+	 * @param infos: un dépôt complet qui contient des informations supplémentaires
 	 */
 	public void analyseDossier(Depot infos) {
 		Queue<File> dossiers = new LinkedList<>();
@@ -143,13 +135,13 @@ public class DepotInstallation extends Depot {
 			File doss = dossiers.poll();
 			File[] fichiers = doss.listFiles();
 			if (fichiers != null) for (File f : fichiers) {
-				if (f.isHidden());
-				else if (f.isDirectory() && !f.getName().equals("memory_repo") && !f.getName().equals("libraries")) dossiers.add(f);
+				if (f.isHidden()) ;
+				else if (f.isDirectory() && !f.getName().equals("memory_repo") && !f.getName().equals("libraries"))
+					dossiers.add(f);
 				else if (f.getName().endsWith(".jar")) {
 					try {
 						boolean succes = importationJar(f);
-						if (succes) continue;
-						if (infos != null) {
+						if (!succes && infos != null) {
 							Optional<ModVersion> version_alias = infos.rechercheAlias(f.getName());
 							if (version_alias.isPresent()) {
 								// Ajout d'une version sans informations supplémentaires.
@@ -158,6 +150,7 @@ public class DepotInstallation extends Depot {
 												version_alias.get().mcversion));
 								local.fusion(version_alias.get()); // confiance d'avoir identifier le fichier
 								local.ajoutURL(f.getAbsoluteFile().toURI().toURL());
+								local.ajoutAlias(f.getName());
 							}
 						}
 						// System.err.println("Fichier jar incompatible: " + f.getName());
@@ -166,6 +159,90 @@ public class DepotInstallation extends Depot {
 					}
 				}
 			}
+		}
+		
+		this.statusImportation();
+	}
+	
+	/** Retourne le status d'installation d'un mod.
+	 *
+	 * Si aucune information n'est disponible, cette version est considérée comme installée manuellement. En mode
+	 * manuel, les fichiers déjà présents peuvent être mise à jour mais pas supprimés.
+	 */
+	public StatusInstallation statusMod(ModVersion version) {
+		return this.installation.getOrDefault(version.mod.modid+"="+version.version, StatusInstallation.MANUELLE);
+	}
+	
+	/** Change le status associé à une version de mod. */
+	public void statusChange(ModVersion version, StatusInstallation status) {
+		this.installation.put(version.mod.modid+"="+version.version, status);
+	}
+	
+	/** Efface le status associé à une version de mod. */
+	public void statusSuppression(ModVersion version) {
+		this.installation.remove(version.mod.modid+"="+version.version);
+	}
+	
+	/** Importe les informations sur le status d'installation. */
+	public void statusImportation() {
+		File infos = dossier.resolve("mods").resolve(".mods.txt").toFile();
+		if (infos.exists()) {
+			try (FileInputStream fis = new FileInputStream(infos);
+				 BufferedReader br = new BufferedReader(new InputStreamReader(fis))) {
+				String ligne;
+				while ((ligne = br.readLine()) != null) {
+					int i = ligne.indexOf(" ");
+					if (i > 0) {
+						String mod_code = ligne.substring(0, i);
+						// TODO: vérifier présence ou présence version différente
+						String status_code = ligne.substring(i + 1);
+						StatusInstallation status = StatusInstallation.MANUELLE;
+						for (StatusInstallation s : StatusInstallation.values())
+							if (s.nom.equalsIgnoreCase(status_code)) {
+								status = s;
+								break;
+							}
+						
+						this.installation.put(mod_code, status);
+					}
+				}
+			} catch (IOException io) {
+				System.err.println(io.getClass() + ":" + io.getLocalizedMessage());
+			}
+		}
+	}
+	
+	public void statusSauvegarde() {
+		File infos = dossier.resolve("mods").resolve(".mods.txt").toFile();
+		try (FileOutputStream fos = new FileOutputStream(infos);
+			 BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos))) {
+			for (String mv : this.installation.keySet()) {
+				bw.write(mv + " " + this.installation.get(mv).nom);
+				bw.newLine();
+			}
+		} catch (IOException io) {
+			System.err.println(io.getClass() + ":" + io.getLocalizedMessage());
+		}
+	}
+	
+	/** Status d'une installation de mod. */
+	public enum StatusInstallation {
+		/** Installation explicite par l'utilisateur. */
+		MANUELLE("manuel"),
+		/** Installation automatique comme dépendance. */
+		AUTO("auto"),
+		/** Installation vérouillée. Le mod ne peut pas être supprimé, même s'il génère des erreurs. */
+		VERROUILLE("verrouille");
+		
+		final String nom;
+		
+		StatusInstallation(String nom) {
+			this.nom = nom;
+		}
+		
+		@Override
+		public String toString() {
+			return this.nom;
 		}
 	}
 }

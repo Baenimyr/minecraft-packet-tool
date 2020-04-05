@@ -170,6 +170,13 @@ Si l'utilisateur le permet, un dépôt généralisé peut sauvegarder les fichie
 Lors de la synchronisations des informations avec un dépôt distant, aucun fichier de mod n'est téléchargé.
 Si le dépôt fournis également les fichiers, leur disponibilité est conservée par l'URL et ils ne seront téléchargés que sur demande de l'utilisateur.
 
+\subsection{État de l'installation}
+Chaque version installée possède l'un des états d'installation suivant: AUTO si le mod est installé comme dépendance d'un autre, MANUEL si l'utilisateur l'a installé explicitement, VÉRROUILLÉ pour conserver le mod malgrès des erreurs.
+
+Les installations manuelles sont l'ancrage qui maintient les fichiers en place.
+Si un mod installé automatiquement n'est plus nécessaire, parce qu'aucun autre ne le requiert comme dépendance, il doit être retiré de l'installation.
+Les mods vérrouillés ne doivent en aucun cas être modifiés sauf si l'utilisateur le décide (désinstallation).
+
 
 \section{Commandes}
 Paramètres génériques:
@@ -192,6 +199,12 @@ Necessite une installation minecraft.
     \item \texttt{depot udpate}: met à jour le dépôt en téléchargeant les informations sur les dépôts internet.
     \item \texttt{add--repository}: enregistre une nouvelle adresse internet de dépôt
 \end{itemize}
+
+
+\subsection{Installation}
+Une installation cible correspond à l'union entre les mods déjà installés manuellement et les nouveaux mods demandés explicitement.
+Ensuite il faut calculer l'arbre des dépendances et vérifier la disponibilité: les intervalles de version ne sont pas vide et contiennent une solution satisfaisante.
+Si une demande n'est pas satisfaite pas une version déjà présente, le fichier correspondant est téléchargé et les précédantes versions sont supprimées.
 
 
 \end{document}
