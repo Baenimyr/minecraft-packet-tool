@@ -3,8 +3,6 @@ package McForgeMods.outils;
 import McForgeMods.ModVersion;
 import picocli.CommandLine;
 
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.nio.file.Path;
 
 /**
@@ -64,25 +62,6 @@ public class Dossiers {
 	
 	public static Path fichierModDepot(Path depot, String modid) {
 		return dossierModDepot(depot, modid).resolve(modid + ".json");
-	}
-	
-	/**
-	 * Localise le fichier d'index général relatif à la racine du dépot.
-	 *
-	 * @param depot: racine du dépot
-	 */
-	public static URL fichierIndexDepot(URL depot) throws MalformedURLException {
-		return new URL(depot, "Mods.json");
-	}
-	
-	/**
-	 * Localise le fichier d'information de mod relatif à la racine du dépot.
-	 *
-	 * @param depot: racine du dépot
-	 * @param modid: identifiant unique du mod cherché.
-	 */
-	public static URL fichierModDepot(URL depot, String modid) throws MalformedURLException {
-		return new URL(depot, modid.substring(0, 1) + "/" + modid + "/" + modid + ".json");
 	}
 	
 	/**

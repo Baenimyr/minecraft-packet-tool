@@ -4,12 +4,16 @@ import McForgeMods.commandes.CommandeDepot;
 import McForgeMods.commandes.CommandeInstall;
 import McForgeMods.commandes.Show;
 import McForgeMods.outils.Dossiers;
+import McForgeMods.outils.Sources;
 import picocli.CommandLine;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.nio.file.Path;
-import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 
 @CommandLine.Command(name = "forgemods", showDefaultValues = true, mixinStandardHelpOptions = true,
@@ -30,31 +34,34 @@ public class ForgeMods implements Runnable {
 	}
 	
 	@CommandLine.Command(name = "add-repository")
-	public int ajout_repo(@CommandLine.Parameters(index = "0", arity = "1..n", paramLabel = "url") List<String> url,
+	public int ajout_repo(@CommandLine.Parameters(index = "0", arity = "1..n", paramLabel = "url") List<String> urls,
 			@CommandLine.Option(names = {"-d", "--depot"}) Path depot) {
 		depot = Dossiers.dossierDepot(depot);
-		final Collection<String> sources = new HashSet<>();
+		Sources sources;
 		
 		final File fichier = depot.resolve("sources.txt").toFile();
 		if (fichier.exists()) {
-			try (FileInputStream input = new FileInputStream(fichier);
-				 BufferedReader reader = new BufferedReader(new InputStreamReader(input))) {
-				reader.lines().map(String::toLowerCase).forEach(sources::add);
+			try (FileInputStream input = new FileInputStream(fichier)) {
+				sources = new Sources(input);
 			} catch (IOException ignored) {
 				return -1;
 			}
+		} else {
+			sources = new Sources();
 		}
 		
-		url.stream().map(String::toLowerCase).forEach(sources::add);
-		
-		try (FileOutputStream output = new FileOutputStream(fichier);
-			 OutputStreamWriter buff = new OutputStreamWriter(output);
-			 BufferedWriter writer = new BufferedWriter(buff)) {
-			for (String src : sources) {
-				writer.write(src);
-				writer.write("\n");
+		for (String url : urls) {
+			try {
+				sources.add(new URL(url));
+			} catch (MalformedURLException m) {
+				System.err.println(String.format("MalformedURL: '%s'", url));
 			}
-		} catch (IOException ignored) {
+		}
+		
+		try (FileOutputStream output = new FileOutputStream(fichier)) {
+			sources.save(output);
+		} catch (IOException i) {
+			i.printStackTrace();
 			return -1;
 		}
 		

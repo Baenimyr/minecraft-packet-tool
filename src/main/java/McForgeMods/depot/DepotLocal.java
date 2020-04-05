@@ -275,26 +275,23 @@ public class DepotLocal extends Depot {
 	 * présentes sont erronées. Il peut être conseillé de supprimer les données périmées avant d'activer la
 	 * synchronisation avec {@link Depot#clear()}.
 	 *
-	 * @param depot_url : adresse à laquelle se trouve le dépot.
+	 * @param depot_distant: interface du dépôt distant
 	 * @throws MalformedURLException si l'url n'est pas conpatible avec l'exploration d'arborescence de fichier
 	 * @throws IOException à la moindre erreur de lecture des flux réseau.
 	 */
-	public void synchronisationDepot(URL depot_url) throws MalformedURLException, IOException {
-		URL url_mods = Dossiers.fichierIndexDepot(depot_url);
-		try (InputStream is = url_mods.openStream()) {
+	public void synchronisationDepot(DepotDistant depot_distant) throws MalformedURLException, IOException {
+		try (InputStream is = depot_distant.fichierIndexDepot()) {
 			this.lectureFichierIndex(new BufferedInputStream(is));
 		}
 		
-		System.out.println("Récupérations des mods de " + depot_url);
 		final List<String> modids = new ArrayList<>(this.getModids());
 		for (int i = 0; i < modids.size(); i++) {
 			String modid = modids.get(i);
-			URL url_modid = Dossiers.fichierModDepot(depot_url, modid);
-			try (InputStream is = url_modid.openStream()) {
+			try (InputStream is = depot_distant.fichierModDepot(modid)) {
 				this.lectureFichierMod(modid, is);
 				float progres = (float) i / modids.size();
 				System.out.print(String.format("\r[%s>%s] %d/%d     ", "=".repeat((int) (50. * progres)),
-						" ".repeat((int) (50 * (1. - progres))), (i + 1), modids.size()));
+						" ".repeat((int) (50 * (1. - progres) - 1)), (i + 1), modids.size()));
 			} catch (FileNotFoundException f) {
 				System.err.println(
 						String.format("Les données de version pour le mod '%s' ne sont pas disponibles.", modid));
