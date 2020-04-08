@@ -3,8 +3,10 @@
 \usepackage[T1]{fontenc}
 \usepackage[margin=25mm]{geometry}
 \usepackage[french]{babel}
-
 \usepackage{hyperref}
+\usepackage{algorithm2e}
+
+
 \usepackage{enumitem}
 \usepackage{dirtree}
 
@@ -38,6 +40,42 @@ Une fois les informations extraites, le programme peut afficher les informations
 MinecraftForge est déjà capable de vérifier les mises à jour et ce programme pourrait également le faire.
 
 
+\subsection{Arbre de dépendance}
+L'arbre de dépendance permet de calculer les intervalles de version satisfaisants plusieurs contraintes.
+Si plusieurs mods déclarent des dépendances sur un même mod mais pour des intervals différents, le compromis correspond à l'intersection des intervalles.
+
+
+
+\subsection{Modification}
+\subsubsection{Installation}
+Lorsque un utilisateur le demande, il faut récupérer l'archive jar d'un mod et la placer dans le dossier \textit{mods}.
+Cependant il faut maintenir le bon fonctionnement de l'installation, notamment la gestion des dépendances.
+En considérant la liste des mods installés manuellement avec le nouveaux mods en cours d'installation, il faut calculer les dépendances nécessaires.
+Les mods installés automatiquement qui ne correspondraient plus devront être retirés.
+Si aucune version connue n'est capable de satisfaire les dépendances connues, c'est une erreur.
+Cela vaut aussi pour les installations manuelles qui interfèreraient entre elles.
+
+L'algorithme est le suivant:
+\begin{itemize}
+    \item Soit R la liste des mods installés manuellement et fixés
+    \item Mettre à jour R en ajoutant les nouveaux mods et modifier les versions des anciens
+    \item Calculer l'arbre de dépendance de R: $A_R$
+    \item Pour tout mod dans l'arbre, vérifier l'existence d'une version disponible.
+    \item Pour tout mod dans l'arbre, s'il n'est pas installé ou si la version DOIT être changée, installer la nouvelle version.
+\end{itemize}
+
+
+\subsubsection{Mise à jour}
+Soit $U$ une liste de mods à mettre à jour.
+Soit $U'$ la liste finale des mods et leur version.
+Pour tout mod de $U$, s'il existe une version du même mod supérieure mais de la même version minecraft, elle est ajoutée à $U'$.
+
+Avec la sélection $U'$, on construit l'arbre des dépendances.
+Si une dépendance n'est pas déjà satisfaite, la version compatible la plus récente est ajoutée à $U'$.
+L'idée est de ne pas mettre à jour les mods quand ce n'est pas nécessaire ou demandé explicitement par l'utilisateur.
+Toutes les versions présentes dans $U'$ peuvent maintenant être installées.
+
+
 \subsection{Téléchargement des fichiers}
 Une fois un mod demandé ou requis par les autres, le programme doit pouvoir trouver le fichier correspondant sur internet.
 Pour un identifiant de mod et une version, il faut maintenant fournir l'url de téléchargement (par exemple directement les sites hébergeurs).
@@ -68,10 +106,24 @@ Sans connexion internet, le programme doit pouvoir fournir les informations dét
 Il est inutile de s'encombrer des informations non nécessaires.
 Les informations locales peuvent être mises à jour sur demande ou automatiquement de temps en temps.
 
+La synchronisation se fait en lisant les fichiers du dépôt distants et en ajoutant au dépot actuel les nouvelles informations, ainsi en cas de conflit entre différents dépôt, le premier de la liste est utilisé.
+De préférence, les fichiers du dépôt doivent être rassemblé dans un fichier tar pour accélérer le téléchargement: une seule connexion seulement doit être établie au lieu d'une connexion par fichier.
+Pour un dépôt correct, le dépôt local doit être effacé pour être remplacé par la compilation des dépôt distants, cependant l'utilisateur peut choisir de conserver les informations déjà présentes en les supposant à jour.
+
+
 \subsection{Dépôt d'installation}
 \label{subsection:depot_installation}
 Une installation minecraft, définie par un dossier \textit{.minecraft}, est importée au besoin grâce aux fichiers \textit{mcmod.info} présents dans l'archive.
 Elle se comporte virtuellement comme un véritable dépôt, ce qui permet de le comparer au dépôt local et de l'utiliser de manière transparente dans le système.
+
+\subsubsection{État de l'installation}
+Chaque version installée possède l'un des états d'installation suivant: AUTO si le mod est installé comme dépendance d'un autre, MANUEL si l'utilisateur l'a installé explicitement, VÉRROUILLÉ pour conserver le mod malgrès des erreurs.
+
+Les installations manuelles sont l'ancrage qui maintient les fichiers en place.
+Si un mod installé automatiquement n'est plus nécessaire, parce qu'aucun autre ne le requiert comme dépendance, il doit être retiré de l'installation.
+Les mods vérrouillés ne doivent en aucun cas être modifiés sauf si l'utilisateur le décide (désinstallation).
+
+
 
 \subsection{Structure du dépôt}
 \begin{figure}
@@ -152,9 +204,10 @@ Un URL relatif est même conseillé pour pouvoir déplacer facilement un dépot 
 Tout URL partageant une partie commune avec la racine du dépôt sera réduit à l'URL relatif.
 Ce système considère le dépôt local comme un potentiel dépôt distant pour d'autres utilisateurs.
 
-La synchronisation se fait en lisant les fichiers du dépôt distants et en ajoutant au dépot actuel les nouvelles informations, ainsi en cas de conflit entre différents dépôt, le premier de la liste est utilisé.
-De préférence, les fichiers du dépôt doivent être rassemblé dans un fichier tar pour accélérer le téléchargement: une seule connexion seulement doit être établie au lieu d'une connexion par fichier.
-Pour un dépôt correct, le dépôt local doit être effacé pour être remplacé par la compilation des dépôt distants, cependant l'utilisateur peut choisir de conserver les informations déjà présentes en les supposant à jour.
+
+
+
+
 
 
 \section{Fichiers locaux}
@@ -169,13 +222,6 @@ Si l'utilisateur le permet, un dépôt généralisé peut sauvegarder les fichie
 
 Lors de la synchronisations des informations avec un dépôt distant, aucun fichier de mod n'est téléchargé.
 Si le dépôt fournis également les fichiers, leur disponibilité est conservée par l'URL et ils ne seront téléchargés que sur demande de l'utilisateur.
-
-\subsection{État de l'installation}
-Chaque version installée possède l'un des états d'installation suivant: AUTO si le mod est installé comme dépendance d'un autre, MANUEL si l'utilisateur l'a installé explicitement, VÉRROUILLÉ pour conserver le mod malgrès des erreurs.
-
-Les installations manuelles sont l'ancrage qui maintient les fichiers en place.
-Si un mod installé automatiquement n'est plus nécessaire, parce qu'aucun autre ne le requiert comme dépendance, il doit être retiré de l'installation.
-Les mods vérrouillés ne doivent en aucun cas être modifiés sauf si l'utilisateur le décide (désinstallation).
 
 
 \section{Commandes}

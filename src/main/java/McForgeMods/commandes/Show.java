@@ -104,8 +104,9 @@ public class Show implements Runnable {
 			}
 			
 			// Liste complète des dépendances nécessaire pour la liste des mods présent.
-			ArbreDependance arbre_dependances = new ArbreDependance(depotLocal, listeRecherche);
-			Map<Mod, VersionIntervalle> liste;
+			ArbreDependance arbre_dependances = new ArbreDependance(listeRecherche);
+			arbre_dependances.extension(depotLocal);
+			Map<String, VersionIntervalle> liste;
 			if (missing) {
 				liste = depotInstallation.dependancesAbsentes(arbre_dependances.requis());
 				System.out.println(String.format("%d absents", liste.size()));
@@ -114,10 +115,10 @@ public class Show implements Runnable {
 				System.out.println(String.format("%d dépendances", liste.size()));
 			}
 			
-			ArrayList<Mod> modids = new ArrayList<>(liste.keySet());
-			modids.sort(Mod::compareTo);
-			for (Mod dep : modids) {
-				System.out.println(dep.modid + " " + liste.get(dep));
+			ArrayList<String> modids = new ArrayList<>(liste.keySet());
+			modids.sort(String::compareTo);
+			for (String dep : modids) {
+				System.out.println(dep + " " + liste.get(dep));
 			}
 			return 0;
 		}

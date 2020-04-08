@@ -155,9 +155,9 @@ public class Depot {
 	 *
 	 * @return une map {modid -> version} des demandes qui n'ont pas trouvée de correspondance.
 	 */
-	public Map<Mod, VersionIntervalle> dependancesAbsentes(final Map<Mod, VersionIntervalle> demande) {
-		final Map<Mod, VersionIntervalle> absents = new HashMap<>();
-		for (Map.Entry<Mod, VersionIntervalle> dep : demande.entrySet()) {
+	public Map<String, VersionIntervalle> dependancesAbsentes(final Map<String, VersionIntervalle> demande) {
+		final Map<String, VersionIntervalle> absents = new HashMap<>();
+		for (Map.Entry<String, VersionIntervalle> dep : demande.entrySet()) {
 			if (!this.contains(dep.getKey()) || this.getModVersions(dep.getKey()).stream()
 					.noneMatch(m -> dep.getValue() == VersionIntervalle.ouvert || dep.getValue().correspond(m.version))) absents.put(dep.getKey(),
 					dep.getValue());

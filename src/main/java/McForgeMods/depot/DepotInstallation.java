@@ -29,11 +29,11 @@ import java.util.zip.ZipFile;
  * détecter cette erreur.
  */
 public class DepotInstallation extends Depot {
-	public static final Pattern                         minecraft_version = Pattern.compile(
+	public static final Pattern                         minecraft_version   = Pattern.compile(
 			"^(1\\.14(\\.[1-4])?|1\\.13(\\.[1-2])?|1\\.12(\\.[1-2])?|1\\.11(\\.[1-2])?|1\\.10(\\.[1-2])?|1\\.9(\\"
 					+ ".[1-4])?|1\\.8(\\.1)?|1\\.7(\\.[1-9]|(10))?|1\\.6\\.[1-4]|1\\.5(\\.[1-2])?)-");
 	public final        Path                            dossier;
-	private final       Map<String, StatusInstallation> installation      = new WeakHashMap<>();
+	private final       Map<String, StatusInstallation> status_installation = new WeakHashMap<>();
 	
 	/**
 	 * Ouvre un dossier pour l'installation des mods. Par défaut, ce dossier est ~/.minecraft/mods.
@@ -45,6 +45,45 @@ public class DepotInstallation extends Depot {
 		else {
 			this.dossier = Path.of(System.getProperty("user.home")).resolve(".minecraft").resolve("mods");
 		}
+	}
+	
+	/**
+	 * Marque un mod comme installé.
+	 * <p>
+	 * Le téléchargement du fichier est effectué en amont. Cette action ne doit être réalisée que si le fichier est
+	 * maintenant présent.
+	 *
+	 * @param status de l'installation
+	 */
+	public void installation(ModVersion mversion, StatusInstallation status) {
+		this.statusChange(mversion, status);
+	}
+	
+	/**
+	 * Désinstalle une version de mod.
+	 * <p>
+	 * Si la cible est toujours nécessaire en temps que dépendance, elle passe en installation automatique. Cette
+	 * fonction désinstalle même si cette version est la dépendance d'un autre mod.
+	 */
+	public void desinstallation(ModVersion mversion) {
+		this.statusChange(mversion, StatusInstallation.AUTO);
+		if (this.contains(mversion.mod)) {
+			this.mod_version.get(mversion.mod).remove(mversion);
+			// TODO: suppression fichier
+			
+			this.statusSuppression(mversion);
+			this.statusSauvegarde();
+		}
+	}
+	
+	/**
+	 * Détecte les conflits: même modid mais versions différentes, et supprime les fichiers en trop.
+	 * <p>
+	 * Deux mods sont en conflit si les modid et la version minecraft sont identiques mais que la version est
+	 * différente.
+	 */
+	public void suppressionConflits() {
+	
 	}
 	
 	/**
@@ -164,23 +203,25 @@ public class DepotInstallation extends Depot {
 		this.statusImportation();
 	}
 	
-	/** Retourne le status d'installation d'un mod.
-	 *
+	/**
+	 * Retourne le status d'installation d'un mod.
+	 * <p>
 	 * Si aucune information n'est disponible, cette version est considérée comme installée manuellement. En mode
 	 * manuel, les fichiers déjà présents peuvent être mise à jour mais pas supprimés.
 	 */
 	public StatusInstallation statusMod(ModVersion version) {
-		return this.installation.getOrDefault(version.mod.modid+"="+version.version, StatusInstallation.MANUELLE);
+		return this.status_installation
+				.getOrDefault(version.mod.modid + " " + version.version, StatusInstallation.MANUELLE);
 	}
 	
 	/** Change le status associé à une version de mod. */
 	public void statusChange(ModVersion version, StatusInstallation status) {
-		this.installation.put(version.mod.modid+"="+version.version, status);
+		this.status_installation.put(version.mod.modid + " " + version.version, status);
 	}
 	
 	/** Efface le status associé à une version de mod. */
 	public void statusSuppression(ModVersion version) {
-		this.installation.remove(version.mod.modid+"="+version.version);
+		this.status_installation.remove(version.mod.modid + " " + version.version);
 	}
 	
 	/** Importe les informations sur le status d'installation. */
@@ -191,19 +232,20 @@ public class DepotInstallation extends Depot {
 				 BufferedReader br = new BufferedReader(new InputStreamReader(fis))) {
 				String ligne;
 				while ((ligne = br.readLine()) != null) {
-					int i = ligne.indexOf(" ");
-					if (i > 0) {
-						String mod_code = ligne.substring(0, i);
-						// TODO: vérifier présence ou présence version différente
-						String status_code = ligne.substring(i + 1);
+					String[] args = ligne.split(" ");
+					if (args.length == 3) {
+						if (!this.contains(args[0])) continue;
+						Optional<ModVersion> mversion = this.getModVersion(this.getMod(args[0]), Version.read(args[1]));
+						if (mversion.isEmpty()) continue;
+						
 						StatusInstallation status = StatusInstallation.MANUELLE;
 						for (StatusInstallation s : StatusInstallation.values())
-							if (s.nom.equalsIgnoreCase(status_code)) {
+							if (s.nom.equalsIgnoreCase(args[2])) {
 								status = s;
 								break;
 							}
 						
-						this.installation.put(mod_code, status);
+						this.statusChange(mversion.get(), status);
 					}
 				}
 			} catch (IOException io) {
@@ -216,8 +258,8 @@ public class DepotInstallation extends Depot {
 		File infos = dossier.resolve("mods").resolve(".mods.txt").toFile();
 		try (FileOutputStream fos = new FileOutputStream(infos);
 			 BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos))) {
-			for (String mv : this.installation.keySet()) {
-				bw.write(mv + " " + this.installation.get(mv).nom);
+			for (String mv : this.status_installation.keySet()) {
+				bw.write(mv + " " + this.status_installation.get(mv).nom);
 				bw.newLine();
 			}
 		} catch (IOException io) {

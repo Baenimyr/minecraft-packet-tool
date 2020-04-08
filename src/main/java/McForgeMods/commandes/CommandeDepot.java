@@ -1,7 +1,6 @@
 package McForgeMods.commandes;
 
 import McForgeMods.ForgeMods;
-import McForgeMods.Mod;
 import McForgeMods.ModVersion;
 import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.ArbreDependance;
@@ -79,15 +78,16 @@ public class CommandeDepot implements Runnable {
 			
 			for (final String modid : modids) {
 				for (final ModVersion version : depot.getModVersions(modid)) {
-					ArbreDependance dependances = new ArbreDependance(depot, Collections.singleton(version));
-					for (Map.Entry<Mod, VersionIntervalle> dep : dependances.requis().entrySet()) {
-						if (!dep.getKey().modid.equals("forge")) {
+					ArbreDependance dependances = new ArbreDependance(Collections.singleton(version));
+					dependances.extension(depot);
+					for (Map.Entry<String, VersionIntervalle> dep : dependances.requis().entrySet()) {
+						if (!dep.getKey().equals("forge")) {
 							if (!depot.contains(dep.getKey()) || depot.getModVersions(dep.getKey()).stream().noneMatch(
 									v -> dep.getValue() == VersionIntervalle.ouvert || dep.getValue()
 											.correspond(v.version))) {
 								System.out.println(String.format(
 										"'%s' a besoin de '%s@%s', mais il n'est pas disponible dans le dépôt !",
-										version.toStringStandard(), dep.getKey().modid, dep.getValue()));
+										version.toStringStandard(), dep.getKey(), dep.getValue()));
 							}
 						}
 					}

@@ -18,7 +18,7 @@ import java.util.Objects;
  * </ul>
  */
 public class VersionIntervalle {
-	public static final VersionIntervalle ouvert = null;
+	public static final VersionIntervalle ouvert = new VersionIntervalle(null, null);
 	
 	Version minimum, maximum;
 	boolean inclut_min, inclut_max;
@@ -122,7 +122,7 @@ public class VersionIntervalle {
 			}
 		} if (contraintes.length() != pos) throw new VersionIntervalleFormatException(contraintes);
 		
-		if (minimum == null && maximum == null) return null;
+		if (minimum == null && maximum == null) return VersionIntervalle.ouvert;
 		else if (intervalle) {
 			VersionIntervalle v = new VersionIntervalle(minimum, maximum);
 			v.inclut_min = inclut_min;
@@ -170,7 +170,7 @@ public class VersionIntervalle {
 					} else resultat.put(modid, versionIntervalle);
 					
 					modid_builder = new StringBuilder();
-					versionIntervalle = null;
+					versionIntervalle = VersionIntervalle.ouvert;
 				} else if (c == '@' && modid_builder.length() > 0) {
 					pos++;
 					if (pos >= texte.length()) {
