@@ -4,7 +4,6 @@ import McForgeMods.Mod;
 import McForgeMods.ModVersion;
 import McForgeMods.Version;
 import McForgeMods.VersionIntervalle;
-import McForgeMods.outils.Dossiers;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -63,11 +62,28 @@ public class DepotLocal extends Depot {
 		}
 	}
 	
+	private File fichierIndexDepot() {
+		return dossier.resolve("Mods.json").toFile();
+	}
+	
+	/** Fournit un dossier de mod en cache.
+	 * Les fichiers de mods peuvent être sauvegardés pour être installé sans téléchargement.
+	 * @param modVersion: version à sauvegarder. Permet de séparer les éléments du cache.
+	 * @return le chemin vers le dossier, ne donne pas de nom au fichier
+	 */
+	public Path dossierCache(ModVersion modVersion) {
+		return dossier.resolve("cache").resolve(modVersion.mod.modid);
+	}
+	
+	private File fichierModDepot(String modid) {
+		return dossier.resolve(modid.substring(0, 1)).resolve(modid).resolve(modid + ".json").toFile();
+	}
+	
 	/**
 	 * Importe les informations du dépot à partir du répertoire de sauvegarde.
 	 */
 	public void importation() throws IOException, JSONException {
-		final File MODS = Dossiers.fichierIndexDepot(this.dossier).toFile();
+		final File MODS = fichierIndexDepot();
 		if (!MODS.exists()) {
 			System.err.println("Absence du fichier principal: 'Mods.json'");
 			return;
@@ -82,7 +98,7 @@ public class DepotLocal extends Depot {
 		ArrayList<String> modids = new ArrayList<>(getModids());
 		Collections.sort(modids);
 		for (String modid : modids) {
-			final File nom_fichier = Dossiers.fichierModDepot(this.dossier, modid).toFile();
+			final File nom_fichier = fichierModDepot(modid);
 			if (!nom_fichier.exists()) System.err.println("Le fichier de données pour '" + modid + "' n'existe pas.");
 			
 			try (FileInputStream fichier = new FileInputStream(nom_fichier)) {
@@ -187,7 +203,7 @@ public class DepotLocal extends Depot {
 	public void sauvegarde() throws IOException {
 		if (!this.dossier.toFile().exists() && !this.dossier.toFile().mkdirs()) return;
 		
-		try (FileOutputStream fichier = new FileOutputStream(Dossiers.fichierIndexDepot(this.dossier).toFile());
+		try (FileOutputStream fichier = new FileOutputStream(fichierIndexDepot());
 			 BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(fichier)) {
 			ecritureFichierIndex(bufferedOutputStream);
 		}
@@ -195,9 +211,9 @@ public class DepotLocal extends Depot {
 		ArrayList<String> liste = new ArrayList<>(this.getModids());
 		Collections.sort(liste);
 		for (String modid : liste) {
-			Path fichier_mod = Dossiers.fichierModDepot(this.dossier, modid);
-			if (!fichier_mod.getParent().toFile().exists()) fichier_mod.getParent().toFile().mkdirs();
-			try (FileOutputStream donnees = new FileOutputStream(fichier_mod.toFile());
+			File fichier_mod = fichierModDepot(modid);
+			if (!fichier_mod.getParentFile().exists()) fichier_mod.getParentFile().mkdirs();
+			try (FileOutputStream donnees = new FileOutputStream(fichier_mod);
 				 BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(donnees)) {
 				this.ecritureFichierMod(modid, bufferedOutputStream);
 			} catch (FileNotFoundException f) {

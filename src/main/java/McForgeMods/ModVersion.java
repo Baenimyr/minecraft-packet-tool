@@ -1,6 +1,7 @@
 package McForgeMods;
 
 import java.net.URL;
+import java.nio.file.Path;
 import java.util.*;
 
 /**
@@ -114,5 +115,15 @@ public class ModVersion {
 	
 	public String toStringStandard() {
 		return String.format("%s-%s-[%s]", mod.modid, version, mcversion);
+	}
+	
+	/** Dossier dans lequel placer les fichiers lorsque le mod est installé.
+	 * Ne donne pas le nom du fichier parce que celui-ci n'est pas standardisé.
+	 *
+	 * @param minecraft: dossier minecraft racine
+	 * @return le dossier d'installation
+	 */
+	public Path dossierInstallation(Path minecraft) {
+		return minecraft.resolve("mods");
 	}
 }

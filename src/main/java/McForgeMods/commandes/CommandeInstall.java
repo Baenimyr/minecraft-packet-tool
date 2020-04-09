@@ -6,7 +6,6 @@ import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.ArbreDependance;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
-import McForgeMods.outils.Dossiers;
 import McForgeMods.outils.TelechargementHttp;
 import picocli.CommandLine;
 
@@ -230,12 +229,13 @@ public class CommandeInstall implements Callable<Integer> {
 			List<URL> http = modVersion.urls.stream()
 					.filter(url -> url.getProtocol().equals("http") || url.getProtocol().equals("https"))
 					.collect(Collectors.toList());
+			Path dossier = modVersion.dossierInstallation(minecraft.dossier);
+			if (Files.notExists(dossier)) Files.createDirectories(dossier);
 			
 			// Tentative de copie de fichier
 			for (URL url : fichiers) {
 				Path source = Path.of(url.getPath());
-				Path cible = Dossiers.dossierInstallationMod(minecraft.dossier, modVersion)
-						.resolve(source.getFileName());
+				Path cible = modVersion.dossierInstallation(minecraft.dossier).resolve(source.getFileName());
 				
 				try {
 					Files.copy(source, cible);
@@ -251,7 +251,7 @@ public class CommandeInstall implements Callable<Integer> {
 			// Tentative de téléchargement HTTP
 			for (URL url : http) {
 				TelechargementHttp telechargement = new TelechargementHttp(url,
-						Dossiers.dossierInstallationMod(minecraft.dossier, modVersion)
+						modVersion.dossierInstallation(minecraft.dossier)
 								.resolve(modVersion.toStringStandard() + ".jar").toFile());
 				try {
 					HttpResponse<String> connexion = telechargement.recupereInformations();
@@ -266,7 +266,7 @@ public class CommandeInstall implements Callable<Integer> {
 					for (String info : content) {
 						Matcher m = filename.matcher(info);
 						if (m.find()) {
-							telechargement.fichier = Dossiers.dossierInstallationMod(minecraft.dossier, modVersion)
+							telechargement.fichier = modVersion.dossierInstallation(minecraft.dossier)
 									.resolve(m.group(1)).toFile();
 							System.out.println(
 									"[Telechargement] [DEBUG] nouveau nom : " + telechargement.fichier.getName());

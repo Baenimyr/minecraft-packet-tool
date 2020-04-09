@@ -6,7 +6,6 @@ import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.ArbreDependance;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
-import McForgeMods.outils.Dossiers;
 import org.json.JSONException;
 import picocli.CommandLine;
 
@@ -167,7 +166,7 @@ public class CommandeDepot implements Runnable {
 				reelle.urls.removeIf(url -> url.getProtocol().equals("file"));
 				
 				if (include_file) {
-					final Path nouveau_fichier = copieFichier(depot.dossier, version);
+					final Path nouveau_fichier = copieFichier(depot, version);
 					if (nouveau_fichier != null)
 						reelle.ajoutURL(new URL(prefix, depot.dossier.relativize(nouveau_fichier).toString()));
 				}
@@ -186,12 +185,12 @@ public class CommandeDepot implements Runnable {
 			return 0;
 		}
 		
-		private Path copieFichier(Path dossier_depot, ModVersion version) {
+		private Path copieFichier(final DepotLocal depot, ModVersion version) {
 			Optional<URL> fichier = version.urls.stream().filter(u -> u.getProtocol().equals("file")).findFirst();
 			if (fichier.isPresent()) {
 				try {
 					final Path source = Path.of(fichier.get().toURI());
-					final Path destination = Dossiers.dossierModDepot(dossier_depot, version.mod.modid)
+					final Path destination = depot.dossierCache(version)
 							.resolve(source.getFileName());
 					destination.getParent().toFile().mkdirs();
 					Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING);
