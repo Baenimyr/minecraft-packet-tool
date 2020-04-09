@@ -276,6 +276,23 @@ public class DepotLocal extends Depot {
 		}
 	}
 	
+	/** Efface toute information non essentielle du dépôt.
+	 *
+	 * Si des versions de mods sont sauvegardées localement, une minimum d'information est conservé.
+	 */
+	public void clear() {
+		for (String modid : this.getModids()) {
+			for (ModVersion modVersion : this.getModVersions(modid)) {
+				modVersion.urls.removeIf(url -> !url.getProtocol().equals("file"));
+				modVersion.requiredMods.clear();
+				modVersion.dependants.clear();
+				modVersion.alias.clear();
+			}
+			
+			this.mod_version.get(this.getMod(modid)).removeIf(mv -> mv.urls.isEmpty());
+		}
+	}
+	
 	/**
 	 * Télécharge les informations présente sur un dépot distant et actualise les informations actuelles.
 	 * <p>
@@ -297,9 +314,9 @@ public class DepotLocal extends Depot {
 			String modid = modids.get(i);
 			try (InputStream is = depot_distant.fichierModDepot(modid)) {
 				this.lectureFichierMod(modid, is);
-				float progres = (float) i / modids.size();
-				System.out.print(String.format("\r[%s>%s] %d/%d     ", "=".repeat((int) (50. * progres)),
-						" ".repeat((int) (50 * (1. - progres) - 1)), (i + 1), modids.size()));
+				// float progres = (float) i / modids.size();
+				//System.out.print(String.format("\r[%s>%s] %d/%d     ", "=".repeat((int) (50. * progres)),
+				//		" ".repeat((int) (50 * (1. - progres) - 1)), (i + 1), modids.size()));
 			} catch (FileNotFoundException f) {
 				System.err.println(
 						String.format("Les données de version pour le mod '%s' ne sont pas disponibles.", modid));

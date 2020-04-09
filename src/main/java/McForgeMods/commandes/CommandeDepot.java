@@ -4,16 +4,13 @@ import McForgeMods.ForgeMods;
 import McForgeMods.ModVersion;
 import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.ArbreDependance;
-import McForgeMods.depot.DepotDistant;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
 import McForgeMods.outils.Dossiers;
-import McForgeMods.outils.Sources;
 import org.json.JSONException;
 import picocli.CommandLine;
-import tar.FichierTar;
 
-import java.io.*;
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -31,7 +28,7 @@ import java.util.concurrent.Callable;
  * <i>import</i> associé avec une installation minecraft récupère les informations directement dans les
  * <i>mcmod.info</i> des fichiers jar trouvés.
  */
-@CommandLine.Command(name = "depot", subcommands = {CommandeDepot.importation.class},
+@CommandLine.Command(name = "depot", subcommands = {CommandeDepot.importation.class, CommandeUpdate.class},
 		description = {"Outil de gestion d'un dépot.",
 				"Une installation minecraft peut être utilisée comme source de fichiers."})
 public class CommandeDepot implements Runnable {
@@ -208,99 +205,5 @@ public class CommandeDepot implements Runnable {
 			}
 			return null;
 		}
-	}
-	
-	@CommandLine.Command(name = "update", description = "Met à jour les informations du dépot à partir d'un autre.")
-	public int update(@CommandLine.Mixin ForgeMods.Help help,
-			@CommandLine.Option(names = {"-d", "--depot"}, description = "Dépot local") Path adresseDepot,
-			@CommandLine.Option(names = {"-f", "--from"}, arity = "0..n", description = "Dépot distant spécifique")
-					List<String> urlDistant, @CommandLine.Option(names = {"-c", "--clear"}, defaultValue = "false",
-			description = "Remplace totalement le dépot initial par les informations téléchargées.") boolean clear) {
-		final DepotLocal depotLocal = new DepotLocal(adresseDepot);
-		if (!clear) {
-			try {
-				depotLocal.importation();
-			} catch (IOException | JSONException e) {
-				System.err.println("Erreur de chargement du dépot local: " + e.getClass() + " " + e.getMessage());
-				return 1;
-			}
-		}
-		
-		Sources sources;
-		if (urlDistant == null) {
-			urlDistant = new LinkedList<>();
-			final File fichier = depotLocal.dossier.resolve("sources.txt").toFile();
-			if (fichier.exists()) {
-				try (FileInputStream input = new FileInputStream(fichier)) {
-					sources = new Sources(input);
-				} catch (IOException ignored) {
-					return -1;
-				}
-			} else {
-				System.err.println("Aucune sources disponible.");
-				return 2;
-			}
-		} else {
-			sources = new Sources();
-			for (String url : urlDistant) {
-				try {
-					sources.add(new URL(url));
-				} catch (MalformedURLException m) {
-					System.err.println(String.format("MalformedURL: '%s'", url));
-				}
-			}
-		}
-		
-		int i = 0;
-		Map<URL, Sources.SourceType> src = sources.urls();
-		for (URL url : src.keySet()) {
-			System.out.println(String.format("%d/%d\t%s", ++i, sources.size(), url));
-			try {
-				if (src.get(url) == Sources.SourceType.TAR) {
-					try (InputStream s = url.openStream()) {
-						final FichierTar tar = new FichierTar(s);
-						depotLocal.synchronisationDepot(new DepotDistant() {
-							@Override
-							public InputStream fichierIndexDepot() throws FileNotFoundException {
-								return tar.fichier("Mods.json").getInputStream();
-							}
-							
-							@Override
-							public InputStream fichierModDepot(String modid) throws FileNotFoundException {
-								return tar.fichier(modid.substring(0, 1) + "/" + modid + "/" + modid + ".json")
-										.getInputStream();
-							}
-						});
-					} catch (FileNotFoundException fnfe) {
-						System.err.println("Fichier absent dans l'archive : '" + fnfe.getMessage() + "'");
-					}
-				} else {
-					depotLocal.synchronisationDepot(new DepotDistant() {
-						@Override
-						public InputStream fichierIndexDepot() throws IOException {
-							return new URL(url, "Mods.json").openStream();
-						}
-						
-						@Override
-						public InputStream fichierModDepot(String modid) throws IOException {
-							return new URL(url, modid.substring(0, 1) + "/" + modid + "/" + modid + ".json")
-									.openStream();
-						}
-					});
-				}
-			} catch (MalformedURLException u) {
-				System.err.println("URL invalide: " + u.getMessage());
-			} catch (IOException io) {
-				System.err.println("Erreur lecture du dépot distant: " + io.getClass() + " " + io.getMessage());
-			}
-		}
-		
-		try {
-			depotLocal.sauvegarde();
-			System.out.println("Dépot sauvegardé en " + depotLocal.dossier);
-		} catch (IOException | JSONException e) {
-			System.err.println("Erreur de sauvegarde du dépot local: " + e.getClass() + " " + e.getMessage());
-		}
-		return 0;
 	}
 }

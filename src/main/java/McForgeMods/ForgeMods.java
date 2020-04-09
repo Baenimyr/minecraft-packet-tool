@@ -2,6 +2,7 @@ package McForgeMods;
 
 import McForgeMods.commandes.CommandeDepot;
 import McForgeMods.commandes.CommandeInstall;
+import McForgeMods.commandes.CommandeUpdate;
 import McForgeMods.commandes.Show;
 import McForgeMods.depot.DepotLocal;
 import McForgeMods.outils.Sources;
@@ -17,7 +18,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 @CommandLine.Command(name = "forgemods", showDefaultValues = true, mixinStandardHelpOptions = true,
-		subcommands = {Show.class, CommandeDepot.class, CommandeInstall.class})
+		subcommands = {Show.class, CommandeDepot.class, CommandeInstall.class, CommandeUpdate.class})
 public class ForgeMods implements Runnable {
 	
 	@CommandLine.Spec
