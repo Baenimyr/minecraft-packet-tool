@@ -7,16 +7,19 @@ import McForgeMods.depot.ArbreDependance;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
 import McForgeMods.outils.Dossiers;
-import McForgeMods.outils.Transfert;
+import McForgeMods.outils.TelechargementHttp;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.net.URISyntaxException;
 import java.net.URL;
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * La commande <i>install</i> permet de récupérer les fichiers de mod présents sur le réseau. Pour l'installation d'un
@@ -190,17 +193,8 @@ public class CommandeInstall implements Callable<Integer> {
 	 */
 	private int telechargementMods(Collection<ModVersion> installations, final DepotInstallation depotInstallation) {
 		
-		final List<TelechargementMod> telechargements = new ArrayList<>();
-		for (ModVersion modVersion : installations) {
-			if (modVersion.urls.stream().noneMatch(
-					url -> url.getProtocol().equals("file") || url.getProtocol().equals("http") || url.getProtocol()
-							.equals("https"))) {
-				System.err.println(String.format("Aucun lien de téléchargement pour '%s=%s'", modVersion.mod.modid,
-						modVersion.version));
-			} else {
-				telechargements.add(new TelechargementMod(modVersion, depotInstallation));
-			}
-		}
+		final List<TelechargementMod> telechargements = installations.stream()
+				.map(modVersion -> new TelechargementMod(modVersion, depotInstallation)).collect(Collectors.toList());
 		
 		final Map<TelechargementMod, Future<Boolean>> tasks = new LinkedHashMap<>();
 		telechargements.forEach(t -> tasks.put(t, executor.submit(t)));
@@ -208,7 +202,9 @@ public class CommandeInstall implements Callable<Integer> {
 			final TelechargementMod tele = task.getKey();
 			final Future<Boolean> future = task.getValue();
 			try {
-				future.get();
+				if (future.get()) {
+					depotInstallation.suppressionConflits(tele.modVersion);
+				}
 			} catch (ExecutionException | InterruptedException erreur) {
 				System.err.println(
 						String.format("Erreur téléchargement de '%s': %s", tele.modVersion, erreur.getMessage()));
@@ -229,37 +225,66 @@ public class CommandeInstall implements Callable<Integer> {
 		
 		@Override
 		public Boolean call() throws Exception {
-			for (URL url : modVersion.urls) {
-				String nom = String
-						.format("%s-%s-%s.jar", modVersion.mod.modid, modVersion.mcversion, modVersion.version);
-				if (url.getPath().endsWith(".jar")) {
-					nom = url.getPath().substring(url.getPath().lastIndexOf('/') + 1);
-				}
-				final Transfert transfert = new Transfert(url,
-						Dossiers.dossierInstallationMod(minecraft.dossier, modVersion).resolve(nom).toUri().toURL());
+			List<URL> fichiers = modVersion.urls.stream().filter(url -> url.getProtocol().equals("file"))
+					.collect(Collectors.toList());
+			List<URL> http = modVersion.urls.stream()
+					.filter(url -> url.getProtocol().equals("http") || url.getProtocol().equals("https"))
+					.collect(Collectors.toList());
+			
+			// Tentative de copie de fichier
+			for (URL url : fichiers) {
+				Path source = Path.of(url.getPath());
+				Path cible = Dossiers.dossierInstallationMod(minecraft.dossier, modVersion)
+						.resolve(source.getFileName());
+				
 				try {
-					final long resultat = transfert.call();
-					if (resultat >= 0) {
-						synchronized (this.minecraft) {
-							if (this.minecraft.contains(this.modVersion.mod))
-								this.minecraft.getModVersions(this.modVersion.mod).stream()
-										.filter(v -> !v.equals(this.modVersion)).forEach(mv -> {
-									try {
-										Files.deleteIfExists(Path.of(mv.urls.get(0).toURI()));
-									} catch (URISyntaxException | IOException e) {
-										System.err.println(e.getClass() + ": " + e.getMessage());
-									}
-								});
-						}
-						synchronized (System.out) {
-							System.out.println(
-									String.format("%-20s %-20s %.1f Ko", modVersion.mod.modid, modVersion.version,
-											(float) transfert.getTransfered() / 1024));
-						}
-						return true;
+					Files.copy(source, cible);
+					synchronized (System.out) {
+						System.out.println(String.format("%-20s %-20s OK", modVersion.mod.modid, modVersion.version));
 					}
-				} catch (IOException e) {
-					System.err.println(e.getMessage());
+					return true;
+				} catch (IOException io) {
+					continue;
+				}
+			}
+			
+			// Tentative de téléchargement HTTP
+			for (URL url : http) {
+				TelechargementHttp telechargement = new TelechargementHttp(url,
+						Dossiers.dossierInstallationMod(minecraft.dossier, modVersion)
+								.resolve(modVersion.toStringStandard() + ".jar").toFile());
+				try {
+					HttpResponse<String> connexion = telechargement.recupereInformations();
+					
+					if (connexion.statusCode() >= 400) {
+						throw new IOException(
+								String.format("Server sent code %d for '%s'", connexion.statusCode(), connexion.uri()));
+					}
+					
+					List<String> content = connexion.headers().allValues("Content-Disposition");
+					final Pattern filename = Pattern.compile("filename=\"(.+)\"");
+					for (String info : content) {
+						Matcher m = filename.matcher(info);
+						if (m.find()) {
+							telechargement.fichier = Dossiers.dossierInstallationMod(minecraft.dossier, modVersion)
+									.resolve(m.group(1)).toFile();
+							System.out.println(
+									"[Telechargement] [DEBUG] nouveau nom : " + telechargement.fichier.getName());
+							break;
+						}
+					}
+					
+					long taille = telechargement.telechargement();
+					if (taille == 0) continue;
+					synchronized (System.out) {
+						System.out.println(
+								String.format("%-20s %-20s %.1f Ko", modVersion.mod.modid, modVersion.version,
+										(float) telechargement.telecharge / 1024));
+					}
+					return true;
+				} catch (IOException io) {
+					System.err.println(io.getClass() + ":" + io.getMessage());
+					io.printStackTrace();
 				}
 			}
 			

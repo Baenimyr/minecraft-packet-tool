@@ -11,10 +11,14 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 
 import java.io.*;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -80,10 +84,26 @@ public class DepotInstallation extends Depot {
 	 * Détecte les conflits: même modid mais versions différentes, et supprime les fichiers en trop.
 	 * <p>
 	 * Deux mods sont en conflit si les modid et la version minecraft sont identiques mais que la version est
-	 * différente.
+	 * différente. Considère seulement les versions pouvant être en conflit avec {@code statique}.
+	 *
+	 * @param statique version à conserver
 	 */
-	public void suppressionConflits() {
-	
+	public void suppressionConflits(ModVersion statique) {
+		if (this.contains(statique.mod)) {
+			List<ModVersion> perimes = this.getModVersions(statique.mod).stream()
+					.filter(mv -> mv.mcversion.equals(statique.mcversion) && !mv.version.equals(statique.version))
+					.collect(Collectors.toList());
+			perimes.forEach(mv -> {
+				for (URL url : mv.urls) {
+					try {
+						if (url.getProtocol().equals("file") && Path.of(url.toURI()).startsWith(this.dossier))
+							Files.deleteIfExists(Path.of(url.toURI()));
+					} catch (IOException | URISyntaxException ignored) {
+					}
+				}
+				// TODO: effacer du dépôt virtuel
+			});
+		}
 	}
 	
 	/**
