@@ -10,9 +10,9 @@ import java.util.*;
  * intervalle de version valide, cependant un mod ne peut apparaitre qu'une seule fois dans l'arbre.
  */
 public class ArbreDependance {
-	final Map<String, VersionIntervalle> mods        = new HashMap<>();
-	final Map<String, Set<String>>       parents     = new HashMap<>();
-	final Map<String, Set<String>>       dependances = new HashMap<>();
+	private final Map<String, VersionIntervalle> mods        = new HashMap<>();
+	private final Map<String, Set<String>>       parents     = new HashMap<>();
+	private final Map<String, Set<String>>       dependances = new HashMap<>();
 	
 	public ArbreDependance() {
 	
@@ -37,6 +37,7 @@ public class ArbreDependance {
 	 * La nouvelle intervalle sera l'intersection entre l'intervalle actuelle et la nouvelle
 	 */
 	public boolean ajoutModIntervalle(String mod, VersionIntervalle versions) {
+		assert Objects.nonNull(versions);
 		if (!mods.containsKey(mod)) {
 			mods.put(mod, versions);
 			parents.put(mod, new HashSet<>());
@@ -86,7 +87,7 @@ public class ArbreDependance {
 		
 		while (!temp.isEmpty()) {
 			final String modid = temp.removeFirst();
-			final VersionIntervalle vintervalle = this.mods.get(modid);
+			final VersionIntervalle vintervalle = this.intervalle(modid);
 			
 			if (depot.contains(modid)) {
 				Optional<ModVersion> candidat = depot.getModVersions(modid).stream()
