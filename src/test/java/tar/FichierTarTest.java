@@ -21,11 +21,12 @@ class FichierTarTest {
 				fail();
 			}
 			
-			assertEquals(3, tar.size());
 			assertTrue(tar.listeFichiers().contains("build.gradle"));
 			EntreeTar build = tar.fichier("build.gradle");
 			assertEquals(1688, build.taille);
 			assertEquals(1579509932L, build.date);
+			tar.lectureTotale();
+			assertEquals(3, tar.size());
 		} catch (Exception i) {
 			i.printStackTrace();
 			fail(i);
@@ -34,16 +35,18 @@ class FichierTarTest {
 	
 	@Test
 	public void forgemods() {
-		try (FileInputStream fichier = new FileInputStream(new File("forgemods.tar"))) {
+		try (FileInputStream fichier = new FileInputStream(new File("Mods.tar"))) {
 			FichierTar tar = new FichierTar(fichier);
 			
+			assertTrue(tar.contains("a/"));
+			assertTrue(tar.contains("b/"));
+			assertTrue(tar.contains("c/"));
+			assertTrue(tar.contains("d/"));
+			assertTrue(tar.contains("e/"));
+			assertTrue(tar.contains("Mods.json"));
+			
+			tar.lectureTotale();
 			assertEquals(112, tar.size());
-			assertTrue(tar.listeFichiers().contains("a/"));
-			assertTrue(tar.listeFichiers().contains("b/"));
-			assertTrue(tar.listeFichiers().contains("c/"));
-			assertTrue(tar.listeFichiers().contains("d/"));
-			assertTrue(tar.listeFichiers().contains("e/"));
-			assertTrue(tar.listeFichiers().contains("Mods.json"));
 			
 			assertTrue(tar.listeFichiers().contains("t/thermalexpansion/thermalexpansion.json"));
 			EntreeTar thermal = tar.fichier("t/thermalexpansion/thermalexpansion.json");
