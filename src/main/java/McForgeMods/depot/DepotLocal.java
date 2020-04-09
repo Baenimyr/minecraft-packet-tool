@@ -154,7 +154,7 @@ public class DepotLocal extends Depot {
 		for (String version : json_total.keySet()) {
 			JSONObject json = json_total.getJSONObject(version);
 			final ModVersion mv = this.ajoutModVersion(new ModVersion(this.getMod(modid), Version.read(version),
-					Version.read(json.getString("mcversion"))));
+					VersionIntervalle.read(json.getString("mcversion"))));
 			
 			if (json.has("urls")) {
 				Object url = json.get("urls");
@@ -265,7 +265,7 @@ public class DepotLocal extends Depot {
 			mv.dependants.sort(String::compareTo);
 			mv.alias.sort(String::compareTo);
 			
-			json.put("mcversion", mv.mcversion);
+			json.put("mcversion", mv.mcversion.minimum().toString(mv.mcversion.minimum().precision(), false, false));
 			
 			JSONArray urls = new JSONArray();
 			for (URL url : mv.urls) {

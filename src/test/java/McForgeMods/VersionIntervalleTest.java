@@ -7,20 +7,25 @@ import static org.junit.jupiter.api.Assertions.*;
 class VersionIntervalleTest {
 	
 	@Test
-	public void testComparaison() {
+	public void comparaison() {
 		VersionIntervalle dep1 = new VersionIntervalle(new Version(1, 0, 0), new Version(2, 0, 0));
 		dep1.inclut_min = true;
 		dep1.inclut_max = false;
 		
 		assertTrue(dep1.correspond(new Version(1, 0, 0)));
 		assertTrue(dep1.correspond(new Version(1, 584, 0)));
+		assertTrue(dep1.correspond(new Version(1, 0, 127)));
 		assertFalse(dep1.correspond(new Version(2, 0, 0)));
 		assertFalse(dep1.correspond(new Version(2, 0, 14)));
 		assertFalse(dep1.correspond(new Version(0, 0, 988)));
+		
+		assertTrue(dep1.englobe(new VersionIntervalle(new Version(1,0,0))));
+		assertTrue(dep1.englobe(dep1));
+		assertFalse(dep1.englobe(new VersionIntervalle(new Version(1,0,0), new Version(3,5,0))));
 	}
 	
 	@Test
-	public void testlecture() {
+	public void lecture() {
 		VersionIntervalle dep1 = VersionIntervalle.read("(,1.0]");
 		assertTrue(dep1.inclut_max);
 		assertFalse(dep1.inclut_min);

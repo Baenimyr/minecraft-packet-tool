@@ -15,7 +15,7 @@ import java.util.*;
 public class ModVersion {
 	public final Mod     mod;
 	public final Version version;
-	public final Version mcversion;
+	public final VersionIntervalle mcversion;
 	
 	/**
 	 * Liste des liens menant au fichier (localement ou un url)
@@ -39,7 +39,7 @@ public class ModVersion {
     List<String> screenshots;
      */
 	
-	public ModVersion(Mod mod, Version version, Version mcversion) {
+	public ModVersion(Mod mod, Version version, VersionIntervalle mcversion) {
 		this.mod = mod;
 		this.version = version;
 		this.mcversion = mcversion;

@@ -98,16 +98,21 @@ public class Version implements Comparable<Version> {
 	
 	@Override
 	public String toString() {
-		StringBuilder sb = new StringBuilder(this.versions[0] + "." + this.versions[1] + "." + this.versions[2]);
-		if (this.versions[3] != 0) {
+		return this.toString(this.versions[3] != 0 ? 3 : 2, true, true);
+	}
+	
+	public String toString(int p, boolean release, boolean build) {
+		StringBuilder sb = new StringBuilder();
+		sb.append(this.versions[0]);
+		for (int i = 1; i < size() && i <= p; i++) {
 			sb.append('.');
-			sb.append(this.versions[3]);
+			sb.append(this.versions[i]);
 		}
-		if (!this.release.isEmpty()) {
+		if (release && !this.release.isEmpty()) {
 			sb.append("-");
 			sb.append(String.join(".", this.release));
 		}
-		if (!this.build.isEmpty()) {
+		if (build && !this.build.isEmpty()) {
 			sb.append("+");
 			sb.append(String.join(".", this.build));
 		}

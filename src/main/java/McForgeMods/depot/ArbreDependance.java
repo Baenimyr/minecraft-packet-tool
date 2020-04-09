@@ -13,6 +13,7 @@ public class ArbreDependance {
 	private final Map<String, VersionIntervalle> mods        = new HashMap<>();
 	private final Map<String, Set<String>>       parents     = new HashMap<>();
 	private final Map<String, Set<String>>       dependances = new HashMap<>();
+	public final  VersionIntervalle              mcversion   = VersionIntervalle.ouvert();
 	
 	public ArbreDependance() {
 	
@@ -24,6 +25,7 @@ public class ArbreDependance {
 	
 	/** Fixe un version pour le mod et recalcul les intervalles de dépendance. */
 	public void ajoutMod(ModVersion modVersion) {
+		this.mcversion.intersection(modVersion.mcversion);
 		if (this.ajoutModIntervalle(modVersion.mod.modid, new VersionIntervalle(modVersion.version)))
 			for (String modid : modVersion.requiredMods.keySet()) {
 				this.ajoutDependance(modVersion.mod.modid, modid);
@@ -43,9 +45,6 @@ public class ArbreDependance {
 			parents.put(mod, new HashSet<>());
 			dependances.put(mod, new HashSet<>());
 			return true;
-		} else if (mods.get(mod) == VersionIntervalle.ouvert) {
-			mods.put(mod, versions);
-			return versions != VersionIntervalle.ouvert;
 		} else {
 			final VersionIntervalle avant = new VersionIntervalle(mods.get(mod));
 			mods.get(mod).intersection(versions);
@@ -74,7 +73,7 @@ public class ArbreDependance {
 			dep.add(requis);
 			dependances.put(parent, dep);
 		}
-		this.ajoutModIntervalle(parent, VersionIntervalle.ouvert);
+		this.ajoutModIntervalle(parent, VersionIntervalle.ouvert());
 	}
 	
 	/**
@@ -82,7 +81,8 @@ public class ArbreDependance {
 	 * <p>
 	 * La version la plus récente compatible du dépôt est utilisée pour déterminer les nouvelles dépendances.
 	 */
-	public void extension(Depot depot) {
+	public Map<String, ModVersion> extension(Depot depot) {
+		Map<String, ModVersion> selection = new HashMap<>();
 		final LinkedList<String> temp = new LinkedList<>(this.mods.keySet());
 		
 		while (!temp.isEmpty()) {
@@ -91,17 +91,20 @@ public class ArbreDependance {
 			
 			if (depot.contains(modid)) {
 				Optional<ModVersion> candidat = depot.getModVersions(modid).stream()
+						.filter(mv -> mv.mcversion.englobe(this.mcversion))
 						.filter(mv -> vintervalle.correspond(mv.version)).max(Comparator.comparing(mv -> mv.version));
 				
 				if (candidat.isPresent()) {
-					this.ajoutMod(candidat.get());
 					final ModVersion mversion = candidat.get();
+					this.ajoutMod(mversion);
+					selection.put(modid, mversion);
 					for (String d_modid : mversion.requiredMods.keySet()) {
 						if (!temp.contains(d_modid)) temp.addLast(d_modid);
 					}
 				}
 			}
 		}
+		return selection;
 	}
 	
 	public Set<String> listeModids() {
@@ -109,7 +112,7 @@ public class ArbreDependance {
 	}
 	
 	public VersionIntervalle intervalle(String modid) {
-		return this.mods.getOrDefault(modid, VersionIntervalle.ouvert);
+		return this.mods.getOrDefault(modid, VersionIntervalle.ouvert());
 	}
 	
 	public Map<String, VersionIntervalle> requis() {
@@ -117,7 +120,8 @@ public class ArbreDependance {
 	}
 	
 	public boolean contains(ModVersion mversion) {
-		return this.mods.containsKey(mversion.mod.modid) && this.mods.get(mversion.mod.modid).correspond(mversion.version);
+		return this.mods.containsKey(mversion.mod.modid) && this.mods.get(mversion.mod.modid)
+				.correspond(mversion.version);
 	}
 	
 	public void clear() {

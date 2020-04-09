@@ -79,7 +79,7 @@ public class CommandeDepot implements Runnable {
 					for (Map.Entry<String, VersionIntervalle> dep : dependances.requis().entrySet()) {
 						if (!dep.getKey().equals("forge")) {
 							if (!depot.contains(dep.getKey()) || depot.getModVersions(dep.getKey()).stream().noneMatch(
-									v -> dep.getValue() == VersionIntervalle.ouvert || dep.getValue()
+									v -> dep.getValue().equals(VersionIntervalle.ouvert()) || dep.getValue()
 											.correspond(v.version))) {
 								System.out.println(String.format(
 										"'%s' a besoin de '%s@%s', mais il n'est pas disponible dans le dépôt !",

@@ -51,12 +51,13 @@ public class CommandeInstall implements Callable<Integer> {
 	@CommandLine.Mixin
 	ForgeMods.DossiersOptions dossiers;
 	
-	@CommandLine.Option(names = {"--mcversion"}, description = "Permet de choisir un version de minecraft. Recommandé.")
+	@CommandLine.Option(names = {"-mc", "--mcversion"}, required = true,
+			description = "Permet de choisir un version de " + "minecraft. " + "Recommandé.")
 	String mcversion;
 	
-	@CommandLine.Option(names = {"--dependencies"}, negatable = true, defaultValue = "true",
+	@CommandLine.Option(names = {"--no-dependencies"}, negatable = true,
 			description = "Autorise ou empêche l'installation des dépendances si besoin.")
-	boolean dependances;
+	boolean dependances = true;
 	
 	/*@CommandLine.Option(names = {"-y", "--yes"}, defaultValue = "false",
 			description = "Répond automatiquement oui à toutes les questions.")
@@ -84,7 +85,8 @@ public class CommandeInstall implements Callable<Integer> {
 		final List<String> installation_manuelle = new ArrayList<>();
 		
 		VersionIntervalle mcversion = this.mcversion != null ? VersionIntervalle.read(this.mcversion)
-				: VersionIntervalle.ouvert;
+				: VersionIntervalle.ouvert();
+		arbre_dependances.mcversion.intersection(mcversion);
 		
 		try {
 			depotLocal.importation();
@@ -101,13 +103,12 @@ public class CommandeInstall implements Callable<Integer> {
 				return ERREUR_MODID;
 			}
 			// Vérification que l'intervalle n'est pas trop large.
-			if (demande.getValue() == VersionIntervalle.ouvert && mcversion == VersionIntervalle.ouvert) {
+			if (demande.getValue().minimum() == null && demande.getValue().maximum() == null && (
+					mcversion.minimum() == null || mcversion.maximum() == null)) {
 				System.err.println(String.format("Vous devez spécifier une version, pour le mod '%s' ou minecraft.",
 						demande.getKey()));
 				return ERREUR_VERSION;
 			}
-			
-			// TODO: détecter la version de minecraft pour limiter la suite
 			
 			arbre_dependances.ajoutModIntervalle(demande.getKey(), demande.getValue());
 			installation_manuelle.add(demande.getKey());
@@ -116,7 +117,7 @@ public class CommandeInstall implements Callable<Integer> {
 		// Ajout de toutes les installations manuelles dans l'installation
 		for (String modid : depotInstallation.getModids()) {
 			for (ModVersion mversion : depotInstallation.getModVersions(modid)) {
-				if (mcversion.correspond(mversion.mcversion)
+				if (mversion.mcversion.englobe(mcversion)
 						&& depotInstallation.statusMod(mversion) != DepotInstallation.StatusInstallation.AUTO
 						&& !arbre_dependances.listeModids().contains(mversion.mod.modid)) {
 					// seulement les choix utilisateur les plus récents
@@ -125,15 +126,28 @@ public class CommandeInstall implements Callable<Integer> {
 			}
 		}
 		
+		/* Association entre un modid et la version selectionnée pour l'installation */
+		Map<String, ModVersion> resolution;
 		if (this.dependances) {
-			arbre_dependances.extension(depotLocal);
+			resolution = arbre_dependances.extension(depotLocal);
+		} else {
+			resolution = new HashMap<>();
+			for (final String modid : installation_manuelle) {
+				if (depotLocal.contains(modid)) {
+					Optional<ModVersion> candidat = depotLocal.getModVersions(modid).stream()
+							.filter(mv -> mv.mcversion.englobe(mcversion))
+							.filter(mv -> arbre_dependances.intervalle(modid).correspond(mv.version))
+							.max(Comparator.comparing(mv -> mv.version));
+					candidat.ifPresent(modVersion -> resolution.put(modid, modVersion));
+				}
+			}
 		}
 		
 		/* Résolution des versions. Cherche dans le dépot si il existe des mods qui correspondent aux versions
 		demandées. Si le dépot d'installation contient déjà un mod qui satisfait la condition, aucun téléchargement
 		n'est nécessaire.
 		 */
-		final Set<String> dependances = arbre_dependances.listeModids();
+		final Iterable<String> dependances = this.dependances ? arbre_dependances.listeModids() : installation_manuelle;
 		final List<ModVersion> installations = new ArrayList<>();
 		for (final String modid : dependances) {
 			if (modid.equalsIgnoreCase("forge")) continue;
@@ -142,18 +156,15 @@ public class CommandeInstall implements Callable<Integer> {
 				System.err.println(String.format("Modid requis inconnu: '%s'", modid));
 				if (!this.force) return ERREUR_MODID;
 			} else if (!depotInstallation.contains(modid) || depotInstallation.getModVersions(modid).stream().noneMatch(
-					mv -> mcversion.correspond(mv.mcversion) && arbre_dependances.intervalle(modid)
+					mv -> mv.mcversion.englobe(mcversion) && arbre_dependances.intervalle(modid)
 							.correspond(mv.version))) {
 				
-				Optional<ModVersion> candidat = depotLocal.getModVersions(modid).stream()
-						.filter(mv -> mcversion == VersionIntervalle.ouvert || mcversion.correspond(mv.mcversion))
-						.filter(mv -> arbre_dependances.intervalle(modid).correspond(mv.version))
-						.max(Comparator.comparing(mv -> mv.version));
-				if (candidat.isPresent()) {
-					installations.add(candidat.get());
+				if (resolution.containsKey(modid)) {
+					installations.add(resolution.get(modid));
 				} else {
-					System.err.println(String.format("Aucune version disponible pour le mod requis '%s@%s'.", modid,
-							arbre_dependances.intervalle(modid)));
+					System.err.println(
+							String.format("Aucune version disponible pour le mod requis '%s@%s' et minecraft %s.",
+									modid, arbre_dependances.intervalle(modid), mcversion));
 					if (!this.force) return ERREUR_VERSION;
 				}
 			}

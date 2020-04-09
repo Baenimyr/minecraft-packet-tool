@@ -156,7 +156,8 @@ public class DepotInstallation extends Depot {
 			if (mod.url != null && mod.url.length() == 0) mod.url = null;
 			if (mod.updateJSON != null && mod.updateJSON.length() == 0) mod.updateJSON = null;
 			
-			final ModVersion modVersion = this.ajoutModVersion(new ModVersion(this.ajoutMod(mod), version, mcversion));
+			final ModVersion modVersion = this.ajoutModVersion(new ModVersion(this.ajoutMod(mod), version,
+					new VersionIntervalle(mcversion, mcversion.precision())));
 			modVersion.ajoutURL(fichier.getAbsoluteFile().toURI().toURL());
 			
 			if (json.has("requiredMods")) {

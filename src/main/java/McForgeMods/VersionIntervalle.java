@@ -18,8 +18,6 @@ import java.util.Objects;
  * </ul>
  */
 public class VersionIntervalle {
-	public static final VersionIntervalle ouvert = new VersionIntervalle(null, null);
-	
 	Version minimum, maximum;
 	boolean inclut_min, inclut_max;
 	
@@ -57,6 +55,10 @@ public class VersionIntervalle {
 		this.maximum.set(precision, this.maximum.get(precision) + 1);
 		this.inclut_min = true;
 		this.inclut_max = false;
+	}
+	
+	public static VersionIntervalle ouvert() {
+		return new VersionIntervalle(null, null);
 	}
 	
 	/**
@@ -120,9 +122,10 @@ public class VersionIntervalle {
 							String.format("Mauvaise façon de fermer une intervalle: '%s'", contraintes));
 				inclut_max = contraintes.charAt(pos++) == ']';
 			}
-		} if (contraintes.length() != pos) throw new VersionIntervalleFormatException(contraintes);
+		}
+		if (contraintes.length() != pos) throw new VersionIntervalleFormatException(contraintes);
 		
-		if (minimum == null && maximum == null) return VersionIntervalle.ouvert;
+		if (minimum == null && maximum == null) return VersionIntervalle.ouvert();
 		else if (intervalle) {
 			VersionIntervalle v = new VersionIntervalle(minimum, maximum);
 			v.inclut_min = inclut_min;
@@ -159,7 +162,7 @@ public class VersionIntervalle {
 			final String texte = o.toString();
 			int pos = 0;
 			StringBuilder modid_builder = new StringBuilder();
-			VersionIntervalle versionIntervalle = VersionIntervalle.ouvert;
+			VersionIntervalle versionIntervalle = VersionIntervalle.ouvert();
 			
 			while (pos < texte.length()) {
 				char c = texte.charAt(pos);
@@ -170,7 +173,7 @@ public class VersionIntervalle {
 					} else resultat.put(modid, versionIntervalle);
 					
 					modid_builder = new StringBuilder();
-					versionIntervalle = VersionIntervalle.ouvert;
+					versionIntervalle = VersionIntervalle.ouvert();
 				} else if (c == '@' && modid_builder.length() > 0) {
 					pos++;
 					if (pos >= texte.length()) {
@@ -202,6 +205,14 @@ public class VersionIntervalle {
 		return resultat;
 	}
 	
+	public Version minimum() {
+		return this.minimum;
+	}
+	
+	public Version maximum() {
+		return this.maximum;
+	}
+	
 	/**
 	 * Cette intervalle devient l'intersection des deux intervalles.
 	 *
@@ -226,8 +237,15 @@ public class VersionIntervalle {
 	 * @return {@code true} si la version est comprise dans l'intervalle.
 	 */
 	public boolean correspond(Version version) {
-		return (minimum == null || version.compareTo(minimum) >= (inclut_min ? 0 : 1)) && (maximum == null
-				|| version.compareTo(maximum) <= (inclut_max ? 0 : -1));
+		return version == null ? (minimum == null || maximum == null)
+				: ((minimum == null || version.compareTo(minimum) >= (inclut_min ? 0 : 1)) && (maximum == null
+						|| version.compareTo(maximum) <= (inclut_max ? 0 : -1)));
+	}
+	
+	public boolean englobe(VersionIntervalle intervalle) {
+		return (this.correspond(intervalle.minimum) || (!inclut_min && intervalle.minimum != null
+				&& this.minimum.compareTo(intervalle.minimum) == 0)) && (this.correspond(intervalle.maximum)
+				|| (!inclut_max && intervalle.maximum != null && this.maximum.compareTo(intervalle.maximum) == 0));
 	}
 	
 	@Override

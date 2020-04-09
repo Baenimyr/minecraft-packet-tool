@@ -159,7 +159,7 @@ public class Depot {
 		final Map<String, VersionIntervalle> absents = new HashMap<>();
 		for (Map.Entry<String, VersionIntervalle> dep : demande.entrySet()) {
 			if (!this.contains(dep.getKey()) || this.getModVersions(dep.getKey()).stream()
-					.noneMatch(m -> dep.getValue() == VersionIntervalle.ouvert || dep.getValue().correspond(m.version))) absents.put(dep.getKey(),
+					.noneMatch(m -> dep.getValue().equals(VersionIntervalle.ouvert()) || dep.getValue().correspond(m.version))) absents.put(dep.getKey(),
 					dep.getValue());
 		}
 		return absents;
