@@ -8,10 +8,7 @@ import McForgeMods.depot.DepotLocal;
 import McForgeMods.outils.Sources;
 import picocli.CommandLine;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Path;
@@ -51,16 +48,24 @@ public class ForgeMods implements Runnable {
 			sources = new Sources();
 		}
 		
-		for (String url : urls) {
-			try {
-				sources.add(new URL(url));
-			} catch (MalformedURLException m) {
-				System.err.println(String.format("MalformedURL: '%s'", url));
+		try (FileOutputStream output = new FileOutputStream(fichier, true);
+			 OutputStreamWriter bos = new OutputStreamWriter(output);
+			 BufferedWriter bw = new BufferedWriter(bos)) {
+			for (String url : urls) {
+				try {
+					URL u = new URL(url);
+					if (!sources.urls().containsKey(u)) {
+						bw.newLine();
+						if (u.getPath().endsWith(".tar"))
+							bw.write("tar\t");
+						else
+							bw.write("dir\t");
+						bw.write(u.toString());
+					}
+				} catch (MalformedURLException m) {
+					System.err.println(String.format("MalformedURL: '%s'", url));
+				}
 			}
-		}
-		
-		try (FileOutputStream output = new FileOutputStream(fichier)) {
-			sources.save(output);
 		} catch (IOException i) {
 			i.printStackTrace();
 			return -1;
