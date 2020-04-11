@@ -37,7 +37,7 @@ public class DepotInstallation extends Depot {
 			"^(1\\.14(\\.[1-4])?|1\\.13(\\.[1-2])?|1\\.12(\\.[1-2])?|1\\.11(\\.[1-2])?|1\\.10(\\.[1-2])?|1\\.9(\\"
 					+ ".[1-4])?|1\\.8(\\.1)?|1\\.7(\\.[1-9]|(10))?|1\\.6\\.[1-4]|1\\.5(\\.[1-2])?)-");
 	public final        Path                            dossier;
-	private final       Map<String, StatusInstallation> status_installation = new WeakHashMap<>();
+	private final       Map<String, StatusInstallation> status_installation = new HashMap<>();
 	
 	/**
 	 * Ouvre un dossier pour l'installation des mods. Par défaut, ce dossier est ~/.minecraft/mods.

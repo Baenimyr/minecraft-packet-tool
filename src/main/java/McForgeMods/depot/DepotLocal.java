@@ -245,7 +245,8 @@ public class DepotLocal extends Depot {
 		}
 		
 		try (OutputStreamWriter writer = new OutputStreamWriter(outputStream)) {
-			json.write(writer, 2, 0);
+			simpleJson.JSONWriter jwriter = new simpleJson.JSONWriter();
+			jwriter.write(json, writer);
 		}
 	}
 	
@@ -288,7 +289,8 @@ public class DepotLocal extends Depot {
 		}
 		
 		try (OutputStreamWriter writer = new OutputStreamWriter(outputStream)) {
-			json_total.write(writer, 2, 0);
+			simpleJson.JSONWriter jwriter = new simpleJson.JSONWriter();
+			jwriter.write(json_total, writer);
 		}
 	}
 	
