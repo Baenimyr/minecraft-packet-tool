@@ -12,7 +12,10 @@ import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @CommandLine.Command(name = "forgemods", showDefaultValues = true, mixinStandardHelpOptions = true,
 		subcommands = {Show.class, CommandeDepot.class, CommandeInstall.class, CommandeUpdate.class})
@@ -49,17 +52,14 @@ public class ForgeMods implements Runnable {
 		}
 		
 		try (FileOutputStream output = new FileOutputStream(fichier, true);
-			 OutputStreamWriter bos = new OutputStreamWriter(output);
-			 BufferedWriter bw = new BufferedWriter(bos)) {
+			 OutputStreamWriter bos = new OutputStreamWriter(output); BufferedWriter bw = new BufferedWriter(bos)) {
 			for (String url : urls) {
 				try {
 					URL u = new URL(url);
 					if (!sources.urls().containsKey(u)) {
 						bw.newLine();
-						if (u.getPath().endsWith(".tar"))
-							bw.write("tar\t");
-						else
-							bw.write("dir\t");
+						if (u.getPath().endsWith(".tar")) bw.write("tar\t");
+						else bw.write("dir\t");
 						bw.write(u.toString());
 					}
 				} catch (MalformedURLException m) {
@@ -70,6 +70,56 @@ public class ForgeMods implements Runnable {
 			i.printStackTrace();
 			return -1;
 		}
+		
+		return 0;
+	}
+	
+	@CommandLine.Command(name = "search", description = "Cherche parmi les mods une chaîne de caractère.")
+	public int commandeSearch(
+			@CommandLine.Mixin Help help,
+			@CommandLine.Option(names = {"-d", "--depot"}, description = "Dépot local à utiliser") Path depot,
+			@CommandLine.Option(names = {"-e", "--regex"}, description = "Active les expressions régulières")
+					boolean regex, @CommandLine.Parameters(paramLabel = "search", arity = "1") String recherche) {
+		final DepotLocal depotLocal = new DepotLocal(depot);
+		try {
+			depotLocal.importation();
+		} catch (IOException io) {
+			System.err.println("Erreur de lecture du dépôt.");
+			return 1;
+		}
+		
+		final HashSet<String> modids = new HashSet<>();
+		if (regex) {
+			Pattern schema = Pattern.compile(recherche);
+			for (String modid : depotLocal.getModids()) {
+				Matcher m_modid = schema.matcher(modid);
+				if (m_modid.find()) {
+					modids.add(modid);
+					continue;
+				}
+				Matcher m_nom = schema.matcher(depotLocal.getMod(modid).name);
+				if (m_nom.find()) {
+					modids.add(modid);
+				}
+			}
+		} else {
+			String recherche_l = recherche.toLowerCase();
+			for (String modid : depotLocal.getModids()) {
+				if (modid.contains(recherche_l)) {
+					modids.add(modid);
+					continue;
+				}
+				if (depotLocal.getMod(modid).name.toLowerCase().contains(recherche_l)) {
+					modids.add(modid);
+				}
+			}
+			depotLocal.getModids().stream().filter(modid -> modid.contains(recherche)).forEach(modids::add);
+		}
+		
+		modids.stream().sorted(String::compareTo).forEach(modid -> {
+			Mod mod = depotLocal.getMod(modid);
+			System.out.println(String.format("\u001b[32m%s\u001b[0m \"%s\"", mod.modid, mod.name));
+		});
 		
 		return 0;
 	}
