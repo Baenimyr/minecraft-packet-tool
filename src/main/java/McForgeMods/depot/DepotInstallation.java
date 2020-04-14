@@ -106,6 +106,57 @@ public class DepotInstallation extends Depot {
 		}
 	}
 	
+	private static ModVersion lectureMcMod(InputStream lecture) {
+		JSONTokener token = new JSONTokener(new NoNewlineReader(lecture));
+		JSONObject json;
+		JSONArray liste = new JSONArray(token);
+		json = liste.getJSONObject(0);
+		
+		if (!json.has("modid") || !json.has("name")) return null;
+		final String modid = json.getString("modid");
+		final String name = json.getString("name");
+		Version version, mcversion;
+		
+		String texte_version = json.getString("version");
+		Matcher m = minecraft_version.matcher(texte_version);
+		if (m.find()) {
+			// System.out.println(String.format("[Version] '%s' => %s\t%s", texte_version, texte_version.substring(0, m.end() - 1), texte_version.substring(m.end())));
+			mcversion = Version.read(texte_version.substring(0, m.end() - 1));
+			version = Version.read(texte_version.substring(m.end()));
+			
+			if (json.has("mcversion")) mcversion = Version.read(json.getString("mcversion"));
+		} else {
+			version = Version.read(texte_version);
+			mcversion = Version.read(json.getString("mcversion")); // obligatoire car non déduit de la version
+		}
+		
+		final Mod mod = new Mod(modid, name);
+		mod.description = json.has("description") ? json.getString("description") : null;
+		mod.url = json.has("url") ? json.getString("url") : null;
+		mod.updateJSON = json.has("updateJSON") ? json.getString("updateJSON") : null;
+		
+		if (mod.description != null && mod.description.length() == 0) mod.description = null;
+		if (mod.url != null && mod.url.length() == 0) mod.url = null;
+		if (mod.updateJSON != null && mod.updateJSON.length() == 0) mod.updateJSON = null;
+		
+		final ModVersion modVersion = new ModVersion(mod, version,
+				new VersionIntervalle(mcversion, mcversion.precision()));
+		
+		if (json.has("requiredMods")) {
+			VersionIntervalle.lectureDependances(json.getJSONArray("requiredMods"))
+					.forEach(modVersion::ajoutModRequis);
+		}
+		if (json.has("dependencies")) {
+			VersionIntervalle.lectureDependances(json.getJSONArray("dependencies"))
+					.forEach(modVersion::ajoutModRequis);
+		}
+		if (json.has("dependants")) {
+			JSONArray dependants = json.getJSONArray("dependants");
+			dependants.forEach(d -> modVersion.ajoutDependant((String) d));
+		}
+		return modVersion;
+	}
+	
 	/**
 	 * Cette fonction lit un fichier et tente d'extraire les informations relatives au mod.
 	 * <p>
@@ -124,56 +175,16 @@ public class DepotInstallation extends Depot {
 			if (mcmod == null) return false;
 			BufferedInputStream lecture = new BufferedInputStream(zip.getInputStream(mcmod));
 			
-			JSONTokener token = new JSONTokener(new NoNewlineReader(lecture));
-			JSONObject json;
-			JSONArray liste = new JSONArray(token);
-			json = liste.getJSONObject(0);
-			
-			if (!json.has("modid") || !json.has("name")) return false;
-			final String modid = json.getString("modid");
-			final String name = json.getString("name");
-			Version version, mcversion;
-			
-			String texte_version = json.getString("version");
-			Matcher m = minecraft_version.matcher(texte_version);
-			if (m.find()) {
-				// System.out.println(String.format("[Version] '%s' => %s\t%s", texte_version, texte_version.substring(0, m.end() - 1), texte_version.substring(m.end())));
-				mcversion = Version.read(texte_version.substring(0, m.end() - 1));
-				version = Version.read(texte_version.substring(m.end()));
+			ModVersion importe = lectureMcMod(lecture);
+			if (importe != null) {
+				final Mod mod = this.ajoutMod(importe.mod);
+				final ModVersion modVersion = new ModVersion(mod, importe.version, importe.mcversion);
+				modVersion.fusion(importe);
 				
-				if (json.has("mcversion")) mcversion = Version.read(json.getString("mcversion"));
-			} else {
-				version = Version.read(texte_version);
-				mcversion = Version.read(json.getString("mcversion")); // obligatoire car non déduit de la version
+				this.ajoutModVersion(modVersion);
+				modVersion.ajoutURL(fichier.getAbsoluteFile().toURI().toURL());
+				modVersion.ajoutAlias(fichier.getName());
 			}
-			
-			final Mod mod = new Mod(modid, name);
-			mod.description = json.has("description") ? json.getString("description") : null;
-			mod.url = json.has("url") ? json.getString("url") : null;
-			mod.updateJSON = json.has("updateJSON") ? json.getString("updateJSON") : null;
-			
-			if (mod.description != null && mod.description.length() == 0) mod.description = null;
-			if (mod.url != null && mod.url.length() == 0) mod.url = null;
-			if (mod.updateJSON != null && mod.updateJSON.length() == 0) mod.updateJSON = null;
-			
-			final ModVersion modVersion = this.ajoutModVersion(new ModVersion(this.ajoutMod(mod), version,
-					new VersionIntervalle(mcversion, mcversion.precision())));
-			modVersion.ajoutURL(fichier.getAbsoluteFile().toURI().toURL());
-			
-			if (json.has("requiredMods")) {
-				VersionIntervalle.lectureDependances(json.getJSONArray("requiredMods"))
-						.forEach(modVersion::ajoutModRequis);
-			}
-			if (json.has("dependencies")) {
-				VersionIntervalle.lectureDependances(json.getJSONArray("dependencies"))
-						.forEach(modVersion::ajoutModRequis);
-			}
-			if (json.has("dependants")) {
-				JSONArray dependants = json.getJSONArray("dependants");
-				dependants.forEach(d -> modVersion.ajoutDependant((String) d));
-			}
-			modVersion.ajoutAlias(fichier.getName());
-			return true;
 		} catch (JSONException | IllegalArgumentException ignored) {
 			// System.err.println("[DEBUG] [importation] '" + fichier.getName() + "':\t" + ignored.getMessage());
 		}
