@@ -32,7 +32,8 @@ archivesBaseName = "ForgeMods"
 dependencies {
     compile "org.json:json:20190722"
     //implementation group: 'commons-cli', name: 'commons-cli', version: '1.4'
-    compile 'info.picocli:picocli:4.1.4'
+    compile 'info.picocli:picocli:4.2.0'
+    // annotationProcessor 'info.picocli:picocli-codegen:4.2.0'
 
     // Use JUnit Jupiter API for testing.
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.5.1'
@@ -41,18 +42,22 @@ dependencies {
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.5.1'
 }
 
+compileJava {
+    // options.compilerArgs += ["-Aproject=${project.name}"]
+}
+
 application {
     // Define the main class for the application.
     mainClassName = 'McForgeMods.ForgeMods'
 }
 
-jar {
+/*jar {
     manifest {
         attributes (
             'Main-Class': application.mainClassName
         )
     }
-}
+}*/
 
 test {
     // Use junit platform for unit tests

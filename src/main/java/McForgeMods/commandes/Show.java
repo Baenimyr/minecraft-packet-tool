@@ -154,6 +154,7 @@ public class Show implements Runnable {
 				local.importation();
 			} catch (IOException erreur) {
 				System.err.println("Erreur de lecture du dépot.");
+				return 1;
 			}
 			
 			if (all) {

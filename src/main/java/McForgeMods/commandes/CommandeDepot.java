@@ -10,7 +10,6 @@ import org.json.JSONException;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
@@ -58,7 +57,8 @@ public class CommandeDepot implements Runnable {
 			if (!force) return 1;
 		}
 		
-		System.out.println(String.format("Dépot importé: %d versions disponibles", depot.sizeModVersion()));
+		System.out.println(
+				String.format("Dépot importé de %s: %d versions disponibles", depot.dossier, depot.sizeModVersion()));
 		
 		if (verbose) {
 			ArrayList<String> modids = new ArrayList<>(depot.getModids());
@@ -111,20 +111,17 @@ public class CommandeDepot implements Runnable {
 		String[] modids;
 		@CommandLine.Option(names = {"-a", "--all"}, defaultValue = "false", description = "Importe tout")
 		boolean  all;
-		@CommandLine.Option(names = {"--include-files"}, defaultValue = "false",
+		@CommandLine.Option(names = {"-i", "--include-files"}, defaultValue = "false",
 				description = "Copie les fichiers dans le dépot et ajoute un url relatif pour accéder au fichier."
 						+ "Ne copie pas les fichiers incertains (pas de mcmod.info)")
 		boolean  include_file;
-		@CommandLine.Option(names = {"--prefix"},
-				description = "Prefixe à appliquer aux urls lors de l'importation des fichiers")
-		String   prefix = null;
 		
 		@CommandLine.Mixin
 		ForgeMods.DossiersOptions dossiers;
 		@CommandLine.Mixin
 		ForgeMods.Help            help;
 		
-		public Integer call() throws MalformedURLException {
+		public Integer call() {
 			DepotLocal depot = new DepotLocal(dossiers.depot);
 			try {
 				depot.importation();
@@ -157,8 +154,6 @@ public class CommandeDepot implements Runnable {
 				return 2;
 			}
 			
-			final URL prefix = include_file ? (this.prefix != null ? new URL(this.prefix)
-					: depot.dossier.toUri().toURL()) : null;
 			for (ModVersion version : importation) {
 				final ModVersion reelle = depot.ajoutModVersion(
 						new ModVersion(depot.ajoutMod(version.mod), version.version, version.mcversion));
@@ -166,13 +161,10 @@ public class CommandeDepot implements Runnable {
 				reelle.urls.removeIf(url -> url.getProtocol().equals("file"));
 				
 				if (include_file) {
-					final Path nouveau_fichier = copieFichier(depot, version);
-					if (nouveau_fichier != null)
-						reelle.ajoutURL(new URL(prefix, depot.dossier.relativize(nouveau_fichier).toString()));
+					copieFichier(depot, version);
 				}
 			}
 			System.out.println(String.format("%d versions importées.", importation.size()));
-			System.out.println(String.format("%d", depot.sizeModVersion()));
 			
 			try {
 				depot.sauvegarde();
@@ -185,16 +177,15 @@ public class CommandeDepot implements Runnable {
 			return 0;
 		}
 		
-		private Path copieFichier(final DepotLocal depot, ModVersion version) {
+		private void copieFichier(final DepotLocal depot, ModVersion version) {
 			Optional<URL> fichier = version.urls.stream().filter(u -> u.getProtocol().equals("file")).findFirst();
 			if (fichier.isPresent()) {
 				try {
 					final Path source = Path.of(fichier.get().toURI());
-					final Path destination = depot.dossierCache(version)
-							.resolve(source.getFileName());
+					final Path destination = depot.dossierCache(version).resolve(source.getFileName());
 					destination.getParent().toFile().mkdirs();
 					Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING);
-					return destination;
+					version.ajoutURL(destination.toUri().toURL());
 				} catch (IOException | URISyntaxException e) {
 					System.err.println(String.format("Impossible de copier le fichier '%s'!", fichier.get()));
 				}
@@ -202,7 +193,6 @@ public class CommandeDepot implements Runnable {
 				System.err.println(
 						String.format("Aucun fichier à copier pour le mod %s=%s", version.mod.modid, version.version));
 			}
-			return null;
 		}
 	}
 }
