@@ -5,6 +5,7 @@
 \usepackage[french]{babel}
 \usepackage{hyperref}
 \usepackage{algorithm2e}
+\usepackage{amssymb}
 
 
 \usepackage{enumitem}
@@ -51,29 +52,23 @@ Si plusieurs mods déclarent des dépendances sur un même mod mais pour des int
 Lorsque un utilisateur le demande, il faut récupérer l'archive jar d'un mod et la placer dans le dossier \textit{mods}.
 Cependant il faut maintenir le bon fonctionnement de l'installation, notamment la gestion des dépendances.
 En considérant la liste des mods installés manuellement avec le nouveaux mods en cours d'installation, il faut calculer les dépendances nécessaires.
-Les mods installés automatiquement qui ne correspondraient plus devront être retirés.
 Si aucune version connue n'est capable de satisfaire les dépendances connues, c'est une erreur.
-Cela vaut aussi pour les installations manuelles qui interfèreraient entre elles.
 
-L'algorithme est le suivant:
-\begin{itemize}
-    \item Soit R la liste des mods installés manuellement et fixés
-    \item Mettre à jour R en ajoutant les nouveaux mods et modifier les versions des anciens
-    \item Calculer l'arbre de dépendance de R: $A_R$
-    \item Pour tout mod dans l'arbre, vérifier l'existence d'une version disponible.
-    \item Pour tout mod dans l'arbre, s'il n'est pas installé ou si la version DOIT être changée, installer la nouvelle version.
-\end{itemize}
+Les versions installées manuellement peuvent ne plus être compatibles avec les nouveaux mods, mais puisque ils ont été choisis par l'utilisateur, il ne seront pas modifiés autrement que manuellement.
+Seule les dépendances non satisfaites par l'installation actuelle seront installées, il ne s'agit pas ici de mettre à jour si ce n'est pas nécessaire.
 
 
 \subsubsection{Mise à jour}
-Soit $U$ une liste de mods à mettre à jour.
-Soit $U'$ la liste finale des mods et leur version.
-Pour tout mod de $U$, s'il existe une version du même mod supérieure mais de la même version minecraft, elle est ajoutée à $U'$.
+La mise à jour automatique consiste à détecter la disponibilité d'une version plus récente pour les mods installés.
+Les dépendances sont calculées à partir des nouvelles versions pour les installations manuelle.
+Dans le cas d'une mise à jour générale et contrairement à l'installation standard, même les installations automatiques seront mises à jour dès que possible.
 
-Avec la sélection $U'$, on construit l'arbre des dépendances.
-Si une dépendance n'est pas déjà satisfaite, la version compatible la plus récente est ajoutée à $U'$.
-L'idée est de ne pas mettre à jour les mods quand ce n'est pas nécessaire ou demandé explicitement par l'utilisateur.
-Toutes les versions présentes dans $U'$ peuvent maintenant être installées.
+\subsubsection{Suppression}
+Pour éviter les suppressions qui rendraient l'installation invalide, la suppression consiste à marquer un mod comme non installé manuellement.
+Ainsi, s'il s'agit d'une dépendance pour un autre mod toujours présent, il ne sera pas supprimé.
+Par contre si aucun des mods consistuant la \textit{racine} de l'installation n'a besoin de lui, le fichier est supprimé.
+
+La suppression des dépendances devenues inutiles peut se faire avec la commande \texttt{autoremove} (non implémentée).
 
 
 \subsection{Téléchargement des fichiers}
@@ -115,13 +110,6 @@ Pour un dépôt correct, le dépôt local doit être effacé pour être remplac�
 \label{subsection:depot_installation}
 Une installation minecraft, définie par un dossier \textit{.minecraft}, est importée au besoin grâce aux fichiers \textit{mcmod.info} présents dans l'archive.
 Elle se comporte virtuellement comme un véritable dépôt, ce qui permet de le comparer au dépôt local et de l'utiliser de manière transparente dans le système.
-
-\subsubsection{État de l'installation}
-Chaque version installée possède l'un des états d'installation suivant: AUTO si le mod est installé comme dépendance d'un autre, MANUEL si l'utilisateur l'a installé explicitement, VÉRROUILLÉ pour conserver le mod malgrès des erreurs.
-
-Les installations manuelles sont l'ancrage qui maintient les fichiers en place.
-Si un mod installé automatiquement n'est plus nécessaire, parce qu'aucun autre ne le requiert comme dépendance, il doit être retiré de l'installation.
-Les mods vérrouillés ne doivent en aucun cas être modifiés sauf si l'utilisateur le décide (désinstallation).
 
 
 
@@ -210,7 +198,7 @@ Ce système considère le dépôt local comme un potentiel dépôt distant pour 
 
 
 
-\section{Fichiers locaux}
+\section{Dossier Minecraft}
 L'instance de jeu utilisée dépend du lieu de lancement du programme ou des options passées en paramètres.
 Par défaut, le programme remonte jusqu'au dossier \textit{.minecraft} le plus proche.
 S'il n'est existe pas parmis les parents, tente d'utiliser le répertoire par défaut: \textit{.minecraft} sur Linux, ou \textit{AppData/.minecraft} sur windows.
@@ -218,10 +206,21 @@ S'il n'est existe pas parmis les parents, tente d'utiliser le répertoire par d�
 Les informations sauvegardées localement comme décris au paragraphe \ref{section:depot} sont placées par défaut dans le répertoire \textit{.minecraft/forgemods}.
 Ce répertoire sert de dépôt local et se présente sous la même forme qu'un dépôt en ligne pour simplifier l'importation des données.
 Les informations du dépôt local sont toujours utilisées en premier, mais peuvent être mises à jour par les autres dépôts connus.
-Si l'utilisateur le permet, un dépôt généralisé peut sauvegarder les fichiers originaux qui ont un jour été téléchargés ou détectés pour les mettre à disposition d'autres installations.
 
 Lors de la synchronisations des informations avec un dépôt distant, aucun fichier de mod n'est téléchargé.
 Si le dépôt fournis également les fichiers, leur disponibilité est conservée par l'URL et ils ne seront téléchargés que sur demande de l'utilisateur.
+
+
+\subsection{État de l'installation}
+Chaque version installée possède l'un des états d'installation suivant: AUTO si le mod est installé comme dépendance d'un autre, MANUEL si l'utilisateur l'a installé explicitement, VÉRROUILLÉ pour conserver le mod malgrès des erreurs.
+
+Les installations manuelles sont l'ancrage qui maintient les fichiers en place.
+Si un mod installé automatiquement n'est plus nécessaire, parce qu'aucun autre ne le requiert comme dépendance, il doit être retiré de l'installation.
+Les mods vérrouillés ne doivent en aucun cas être modifiés sauf si l'utilisateur le décide (désinstallation).
+
+\subsection{Cache}
+Si l'utilisateur le permet, le dépôt local peut sauvegarder les fichiers originaux qui ont un jour été téléchargés ou détectés pour les mettre à disposition d'autres installations.
+Par contre, lors de l'actualisation du dépôt local, les urls pointant vers le cache sont conservés.
 
 
 \section{Commandes}
