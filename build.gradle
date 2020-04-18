@@ -51,13 +51,13 @@ application {
     mainClassName = 'McForgeMods.ForgeMods'
 }
 
-/*jar {
+jar {
     manifest {
         attributes (
             'Main-Class': application.mainClassName
         )
     }
-}*/
+}
 
 test {
     // Use junit platform for unit tests

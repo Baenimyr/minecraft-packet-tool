@@ -4,6 +4,7 @@
 # Ignore Gradle build output directory
 build
 /bin
+/libs
 
 # Ignore IDE and auxilary files
 .idea
@@ -17,3 +18,4 @@ build
 *.synctex.gz
 *.toc
 *~
+*.pdf
