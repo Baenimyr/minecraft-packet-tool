@@ -45,9 +45,18 @@ public class DepotInstallation extends Depot {
 	 * @param dossier d'installation ou {@code null}
 	 */
 	public DepotInstallation(Path dossier) {
-		if (dossier != null) this.dossier = dossier.toAbsolutePath();
-		else {
-			this.dossier = Path.of(System.getProperty("user.home")).resolve(".minecraft").resolve("mods");
+		if (dossier == null) {
+			Path d = Path.of("").toAbsolutePath();
+			for (int i = d.getNameCount() - 1; i >= 0; i--)
+				if (d.getName(i).toString().equals(".minecraft")) {
+					this.dossier = d.subpath(0, i + 1);
+					return;
+				}
+			this.dossier = Path.of(System.getProperty("user.home")).resolve(".minecraft");
+		} else if (dossier.startsWith("~")) {
+			this.dossier = Path.of(System.getProperty("user.home")).resolve(dossier.subpath(1, dossier.getNameCount()));
+		} else {
+			this.dossier = dossier.toAbsolutePath();
 		}
 	}
 	
@@ -199,7 +208,7 @@ public class DepotInstallation extends Depot {
 	 */
 	public void analyseDossier(Depot infos) {
 		Queue<File> dossiers = new LinkedList<>();
-		dossiers.add(dossier.toFile().getAbsoluteFile());
+		dossiers.add(dossier.resolve("mods").toFile());
 		
 		while (!dossiers.isEmpty()) {
 			File doss = dossiers.poll();

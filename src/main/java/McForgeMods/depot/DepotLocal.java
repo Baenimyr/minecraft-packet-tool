@@ -55,10 +55,12 @@ public class DepotLocal extends Depot {
 	 * @param dossier du dépôt ou {@code null}
 	 */
 	public DepotLocal(Path dossier) {
-		if (dossier != null)
-			this.dossier = dossier.toAbsolutePath();
-		else {
+		if (dossier == null) {
 			this.dossier = Path.of(System.getProperty("user.home")).resolve(".minecraft").resolve("forgemods");
+		} else if (dossier.startsWith("~")) {
+			this.dossier = Path.of(System.getProperty("user.home")).resolve(dossier.subpath(1, dossier.getNameCount()));
+		} else {
+			this.dossier = dossier.toAbsolutePath();
 		}
 	}
 	
