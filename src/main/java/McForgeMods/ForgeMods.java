@@ -2,8 +2,10 @@ package McForgeMods;
 
 import McForgeMods.commandes.CommandeDepot;
 import McForgeMods.commandes.CommandeInstall;
+import McForgeMods.commandes.CommandeShow;
 import McForgeMods.commandes.CommandeUpdate;
-import McForgeMods.commandes.Show;
+import McForgeMods.depot.ArbreDependance;
+import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
 import McForgeMods.outils.Sources;
 import picocli.CommandLine;
@@ -12,13 +14,13 @@ import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Path;
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @CommandLine.Command(name = "forgemods", showDefaultValues = true, mixinStandardHelpOptions = true,
-		subcommands = {Show.class, CommandeDepot.class, CommandeInstall.class, CommandeUpdate.class})
+		subcommands = {CommandeShow.class, CommandeDepot.class, CommandeInstall.class, CommandeUpdate.class})
 public class ForgeMods implements Runnable {
 	
 	@CommandLine.Spec
@@ -75,8 +77,7 @@ public class ForgeMods implements Runnable {
 	}
 	
 	@CommandLine.Command(name = "search", description = "Cherche parmi les mods une chaîne de caractère.")
-	public int commandeSearch(
-			@CommandLine.Mixin Help help,
+	public int commandeSearch(@CommandLine.Mixin Help help,
 			@CommandLine.Option(names = {"-d", "--depot"}, description = "Dépot local à utiliser") Path depot,
 			@CommandLine.Option(names = {"-e", "--regex"}, description = "Active les expressions régulières")
 					boolean regex, @CommandLine.Parameters(paramLabel = "search", arity = "1") String recherche) {
@@ -121,6 +122,77 @@ public class ForgeMods implements Runnable {
 			System.out.println(String.format("\u001b[32m%s\u001b[0m \"%s\"", mod.modid, mod.name));
 		});
 		
+		return 0;
+	}
+	
+	@CommandLine.Command(name = "depends", description = "Affiche les dépendances des mods.")
+	public int depends(@CommandLine.Parameters(index = "0", arity = "0..n",
+			description = "Limite l'affichage aux dépendances de certains mods (modid[@version])")
+			ArrayList<String> mods, @CommandLine.Mixin ForgeMods.DossiersOptions dossiers,
+			@CommandLine.Option(names = {"--missing"}, defaultValue = "false",
+					description = "Affiche les dépendances manquantes. Peut afficher des mods comme absents parce "
+							+ "que non détectés dans le dossier d'installation.") boolean missing,
+			@CommandLine.Option(names = {"-a", "--all"}) boolean all, @CommandLine.Mixin ForgeMods.Help help) {
+		final DepotLocal depotLocal = new DepotLocal(dossiers.depot);
+		final DepotInstallation depotInstallation = new DepotInstallation(dossiers.minecraft);
+		
+		try {
+			depotLocal.importation();
+		} catch (IOException e) {
+			System.err.println("Erreur de lecture du dépôt.");
+			return 1;
+		}
+		depotInstallation.analyseDossier(depotLocal);
+		
+		// Liste des versions pour lesquels chercher les dépendances.
+		List<ModVersion> listeRecherche;
+		
+		if (all) {
+			listeRecherche = depotInstallation.getModids().stream()
+					.flatMap(modid -> depotInstallation.getModVersions(modid).stream()).collect(Collectors.toList());
+		} else if (mods != null && mods.size() > 0) {
+			final List<ModVersion> resultat = new ArrayList<>();
+			Map<String, VersionIntervalle> recherche = VersionIntervalle.lectureDependances(mods);
+			for (Map.Entry<String, VersionIntervalle> entry : recherche.entrySet()) {
+				String modid = entry.getKey();
+				VersionIntervalle version = entry.getValue();
+				if (depotLocal.contains(modid)) {
+					Optional<ModVersion> trouvee = depotLocal.getModVersions(modid).stream()
+							.filter(modVersion -> version.equals(VersionIntervalle.ouvert()) || version
+									.correspond(modVersion.version)).max(Comparator.comparing(mv -> mv.version));
+					if (trouvee.isPresent()) resultat.add(trouvee.get());
+					else {
+						System.err.println(String.format("Version inconnue pour '%s': '%s'", modid, version));
+						return 3;
+					}
+				} else {
+					System.err.println(String.format("Modid inconnu: '%s'", modid));
+					return 3;
+				}
+			}
+			listeRecherche = resultat;
+		} else {
+			System.err.println("Nécessite une liste de travail.");
+			return 4;
+		}
+		
+		// Liste complète des dépendances nécessaire pour la liste des mods présent.
+		ArbreDependance arbre_dependances = new ArbreDependance(listeRecherche);
+		arbre_dependances.extension(depotLocal);
+		Map<String, VersionIntervalle> liste;
+		if (missing) {
+			liste = depotInstallation.dependancesAbsentes(arbre_dependances.requis());
+			System.out.println(String.format("%d absents", liste.size()));
+		} else {
+			liste = arbre_dependances.requis();
+			System.out.println(String.format("%d dépendances", liste.size()));
+		}
+		
+		ArrayList<String> modids = new ArrayList<>(liste.keySet());
+		modids.sort(String::compareTo);
+		for (String dep : modids) {
+			System.out.println(dep + " " + liste.get(dep));
+		}
 		return 0;
 	}
 	
