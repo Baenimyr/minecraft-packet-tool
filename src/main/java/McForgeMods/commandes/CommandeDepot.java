@@ -9,6 +9,7 @@ import McForgeMods.depot.DepotLocal;
 import org.json.JSONException;
 import picocli.CommandLine;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -28,6 +29,8 @@ import java.util.concurrent.Callable;
  */
 @CommandLine.Command(name = "depot", subcommands = {CommandeDepot.importation.class, CommandeUpdate.class},
 		description = {"Outil de gestion d'un dépot.",
+				"Un dépôt rassemble toutes les informations connues sur les mods et leurs versions, il est "
+						+ "indispensable pour l'installation ou la mise à jour d'une installation.",
 				"Une installation minecraft peut être utilisée comme source de fichiers."})
 public class CommandeDepot implements Runnable {
 	
@@ -107,9 +110,11 @@ public class CommandeDepot implements Runnable {
 					+ "Utilise un dépot minecraft comme source des jars.")
 	static class importation implements Callable<Integer> {
 		@CommandLine.Parameters(index = "0", arity = "0..*", paramLabel = "modid",
-				description = "Liste de mod spécifiques à importer (modid).")
+				description = "Liste de mod spécifiques à importer. Doit être un nom de fichier ou le modid "
+						+ "d'un mod présent dans le dossier minecraft.")
 		String[] modids;
-		@CommandLine.Option(names = {"-a", "--all"}, defaultValue = "false", description = "Importe tout")
+		@CommandLine.Option(names = {"-a", "--all"}, defaultValue = "false",
+				description = "Importe tous les mods détectés dans le dossier minecraft. Ignore la liste de mods.")
 		boolean  all;
 		@CommandLine.Option(names = {"-i", "--include-files"}, defaultValue = "false",
 				description = "Copie les fichiers dans le dépot et ajoute un url relatif pour accéder au fichier."
@@ -143,10 +148,20 @@ public class CommandeDepot implements Runnable {
 				}
 			} else if (modids != null && modids.length > 0) {
 				for (String modid : modids) {
-					if (installation.contains(modid)) {
+					final File fichier = new File(modid);
+					if (fichier.exists()) {
+						try {
+							Optional<ModVersion> mod = DepotInstallation.importationJar(fichier);
+							URL url = fichier.toURI().toURL();
+							mod.ifPresent(mv -> mv.urls.add(url));
+							mod.ifPresent(importation::add);
+						} catch (IOException i) {
+							i.printStackTrace();
+						}
+					} else if (installation.contains(modid)) {
 						importation.addAll(installation.getModVersions(modid));
 					} else {
-						System.err.println("Modid non reconnu: '" + modid + "'");
+						System.err.println("Mod non reconnu: '" + modid + "'");
 					}
 				}
 			} else {
