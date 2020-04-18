@@ -33,8 +33,7 @@ public class TelechargementHttp {
 				.uri(url.toURI()).setHeader("User-Agent", "Mozilla/5.0 Firefox/75.0")
 				.setHeader("Accept-Language", "en-US").build();
 		
-		HttpResponse<String> response = client.send(connexion, HttpResponse.BodyHandlers.ofString());
-		return response;
+		return client.send(connexion, HttpResponse.BodyHandlers.ofString());
 	}
 	
 	public long telechargement() throws URISyntaxException, IOException, InterruptedException {
@@ -53,7 +52,10 @@ public class TelechargementHttp {
 			ReadableByteChannel f_http = Channels.newChannel(is);
 			FileChannel f_channel = fos.getChannel();
 			
-			while (telecharge < taille_totale) telecharge += f_channel.transferFrom(f_http, 0, 4096);
+			while (telecharge < taille_totale) telecharge += f_channel.transferFrom(f_http, telecharge,
+					taille_totale - telecharge);
+			f_http.close();
+			f_channel.close();
 		}
 		
 		return telecharge - telecharge_avant;

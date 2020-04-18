@@ -73,7 +73,15 @@ public class DepotInstallation extends Depot {
 		this.statusChange(mversion, StatusInstallation.AUTO);
 		if (this.contains(mversion.mod)) {
 			this.mod_version.get(mversion.mod).remove(mversion);
-			// TODO: suppression fichier
+			
+			// Suppression des fichiers
+			for (URL url : mversion.urls) {
+				try {
+					if (url.getProtocol().equals("file") && Path.of(url.toURI()).startsWith(this.dossier))
+						Files.deleteIfExists(Path.of(url.toURI()));
+				} catch (IOException | URISyntaxException ignored) {
+				}
+			}
 			
 			this.statusSuppression(mversion);
 			this.statusSauvegarde();
@@ -93,16 +101,7 @@ public class DepotInstallation extends Depot {
 			List<ModVersion> perimes = this.getModVersions(statique.mod).stream()
 					.filter(mv -> mv.mcversion.equals(statique.mcversion) && !mv.version.equals(statique.version))
 					.collect(Collectors.toList());
-			perimes.forEach(mv -> {
-				for (URL url : mv.urls) {
-					try {
-						if (url.getProtocol().equals("file") && Path.of(url.toURI()).startsWith(this.dossier))
-							Files.deleteIfExists(Path.of(url.toURI()));
-					} catch (IOException | URISyntaxException ignored) {
-					}
-				}
-				// TODO: effacer du dépôt virtuel
-			});
+			perimes.forEach(this::desinstallation);
 		}
 	}
 	
@@ -256,7 +255,11 @@ public class DepotInstallation extends Depot {
 		this.status_installation.remove(version.mod.modid + " " + version.version);
 	}
 	
-	/** Importe les informations sur le status d'installation. */
+	/** Importe les informations sur le status d'installation.
+	 *
+	 * Tous les status sont importés même si les mods ont disparus. Un mod pourrait ne pas être détecté ou ce serait
+	 * le résultat d'une mauvaise manipulation, la restauration de l'installation doit rester possible.
+	 */
 	public void statusImportation() {
 		File infos = dossier.resolve("mods").resolve(".mods.txt").toFile();
 		if (infos.exists()) {
@@ -266,9 +269,15 @@ public class DepotInstallation extends Depot {
 				while ((ligne = br.readLine()) != null) {
 					String[] args = ligne.split(" ");
 					if (args.length == 3) {
-						if (!this.contains(args[0])) continue;
-						Optional<ModVersion> mversion = this.getModVersion(this.getMod(args[0]), Version.read(args[1]));
-						if (mversion.isEmpty()) continue;
+						if (!this.contains(args[0])) {
+							System.err.println(String.format("Mod '%s' disparu", args[0]));
+						} else {
+							Optional<ModVersion> mversion = this
+									.getModVersion(this.getMod(args[0]), Version.read(args[1]));
+							if (mversion.isEmpty()) {
+								System.err.println(String.format("Mod '%s' %s disparu", args[0], args[1]));
+							}
+						}
 						
 						StatusInstallation status = StatusInstallation.MANUELLE;
 						for (StatusInstallation s : StatusInstallation.values())
@@ -277,7 +286,8 @@ public class DepotInstallation extends Depot {
 								break;
 							}
 						
-						this.statusChange(mversion.get(), status);
+						// Enregistre le status même si le fichier à disparu
+						this.status_installation.put(args[0] + " " + args[1], status);
 					}
 				}
 			} catch (IOException io) {

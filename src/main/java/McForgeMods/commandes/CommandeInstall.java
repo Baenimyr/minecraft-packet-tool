@@ -254,16 +254,20 @@ public class CommandeInstall implements Callable<Integer> {
 						System.out.println(String.format("%-20s %-20s OK", modVersion.mod.modid, modVersion.version));
 					}
 					return true;
-				} catch (IOException io) {
-					continue;
+				} catch (IOException ignored) {
 				}
 			}
 			
 			// Tentative de téléchargement HTTP
 			for (URL url : http) {
+				String nom = url.getPath();
+				nom = nom.substring(nom.lastIndexOf('/') + 1);
+				if (!nom.endsWith(".jar"))
+					nom = modVersion.toStringStandard() + ".jar";
+				
 				TelechargementHttp telechargement = new TelechargementHttp(url,
 						modVersion.dossierInstallation(minecraft.dossier)
-								.resolve(modVersion.toStringStandard() + ".jar").toFile());
+								.resolve(nom).toFile());
 				try {
 					HttpResponse<String> connexion = telechargement.recupereInformations();
 					
