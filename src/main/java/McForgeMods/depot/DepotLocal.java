@@ -76,7 +76,7 @@ public class DepotLocal extends Depot {
 	}
 	
 	private File fichierModDepot(String modid) {
-		return dossier.resolve(modid.substring(0, 1)).resolve(modid).resolve(modid + ".json").toFile();
+		return dossier.resolve(modid.substring(0, 1)).resolve(modid + ".json").toFile();
 	}
 	
 	/**
@@ -181,13 +181,6 @@ public class DepotLocal extends Depot {
 					mv.ajoutModRequis(dependances.getKey(), dependances.getValue());
 			}
 			
-			if (json.has("dependants")) {
-				JSONArray liste = json.getJSONArray("dependants");
-				for (int i = 0; i < liste.length(); i++) {
-					mv.ajoutDependant(liste.getString(i));
-				}
-			}
-			
 			if (json.has("alias")) {
 				JSONArray liste = json.getJSONArray("alias");
 				for (int i = 0; i < liste.length(); i++)
@@ -263,7 +256,6 @@ public class DepotLocal extends Depot {
 		for (ModVersion mv : this.mod_version.get(mod)) {
 			JSONObject json = new JSONObject();
 			mv.urls.sort(Comparator.comparing(URL::toString));
-			mv.dependants.sort(String::compareTo);
 			mv.alias.sort(String::compareTo);
 			
 			json.put("mcversion", mv.mcversion.toStringMinimal());
@@ -283,7 +275,6 @@ public class DepotLocal extends Depot {
 					.map(e -> e.getValue() != null ? e.getKey() + "@" + e.getValue() : e.getKey()).forEach(liste::put);
 			json.put("requiredMods", liste);
 			
-			json.put("dependants", new JSONArray(mv.dependants));
 			json.put("alias", new JSONArray(mv.alias));
 			json_total.put(mv.version.toString(), json);
 		}
@@ -303,7 +294,6 @@ public class DepotLocal extends Depot {
 			for (ModVersion modVersion : this.getModVersions(modid)) {
 				modVersion.urls.removeIf(url -> !url.getProtocol().equals("file"));
 				modVersion.requiredMods.clear();
-				modVersion.dependants.clear();
 				modVersion.alias.clear();
 			}
 			

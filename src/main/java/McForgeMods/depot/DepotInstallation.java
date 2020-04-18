@@ -149,10 +149,6 @@ public class DepotInstallation extends Depot {
 			VersionIntervalle.lectureDependances(json.getJSONArray("dependencies"))
 					.forEach(modVersion::ajoutModRequis);
 		}
-		if (json.has("dependants")) {
-			JSONArray dependants = json.getJSONArray("dependants");
-			dependants.forEach(d -> modVersion.ajoutDependant((String) d));
-		}
 		return modVersion;
 	}
 	
