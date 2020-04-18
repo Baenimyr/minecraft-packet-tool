@@ -268,6 +268,10 @@ public class VersionIntervalle {
 				maximum.toString() + (inclut_max ? ']' : ')') : ')');
 	}
 	
+	public String toStringMinimal() {
+		return minimum != null ? this.minimum.toString(this.minimum.precision(), false, false) : this.toString();
+	}
+	
 	public static class VersionIntervalleFormatException extends IllegalArgumentException {
 		public VersionIntervalleFormatException(String texte) {
 			super(texte);

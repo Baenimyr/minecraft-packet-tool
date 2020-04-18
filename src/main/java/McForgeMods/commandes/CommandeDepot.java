@@ -52,8 +52,8 @@ public class CommandeDepot implements Runnable {
 		DepotLocal depot = new DepotLocal(dossiers.depot);
 		try {
 			depot.importation();
-		} catch (IOException | JSONException i) {
-			System.err.println("Erreur de lecture du dépot: " + i.getClass() + ": " + i.getMessage());
+		} catch (IOException | JSONException | IllegalArgumentException i) {
+			System.err.println("Erreur de lecture du dépot: " + i.getClass().getSimpleName() + ": " + i.getMessage());
 			if (!force) return 1;
 		}
 		
@@ -94,7 +94,7 @@ public class CommandeDepot implements Runnable {
 		try {
 			depot.sauvegarde();
 		} catch (IOException i) {
-			System.err.println("Erreur d'écriture du dépot: " + i.getClass() + ": " + i.getMessage());
+			System.err.println("Erreur d'écriture du dépot: " + i.getClass().getSimpleName() + ": " + i.getMessage());
 			return 1;
 		}
 		
@@ -125,9 +125,9 @@ public class CommandeDepot implements Runnable {
 			DepotLocal depot = new DepotLocal(dossiers.depot);
 			try {
 				depot.importation();
-			} catch (IOException | JSONException i) {
+			} catch (IOException | JSONException | IllegalArgumentException i) {
 				System.err
-						.println("Erreur de lecture des informations du dépot: " + i.getClass() + " " + i.getMessage());
+						.println("Erreur de lecture des informations du dépot: " + i.getClass().getSimpleName() + " " + i.getMessage());
 				return 1;
 			}
 			DepotInstallation installation = new DepotInstallation(dossiers.minecraft);
@@ -171,7 +171,7 @@ public class CommandeDepot implements Runnable {
 			} catch (IOException i) {
 				System.err.println(
 						String.format("Impossible de sauvegarder le dépot local à '%s': %s %s", depot.dossier,
-								getClass(), i.getMessage()));
+								getClass().getSimpleName(), i.getMessage()));
 				return 1;
 			}
 			return 0;

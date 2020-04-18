@@ -110,11 +110,11 @@ public class ModVersion {
 	
 	@Override
 	public String toString() {
-		return String.format("'%s' %s [%s]", mod.name, version, mcversion);
+		return String.format("'%s' %s %s", mod.name, version, mcversion);
 	}
 	
 	public String toStringStandard() {
-		return String.format("%s-%s-[%s]", mod.modid, version, mcversion);
+		return String.format("%s-%s-%s", mod.modid, mcversion.toStringMinimal(), version);
 	}
 	
 	/** Dossier dans lequel placer les fichiers lorsque le mod est installé.

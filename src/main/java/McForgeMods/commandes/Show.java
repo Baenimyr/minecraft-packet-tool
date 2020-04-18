@@ -43,7 +43,7 @@ public class Show implements Runnable {
 			+ "dépendance n'est pas déclarée, elle ne sera pas détectée."})
 	static class showDependencies implements Callable<Integer> {
 		@CommandLine.Mixin
-		ForgeMods.Help           help;
+		ForgeMods.Help            help;
 		@CommandLine.Mixin
 		ShowOptions               show;
 		@CommandLine.Mixin
@@ -173,10 +173,9 @@ public class Show implements Runnable {
 			for (String modid : modids) {
 				if (regex != null && !regex.matcher(modid).find()) continue;
 				
-				for (ModVersion mv : dep.getModVersions(modid)) {
-					if (filtre_mc == null || mv.mcversion.englobe(filtre_mc))
-						System.out.println(String.format("%-20s %-10s %s", modid, mv.version, mv.mcversion));
-				}
+				dep.getModVersions(modid).stream().filter(mv -> filtre_mc == null || mv.mcversion.englobe(filtre_mc))
+						.sorted(Comparator.comparing(mv -> mv.version)).forEach(
+						mv -> System.out.println(String.format("%-20s %-10s %s", modid, mv.version, mv.mcversion)));
 			}
 			
 			return 0;
@@ -226,7 +225,7 @@ public class Show implements Runnable {
 						String.format("%s (%s):%n%s%n{url='%s', updateJSON='%s'}", mod.name, mod.modid, mod.description,
 								mod.url, mod.updateJSON));
 				StringJoiner joiner = new StringJoiner(" ");
-				depotLocal.getModVersions(mod).forEach(mv -> joiner.add(mv.version.toString()));
+				depotLocal.getModVersions(mod).stream().sorted(Comparator.comparing(mv -> mv.version)).forEach(mv -> joiner.add(mv.version.toString()));
 				System.out.println("versions: " + joiner.toString());
 				System.out.println();
 			}

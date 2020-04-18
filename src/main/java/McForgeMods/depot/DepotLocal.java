@@ -266,7 +266,7 @@ public class DepotLocal extends Depot {
 			mv.dependants.sort(String::compareTo);
 			mv.alias.sort(String::compareTo);
 			
-			json.put("mcversion", mv.mcversion.minimum().toString(mv.mcversion.minimum().precision(), false, false));
+			json.put("mcversion", mv.mcversion.toStringMinimal());
 			
 			JSONArray urls = new JSONArray();
 			for (URL url : mv.urls) {
