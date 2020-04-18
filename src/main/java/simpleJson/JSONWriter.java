@@ -87,12 +87,10 @@ public class JSONWriter {
 		else if (o instanceof Float) writer.write(Float.toString((Float) o));
 		else if (o instanceof Double) writer.write(Double.toString((Double) o));
 		else if (o instanceof Boolean) writer.write(Boolean.toString((Boolean) o));
-		else if (o instanceof String) {
-			quote(o.toString(), writer);
-		} else if (o instanceof Collection<?>) {
+		else if (o instanceof Collection<?>) {
 			this.writeList(new JSONArray((Collection<?>) o), writer, indent);
 		} else {
-			throw new IllegalArgumentException("Objet " + o.getClass() + " incompatible.");
+			quote(o.toString(), writer);
 		}
 	}
 	
