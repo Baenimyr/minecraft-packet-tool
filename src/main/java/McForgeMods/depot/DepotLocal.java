@@ -11,6 +11,7 @@ import org.json.JSONTokener;
 
 import java.io.*;
 import java.net.MalformedURLException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Path;
 import java.util.*;
@@ -167,7 +168,7 @@ public class DepotLocal extends Depot {
 						}
 				} else {
 					try {
-						mv.ajoutURL(new URL(json.getString("urls")));
+						mv.ajoutURL(new URL(this.dossier.toUri().toURL(), json.getString("urls")));
 					} catch (MalformedURLException u) {
 						u.printStackTrace();
 					}
@@ -262,11 +263,16 @@ public class DepotLocal extends Depot {
 			
 			JSONArray urls = new JSONArray();
 			for (URL url : mv.urls) {
-				if (url.getProtocol().equals("file") && url.getHost().isEmpty()) {
-					Path path = Path.of(url.getPath());
-					if (path.startsWith(this.dossier)) urls.put(this.dossier.relativize(path));
-					else urls.put(url.toString());
-				} else urls.put(url.toString());
+				if (url.getProtocol().equals("file")) {
+					try {
+						Path path = Path.of(url.toURI().getPath());
+						if (path.startsWith(this.dossier)) {
+							urls.put(this.dossier.relativize(path));
+							continue;
+						}
+					} catch (URISyntaxException ignored) {}
+				}
+				urls.put(url.toString());
 			}
 			json.put("urls", urls);
 			

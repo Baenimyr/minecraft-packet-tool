@@ -126,8 +126,8 @@ public class CommandeDepot implements Runnable {
 			try {
 				depot.importation();
 			} catch (IOException | JSONException | IllegalArgumentException i) {
-				System.err
-						.println("Erreur de lecture des informations du dépot: " + i.getClass().getSimpleName() + " " + i.getMessage());
+				System.err.println(String.format("Erreur de lecture des informations du dépot: %s %s",
+						i.getClass().getSimpleName(), i.getMessage()));
 				return 1;
 			}
 			DepotInstallation installation = new DepotInstallation(dossiers.minecraft);
@@ -154,14 +154,15 @@ public class CommandeDepot implements Runnable {
 				return 2;
 			}
 			
-			for (ModVersion version : importation) {
+			for (ModVersion version_client : importation) {
 				final ModVersion reelle = depot.ajoutModVersion(
-						new ModVersion(depot.ajoutMod(version.mod), version.version, version.mcversion));
-				reelle.fusion(version);
+						new ModVersion(depot.ajoutMod(version_client.mod), version_client.version,
+								version_client.mcversion));
+				reelle.fusion(version_client);
 				reelle.urls.removeIf(url -> url.getProtocol().equals("file"));
 				
 				if (include_file) {
-					copieFichier(depot, version);
+					copieFichier(depot, version_client);
 				}
 			}
 			System.out.println(String.format("%d versions importées.", importation.size()));
@@ -177,7 +178,7 @@ public class CommandeDepot implements Runnable {
 			return 0;
 		}
 		
-		private void copieFichier(final DepotLocal depot, ModVersion version) {
+		private void copieFichier(final DepotLocal depot, final ModVersion version) {
 			Optional<URL> fichier = version.urls.stream().filter(u -> u.getProtocol().equals("file")).findFirst();
 			if (fichier.isPresent()) {
 				try {
@@ -185,7 +186,10 @@ public class CommandeDepot implements Runnable {
 					final Path destination = depot.dossierCache(version).resolve(source.getFileName());
 					destination.getParent().toFile().mkdirs();
 					Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING);
-					version.ajoutURL(destination.toUri().toURL());
+					
+					Optional<ModVersion> version_depot = depot
+							.getModVersion(depot.getMod(version.mod.modid), version.version);
+					if (version_depot.isPresent()) version_depot.get().ajoutURL(destination.toUri().toURL());
 				} catch (IOException | URISyntaxException e) {
 					System.err.println(String.format("Impossible de copier le fichier '%s'!", fichier.get()));
 				}
