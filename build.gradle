@@ -31,8 +31,8 @@ archivesBaseName = "ForgeMods"
 
 dependencies {
     compile "org.json:json:20190722"
-    //implementation group: 'commons-cli', name: 'commons-cli', version: '1.4'
     compile 'info.picocli:picocli:4.2.0'
+    compile 'org.tomlj:tomlj:1.0.0'
     // annotationProcessor 'info.picocli:picocli-codegen:4.2.0'
 
     // Use JUnit Jupiter API for testing.

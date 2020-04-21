@@ -9,6 +9,10 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
+import org.tomlj.Toml;
+import org.tomlj.TomlArray;
+import org.tomlj.TomlParseResult;
+import org.tomlj.TomlTable;
 
 import java.io.*;
 import java.net.MalformedURLException;
@@ -151,6 +155,54 @@ public class DepotInstallation extends Depot {
 		return Optional.of(modVersion);
 	}
 	
+	private static Optional<ModVersion> lectureModTOML(InputStream lecture) throws IOException {
+		TomlParseResult toml = Toml.parse(lecture);
+		TomlArray mods = toml.getArray("mods");
+		if (mods == null || mods.isEmpty()) {
+			System.err.println("[mods.toml] pas de liste 'mods'");
+			return Optional.empty();
+		}
+		
+		TomlTable mod_info = mods.getTable(0);
+		if (mod_info == null || !mod_info.contains("modId")) {
+			System.err.println("[mods.toml] aucun 'modId'");
+			return Optional.empty();
+		}
+		final Mod mod = new Mod(mod_info.getString("modId"), mod_info.getString("displayName"));
+		mod.url = mod_info.contains("displayURL") ? mod_info.getString("displayURL") : null;
+		mod.updateJSON = mod_info.contains("updateJSONURL") ? mod_info.getString("updateJSONURL") : null;
+		mod.description = mod_info.contains("description") ? mod_info.getString("description") : null;
+		
+		
+		TomlArray dependencies_info = toml.getArray("dependencies." + mod.modid);
+		if (dependencies_info == null) {
+			System.err.println("[mods.toml] pas de liste 'dependencies." + mod.modid + "'");
+			return Optional.empty();
+		}
+		final Map<String, VersionIntervalle> dependencies = new HashMap<>();
+		VersionIntervalle mcversion = null;
+		for (int i = 0; i < dependencies_info.size(); i++) {
+			TomlTable dep_i = dependencies_info.getTable(i);
+			final String dep_modid = dep_i.getString("modId");
+			final VersionIntervalle dep_versions = VersionIntervalle.read(dep_i.getString("versionRange"));
+			
+			if (dep_modid.equals("minecraft")) {
+				mcversion = dep_versions;
+			} else {
+				dependencies.put(dep_modid, dep_versions);
+			}
+		}
+		
+		if (mcversion == null) {
+			System.err.println("[mods.toml] Aucune version minecraft spécifiée pour " + mod.modid);
+			return Optional.empty();
+		}
+		final ModVersion modVersion = new ModVersion(mod, Version.read(mod_info.getString("version")), mcversion);
+		modVersion.requiredMods.putAll(dependencies);
+		
+		return Optional.of(modVersion);
+	}
+	
 	/**
 	 * Cette fonction lit un fichier et tente d'extraire les informations relatives au mod.
 	 * <p>
@@ -166,6 +218,12 @@ public class DepotInstallation extends Depot {
 	 */
 	public static Optional<ModVersion> importationJar(File fichier) throws IOException {
 		try (ZipFile zip = new ZipFile(fichier)) {
+			ZipEntry modToml = zip.getEntry("META-INF/mods.toml");
+			if (modToml != null) {
+				Optional<ModVersion> version = lectureModTOML(zip.getInputStream(modToml));
+				if (version.isPresent()) return version;
+			}
+			
 			ZipEntry mcmod = zip.getEntry("mcmod.info");
 			if (mcmod != null) try (BufferedInputStream lecture = new BufferedInputStream(zip.getInputStream(mcmod))) {
 				return lectureMcMod(lecture);

@@ -101,11 +101,15 @@ public class VersionIntervalle {
 		}
 		
 		if (intervalle) {
-			if (pos >= contraintes.length() || contraintes.charAt(pos) != ',')
-				throw new VersionIntervalleFormatException(
-						String.format("L'intervalle n'est pas fermée: '%s'", contraintes));
+			if (pos >= contraintes.length()) throw new VersionIntervalleFormatException(
+					String.format("L'intervalle n'est pas fermée: '%s'", contraintes));
+			if (contraintes.charAt(pos) == ']')
+				maximum = minimum;
+			else if (contraintes.charAt(pos) != ',') throw new VersionIntervalleFormatException(String.format(
+					String.format("Impossible de continuer la lecture au caractère %d de '%s'", pos, contraintes)));
+			else
+				pos++;
 			
-			pos++;
 			if (contraintes.charAt(pos) == ')') {
 				inclut_max = false;
 				pos++;
@@ -244,8 +248,8 @@ public class VersionIntervalle {
 	
 	public boolean englobe(VersionIntervalle intervalle) {
 		return (this.correspond(intervalle.minimum) || (!inclut_min && intervalle.minimum != null
-				&& this.minimum.compareTo(intervalle.minimum) == 0)) && (this.correspond(intervalle.maximum)
-				|| (!inclut_max && intervalle.maximum != null && this.maximum.compareTo(intervalle.maximum) == 0));
+				&& this.minimum.compareTo(intervalle.minimum) == 0)) && (this.correspond(intervalle.maximum) || (
+				!inclut_max && intervalle.maximum != null && this.maximum.compareTo(intervalle.maximum) == 0));
 	}
 	
 	@Override
