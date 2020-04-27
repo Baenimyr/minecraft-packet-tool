@@ -13,17 +13,15 @@ import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
-@CommandLine.Command(name = "show", description = {"Affichage d'informations."})
+@CommandLine.Command(name = "show", resourceBundle = "mcforgemods/lang/Show")
 public class CommandeShow implements Callable<Integer> {
 	@CommandLine.Mixin
 	ForgeMods.Help help;
 	
-	@CommandLine.Option(names = {"-d", "--depot"}, description = "Dépot local à utiliser")
+	@CommandLine.Option(names = {"-d", "--depot"})
 	public Path depot = null;
 	
-	@CommandLine.Parameters(arity = "1..n", description = "Affiche les informations d'une liste de mods. S'il y a une "
-			+ "intervalle de version (modid@version), affiche les informations détaillées de toutes les versions "
-			+ "correspondantes. Sinon affiche les informations générales du mod.")
+	@CommandLine.Parameters(arity = "1..n", descriptionKey = "recherche")
 	ArrayList<String> recherche;
 	
 	@Override
@@ -53,9 +51,9 @@ public class CommandeShow implements Callable<Integer> {
 		}
 		
 		for (Mod mod : mods) {
-			System.out.println(
-					String.format("%s (%s):%n%s%n{url='%s', updateJSON='%s'}", mod.name, mod.modid, mod.description,
-							mod.url != null ? mod.url : "", mod.updateJSON != null ? mod.updateJSON : ""));
+			System.out.println(String.format("%s (%s):%n'%s'%n{url='%s', updateJSON='%s'}", mod.name, mod.modid,
+					mod.description != null ? mod.description : "", mod.url != null ? mod.url : "",
+					mod.updateJSON != null ? mod.updateJSON : ""));
 			StringJoiner joiner = new StringJoiner(" ");
 			depotLocal.getModVersions(mod).stream().sorted(Comparator.comparing(mv -> mv.version))
 					.forEach(mv -> joiner.add(mv.version.toString()));
@@ -64,14 +62,14 @@ public class CommandeShow implements Callable<Integer> {
 		}
 		
 		for (ModVersion version : versions) {
-			System.out.println(String.format("%s %s [%s]:", version.mod.modid, version.version,
+			System.out.println(String.format("%s %s [%s]", version.mod.modid, version.version,
 					version.mcversion.toStringMinimal()));
 			StringJoiner joiner = new StringJoiner(",");
 			version.requiredMods.entrySet().stream().sorted(Map.Entry.comparingByKey())
 					.forEach(e -> joiner.add(e.getKey() + "@" + e.getValue()));
-			System.out.println("requiredMods " + joiner.toString());
-			System.out.println("urls\t" + Arrays.toString(version.urls.toArray()));
-			System.out.println("alias\t" + Arrays.toString(version.alias.toArray()));
+			System.out.println("requiredMods: " + joiner.toString());
+			System.out.println("urls:\t" + Arrays.toString(version.urls.toArray()));
+			System.out.println("alias:\t" + Arrays.toString(version.alias.toArray()));
 			System.out.println();
 		}
 		

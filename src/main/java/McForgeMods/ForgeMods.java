@@ -1,9 +1,6 @@
 package McForgeMods;
 
-import McForgeMods.commandes.CommandeDepot;
-import McForgeMods.commandes.CommandeInstall;
-import McForgeMods.commandes.CommandeShow;
-import McForgeMods.commandes.CommandeUpdate;
+import McForgeMods.commandes.*;
 import McForgeMods.depot.ArbreDependance;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
@@ -20,7 +17,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @CommandLine.Command(name = "forgemods", showDefaultValues = true, mixinStandardHelpOptions = true,
-		subcommands = {CommandeShow.class, CommandeDepot.class, CommandeInstall.class, CommandeUpdate.class})
+		subcommands = {CommandeShow.class, CommandeListe.class, CommandeDepot.class, CommandeInstall.class,
+				CommandeUpdate.class})
 public class ForgeMods implements Runnable {
 	
 	@CommandLine.Spec
