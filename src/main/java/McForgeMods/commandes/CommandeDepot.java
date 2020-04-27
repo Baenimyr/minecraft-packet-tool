@@ -27,8 +27,7 @@ import java.util.concurrent.Callable;
  * <i>mcmod.info</i> des fichiers jar trouvés.
  */
 @CommandLine.Command(name = "depot", subcommands = {CommandeDepot.importation.class, CommandeUpdate.class},
-		description = {"Outil de gestion d'un dépot.",
-				"Une installation minecraft peut être utilisée comme source de fichiers."})
+		resourceBundle = "mcforgemods/lang/Depot")
 public class CommandeDepot implements Runnable {
 	
 	@CommandLine.Option(names = {"--help"}, usageHelp = true)
@@ -42,14 +41,13 @@ public class CommandeDepot implements Runnable {
 		throw new CommandLine.ParameterException(spec.commandLine(), "Missing required subcommand");
 	}
 	
-	@CommandLine.Command(name = "refresh", description = "Importe est sauvegarde le dépot.\nPermet de détecter des "
-			+ "erreurs. En cas d'erreur ne sauvegarde pas les informations corrompues.")
-	public int refresh(@CommandLine.Mixin ForgeMods.DossiersOptions dossiers, @CommandLine.Mixin ForgeMods.Help help,
-			@CommandLine.Option(names = {"-f", "--force"}, defaultValue = "false",
-					description = "Force la sauvegarde du dépot, même après des erreurs lors de l'importation.")
-					boolean force, @CommandLine.Option(names = {"-v", "--verbose"}, defaultValue = "false",
-			description = "Affiche plus d'informations sur les erreurs.") boolean verbose) {
-		DepotLocal depot = new DepotLocal(dossiers.depot);
+	@CommandLine.Command(name = "refresh")
+	public int refresh(@CommandLine.Option(names = "--depot") Path chemin_depot, @CommandLine.Mixin ForgeMods.Help help,
+			@CommandLine.Option(names = {"-f", "--force"}, defaultValue = "false", descriptionKey = "force")
+					boolean force,
+			@CommandLine.Option(names = {"-v", "--verbose"}, defaultValue = "false", descriptionKey = "verbose")
+					boolean verbose) {
+		DepotLocal depot = new DepotLocal(chemin_depot);
 		try {
 			depot.importation();
 		} catch (IOException | JSONException | IllegalArgumentException i) {
@@ -102,18 +100,13 @@ public class CommandeDepot implements Runnable {
 		return 0;
 	}
 	
-	@CommandLine.Command(name = "import",
-			description = "Permet d'importer des informations présentes dans les fichiers mcmod.info des archives jar. "
-					+ "Utilise un dépot minecraft comme source des jars.")
+	@CommandLine.Command(name = "import")
 	static class importation implements Callable<Integer> {
-		@CommandLine.Parameters(index = "0", arity = "0..*", paramLabel = "modid",
-				description = "Liste de mod spécifiques à importer (modid).")
+		@CommandLine.Parameters(index = "0", arity = "0..*", paramLabel = "modid", descriptionKey = "modids")
 		String[] modids;
-		@CommandLine.Option(names = {"-a", "--all"}, defaultValue = "false", description = "Importe tout")
+		@CommandLine.Option(names = {"-a", "--all"}, defaultValue = "false")
 		boolean  all;
-		@CommandLine.Option(names = {"-i", "--include-files"}, defaultValue = "false",
-				description = "Copie les fichiers dans le dépot et ajoute un url relatif pour accéder au fichier."
-						+ "Ne copie pas les fichiers incertains (pas de mcmod.info)")
+		@CommandLine.Option(names = {"-i", "--include-files"}, defaultValue = "false", descriptionKey = "include")
 		boolean  include_file;
 		
 		@CommandLine.Mixin

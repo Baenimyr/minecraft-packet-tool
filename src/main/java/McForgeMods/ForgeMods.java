@@ -16,7 +16,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-@CommandLine.Command(name = "forgemods", showDefaultValues = true, mixinStandardHelpOptions = true,
+@CommandLine.Command(name = "forgemods", showDefaultValues = true, resourceBundle = "mcforgemods/lang/ForgeMods",
+		mixinStandardHelpOptions = true,
 		subcommands = {CommandeShow.class, CommandeListe.class, CommandeDepot.class, CommandeInstall.class,
 				CommandeUpdate.class})
 public class ForgeMods implements Runnable {
@@ -74,11 +75,10 @@ public class ForgeMods implements Runnable {
 		return 0;
 	}
 	
-	@CommandLine.Command(name = "search", description = "Cherche parmi les mods une chaîne de caractère.")
-	public int commandeSearch(@CommandLine.Mixin Help help,
-			@CommandLine.Option(names = {"-d", "--depot"}, description = "Dépot local à utiliser") Path depot,
-			@CommandLine.Option(names = {"-e", "--regex"}, description = "Active les expressions régulières")
-					boolean regex, @CommandLine.Parameters(paramLabel = "search", arity = "1") String recherche) {
+	@CommandLine.Command(name = "search")
+	public int commandeSearch(@CommandLine.Mixin Help help, @CommandLine.Option(names = {"-d", "--depot"}) Path depot,
+			@CommandLine.Option(names = {"-e", "--regex"}) boolean regex,
+			@CommandLine.Parameters(paramLabel = "search", arity = "1") String recherche) {
 		final DepotLocal depotLocal = new DepotLocal(depot);
 		try {
 			depotLocal.importation();
@@ -123,13 +123,11 @@ public class ForgeMods implements Runnable {
 		return 0;
 	}
 	
-	@CommandLine.Command(name = "depends", description = "Affiche les dépendances des mods.")
-	public int depends(@CommandLine.Parameters(index = "0", arity = "0..n",
-			description = "Limite l'affichage aux dépendances de certains mods (modid[@version])")
-			ArrayList<String> mods, @CommandLine.Mixin ForgeMods.DossiersOptions dossiers,
-			@CommandLine.Option(names = {"--missing"}, defaultValue = "false",
-					description = "Affiche les dépendances manquantes. Peut afficher des mods comme absents parce "
-							+ "que non détectés dans le dossier d'installation.") boolean missing,
+	@CommandLine.Command(name = "depends")
+	public int depends(
+			@CommandLine.Parameters(index = "0", arity = "0..n", descriptionKey = "mods") ArrayList<String> mods,
+			@CommandLine.Mixin ForgeMods.DossiersOptions dossiers,
+			@CommandLine.Option(names = {"--missing"}, defaultValue = "false") boolean missing,
 			@CommandLine.Option(names = {"-a", "--all"}) boolean all, @CommandLine.Mixin ForgeMods.Help help) {
 		final DepotLocal depotLocal = new DepotLocal(dossiers.depot);
 		final DepotInstallation depotInstallation = new DepotInstallation(dossiers.minecraft);

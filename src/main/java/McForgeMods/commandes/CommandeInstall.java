@@ -26,12 +26,7 @@ import java.util.stream.Collectors;
  * version maximale possible sera installée. Si l'utilisateur spécifie une version de minecraft, spécifier la version du
  * mod devient facultatif et c'est la version maximale
  */
-@CommandLine.Command(name = "install", sortOptions = false, description = {"Permet l'installation de mods.",
-		"Chaque mod de la liste sera installé ou mis à jour vers la dernière version compatibles avec le reste des "
-				+ "mods."}, exitCodeListHeading = "%nListe des codes d'erreur:%n",
-		exitCodeList = {CommandeInstall.ERREUR_NOM + ":erreur de nom", CommandeInstall.ERREUR_MODID + ":modid inconnu",
-				CommandeInstall.ERREUR_RESSOURCE + ":erreur de ressource",
-				CommandeInstall.ERREUR_URL + ":aucun lien disponible"})
+@CommandLine.Command(name = "install", sortOptions = false, resourceBundle = "mcforgemods/lang/Install")
 public class CommandeInstall implements Callable<Integer> {
 	static final int ERREUR_NOM       = 10;
 	static final int ERREUR_MODID     = ERREUR_NOM + 1;
@@ -45,18 +40,16 @@ public class CommandeInstall implements Callable<Integer> {
 	@CommandLine.Option(names = {"-h", "--help"}, usageHelp = true)
 	boolean help;
 	
-	@CommandLine.Parameters(arity = "1..n", description = "Liste des mods à installer.")
+	@CommandLine.Parameters(arity = "1..n", descriptionKey = "mods")
 	ArrayList<String> mods;
 	
 	@CommandLine.Mixin
 	ForgeMods.DossiersOptions dossiers;
 	
-	@CommandLine.Option(names = {"-mc", "--mcversion"}, required = true,
-			description = "Permet de choisir un version de " + "minecraft. " + "Recommandé.")
+	@CommandLine.Option(names = {"-mc", "--mcversion"}, required = true)
 	String mcversion;
 	
-	@CommandLine.Option(names = {"--no-dependencies"}, negatable = true,
-			description = "Autorise ou empêche l'installation des dépendances si besoin.")
+	@CommandLine.Option(names = {"--no-dependencies"}, negatable = true, descriptionKey = "dependencies")
 	boolean dependances = true;
 	
 	/*@CommandLine.Option(names = {"-y", "--yes"}, defaultValue = "false",
@@ -67,8 +60,7 @@ public class CommandeInstall implements Callable<Integer> {
 			description = "Interdit l'installation de nouveaux mods. Les mods de la liste seront mis à jour.")
 	boolean only_update;*/
 	
-	@CommandLine.Option(names = {"-s", "--simulate", "--dry-run"}, defaultValue = "false",
-			description = "Simule l'installation.")
+	@CommandLine.Option(names = {"-s", "--simulate", "--dry-run"}, defaultValue = "false", descriptionKey = "simulate")
 	boolean dry_run;
 	
 	@CommandLine.Option(names = {"-f", "--force"}, defaultValue = "false",

@@ -17,17 +17,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 
-@CommandLine.Command(name = "update", description = "Met à jour les informations du dépot à partir d'un autre.")
+@CommandLine.Command(name = "update", resourceBundle = "mcforgemods/lang/Update")
 public class CommandeUpdate implements Callable<Integer> {
 	@CommandLine.Mixin
 	ForgeMods.Help help;
-	@CommandLine.Option(names = {"-d", "--depot"}, description = "Dépot local")
-	Path         adresseDepot;
-	@CommandLine.Option(names = {"-f", "--from"}, arity = "0..n", description = "Dépot distant spécifique")
-	List<String> urlDistant;
-	@CommandLine.Option(names = {"-c", "--clear"}, negatable = true, defaultValue = "true",
-			description = "Remplace totalement le dépot initial par les informations téléchargées.")
-	boolean clear;
+	@CommandLine.Option(names = {"-d", "--depot"})
+	Path           adresseDepot;
+	@CommandLine.Option(names = {"-f", "--from"}, arity = "0..n", descriptionKey = "from")
+	List<String>   urlDistant;
+	@CommandLine.Option(names = "--no-clear", negatable = true, defaultValue = "true", descriptionKey = "clear")
+	boolean        clear;
 	
 	@Override
 	public Integer call() throws Exception {
