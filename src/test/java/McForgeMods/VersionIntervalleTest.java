@@ -2,6 +2,9 @@ package McForgeMods;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Collections;
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class VersionIntervalleTest {
@@ -44,11 +47,11 @@ class VersionIntervalleTest {
 		assertNull(dep3.maximum);
 		assertEquals(new Version(1, 0, 0), dep3.minimum);
 		
-		VersionIntervalle dep4 = VersionIntervalle.read("[1.0,]");
+		VersionIntervalle dep4 = VersionIntervalle.read("[1.0]");
 		assertTrue(dep4.inclut_max);
 		assertTrue(dep4.inclut_min);
-		assertNull(dep4.maximum);
 		assertEquals(new Version(1, 0, 0), dep4.minimum);
+		assertEquals(dep4.minimum, dep4.maximum);
 		
 		VersionIntervalle dep5 = VersionIntervalle.read("1.0");
 		assertFalse(dep5.inclut_max);
@@ -57,5 +60,16 @@ class VersionIntervalleTest {
 		assertNotNull(dep5.maximum);
 		assertEquals(new Version(1, 0, 0), dep5.minimum);
 		assertEquals(new Version(1, 1, 0), dep5.maximum);
+	}
+	
+	@Test
+	public void dependances() {
+		Map<String, VersionIntervalle> intervalles = VersionIntervalle.lectureDependances(
+				Collections.singletonList("mod@[2.54.3," + "2.55)"));
+		assertEquals(1, intervalles.size());
+		assertTrue(intervalles.get("mod").inclut_min);
+		assertFalse(intervalles.get("mod").inclut_max);
+		assertEquals(new Version(2,54,3), intervalles.get("mod").minimum);
+		assertEquals(new Version(2,55,0), intervalles.get("mod").maximum);
 	}
 }

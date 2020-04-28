@@ -1,8 +1,9 @@
 package McForgeMods;
 
 import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Permet de décomposer et comparer les versions entre-elles. Une version valide est composés de chiffres séparés par
@@ -12,12 +13,14 @@ import java.util.List;
  * @since 2020-01-10
  */
 public class Version implements Comparable<Version> {
+	public static final Pattern VERSION = Pattern.compile(
+			"(\\d+)\\.(\\d+)(\\.(\\d+)(\\.(\\d+))?)?(-(?<release>\\p{Alnum}+))?(\\+" + "(?<build>\\p{Alnum}+))?");
 	/**
 	 * major, medium, minor, patch
 	 */
-	private final        int[]        versions = new int[4];
-	private final        List<String> release  = new LinkedList<>();
-	private final        List<String> build    = new LinkedList<>();
+	private final int[]  versions = new int[4];
+	public        String release  = null;
+	public        String build    = null;
 	
 	public Version(int major, int medium, int minor, int patch) {
 		this.versions[0] = major;
@@ -63,20 +66,37 @@ public class Version implements Comparable<Version> {
 		this.versions[index] = valeur;
 	}
 	
-	public List<String> getRelease() {
+	public static Version read(String texte) throws IllegalArgumentException {
+		Matcher m = VERSION.matcher(texte);
+		if (m.find()) {
+			return read(m);
+		} else throw new IllegalArgumentException(String.format("Version illisible: '%s'", texte));
+	}
+	
+	public static Version read(Matcher m) {
+		Version version;
+		String minor = m.group(4);
+		String patch = m.group(6);
+		String release = m.group(8);
+		String build = m.group(10);
+		
+		int v_minor = minor == null ? 0 : Integer.parseInt(minor);
+		
+		if (patch != null) version = new Version(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)), v_minor,
+				Integer.parseInt(patch));
+		else version = new Version(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)), v_minor);
+		
+		if (release != null) version.release = release;
+		if (build != null) version.build = build;
+		return version;
+	}
+	
+	public String getRelease() {
 		return this.release;
 	}
 	
-	public List<String> getBuild() {
+	public String getBuild() {
 		return this.build;
-	}
-	
-	public static Version read(String version) throws IllegalArgumentException {
-		VersionBuilder builder = new VersionBuilder(version); //.noRelease().noBuild();
-		int lu = builder.read();
-		if (lu != version.length())
-			throw new IllegalArgumentException(String.format("Version illisible: '%s'", version));
-		return builder.version();
 	}
 	
 	@Override
@@ -85,11 +105,8 @@ public class Version implements Comparable<Version> {
 			if (this.versions[1] == version.versions[1]) {
 				if (this.versions[2] == version.versions[2]) {
 					if (this.versions[3] == version.versions[3]) {
-						for (int i = 0; i < this.release.size() && i < version.release.size(); i++) {
-							int diff = this.release.get(i).compareTo(version.release.get(i));
-							if (diff != 0) return diff;
-						}
-						return Integer.compare(this.release.size(), version.release.size());
+						return this.release == null ? (version.release == null ? 0 : 1)
+								: Objects.compare(this.release, version.release, String::compareTo);
 					} else return Integer.compare(this.versions[3], version.versions[3]);
 				} else return Integer.compare(this.versions[2], version.versions[2]);
 			} else return Integer.compare(this.versions[1], version.versions[1]);
@@ -108,11 +125,11 @@ public class Version implements Comparable<Version> {
 			sb.append('.');
 			sb.append(this.versions[i]);
 		}
-		if (release && !this.release.isEmpty()) {
+		if (release && this.release != null) {
 			sb.append("-");
 			sb.append(String.join(".", this.release));
 		}
-		if (build && !this.build.isEmpty()) {
+		if (build && this.build != null) {
 			sb.append("+");
 			sb.append(String.join(".", this.build));
 		}
@@ -123,138 +140,11 @@ public class Version implements Comparable<Version> {
 	public boolean equals(Object o) {
 		if (this == o) return true;
 		if (o == null || getClass() != o.getClass()) return false;
-		return Arrays.equals(versions, ((Version) o).versions) && Arrays
-				.equals(this.release.toArray(), ((Version) o).release.toArray());
+		return Arrays.equals(versions, ((Version) o).versions) && Objects.equals(this.release, ((Version) o).release);
 	}
 	
 	@Override
 	public int hashCode() {
 		return Arrays.hashCode(versions);
-	}
-	
-	
-	public static class VersionBuilder {
-		private final String texte;
-		private       int    lecture = 0;
-		
-		private boolean accept_release = true;
-		private boolean accept_build   = true;
-		/**
-		 * Nombre de sous-version réellement lues.
-		 */
-		public  int     precision      = 0;
-		
-		private       int          major   = 0;
-		private       int          medium  = 0;
-		private       int          minor   = 0;
-		private       int          patch   = 0;
-		private final List<String> release = new LinkedList<>();
-		private final List<String> build   = new LinkedList<>();
-		
-		public VersionBuilder(String texte) {
-			this.texte = texte;
-		}
-		
-		public VersionBuilder(String texte, int depart) {
-			this(texte);
-			this.lecture = depart;
-		}
-		
-		public Version version() {
-			final Version version = new Version(major, medium, minor, patch);
-			version.release.addAll(this.release);
-			version.build.addAll(this.build);
-			return version;
-		}
-		
-		public VersionBuilder noRelease() {
-			this.accept_release = false;
-			return this;
-		}
-		
-		public VersionBuilder noBuild() {
-			this.accept_build = false;
-			return this;
-		}
-		
-		public int read() throws IllegalArgumentException {
-			lectureVersion();
-			while (lecture < texte.length()) {
-				char c = texte.charAt(lecture);
-				if (this.accept_release && c == '-') {
-					lecture++;
-					lectureRelease();
-				} else if (this.accept_build && c == '+') {
-					lecture++;
-					lectureBuild();
-				} else break;
-			}
-			return lecture;
-		}
-		
-		private int lectureChiffre() {
-			int pos = lecture;
-			while (pos < texte.length() && Character.isDigit(texte.charAt(pos))) pos++;
-			if (lecture == pos) throw new IllegalArgumentException(
-					String.format("Absence de nombre en position %d dans '%s' !", lecture, this.texte));
-			int i = Integer.parseInt(texte.substring(lecture, pos));
-			lecture = pos;
-			return i;
-		}
-		
-		private void lectureVersion() {
-			this.major = lectureChiffre();
-			if (lecture < texte.length() && texte.charAt(lecture) == '.') {
-				lecture++;
-				this.medium = lectureChiffre();
-				precision = 1;
-				if (lecture < texte.length() && texte.charAt(lecture) == '.') {
-					lecture++;
-					this.minor = lectureChiffre();
-					precision = 2;
-					if (lecture < texte.length() && texte.charAt(lecture) == '.') {
-						lecture++;
-						this.patch = lectureChiffre();
-						precision = 3;
-					}
-				}
-			}
-		}
-		
-		private void lectureRelease() {
-			int pos = lecture;
-			while (pos < texte.length() && (Character.isDigit(texte.charAt(pos)) || Character
-					.isAlphabetic(texte.charAt(pos)) || texte.charAt(pos) == '.')) {
-				if (texte.charAt(pos) == '.') {
-					if (lecture == pos) throw new IllegalArgumentException(
-							String.format("Absence de texte en position %d dans '%s'", lecture, this.texte));
-					this.release.add(texte.substring(lecture, pos));
-					lecture = ++pos;
-				} else pos++;
-			}
-			
-			if (lecture == pos) throw new IllegalArgumentException(
-					String.format("Absence de texte en position %d dans '%s' !", lecture, this.texte));
-			this.release.add(this.texte.substring(lecture, pos));
-			lecture = pos;
-		}
-		
-		private void lectureBuild() {
-			int pos = lecture;
-			while (pos < texte.length() && (Character.isDigit(texte.charAt(pos)) || Character
-					.isAlphabetic(texte.charAt(pos)) || texte.charAt(pos) == '.')) {
-				if (texte.charAt(pos) == '.') {
-					if (lecture == pos) throw new IllegalArgumentException(
-							String.format("Absence de texte en position %d dans '%s'", lecture, this.texte));
-					this.build.add(texte.substring(lecture, pos));
-					lecture = ++pos;
-				} else pos++;
-			}
-			
-			if (lecture == pos) throw new IllegalArgumentException(
-					String.format("Absence de texte en position %d dans '%s' !", lecture, this.texte));
-			this.build.add(this.texte.substring(lecture, pos));
-			lecture = pos;
-		}
 	}
 }

@@ -3,6 +3,8 @@ package McForgeMods;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Une intervalle de versions englobe toutes les versions comprises entre les deux bornes.
@@ -18,6 +20,9 @@ import java.util.Objects;
  * </ul>
  */
 public class VersionIntervalle {
+	public static final Pattern VERSION_INTERVALLE = Pattern.compile(
+			"(?<bmin>[\\(\\[]?)(?<vmin>[\\p{Alnum}\\.+-]+)?(,(?<vmax>[\\p{Alnum}\\.+-]+)?)?(?<bmax>[\\)" + "\\]]?)");
+	
 	Version minimum, maximum;
 	boolean inclut_min, inclut_max;
 	
@@ -73,67 +78,48 @@ public class VersionIntervalle {
 	 *     <li>1.2.0 -> [1.2,1.2.1)</li>
 	 * </ul>
 	 *
-	 * @param contraintes texte de l'interval
+	 * @param in texte de l'interval
 	 * @throws VersionIntervalleFormatException si le format n'est pas respecté.
 	 */
-	public static VersionIntervalle read(String contraintes) throws VersionIntervalleFormatException {
-		Version minimum = null, maximum = null;
-		int precision_minimum = 0;
-		boolean inclut_min = true, inclut_max = false;
-		
-		boolean intervalle = false;
-		int pos = 0;
-		if (!Character.isDigit(contraintes.charAt(pos))) {
-			if (contraintes.charAt(pos) != '(' && contraintes.charAt(pos) != '[')
-				throw new VersionIntervalleFormatException(contraintes + " commence avec un caractère invalide.");
+	public static VersionIntervalle read(String in) throws VersionIntervalleFormatException {
+		final Matcher m = VERSION_INTERVALLE.matcher(in);
+		if (m.find()) {
+			VersionIntervalle intervalle;
+			final boolean inclut_min, inclut_max;
+			final Version v_minimale, v_maximale;
 			
-			inclut_min = contraintes.charAt(pos) == '[';
-			pos++;
-			intervalle = true;
-		}
-		
-		if (!intervalle || contraintes.charAt(pos) != ',') {
-			Version.VersionBuilder b1 = new Version.VersionBuilder(contraintes, pos);
-			int fin = b1.read();
-			if (fin > pos) minimum = b1.version();
-			precision_minimum = b1.precision;
-			pos = fin;
-		}
-		
-		if (intervalle) {
-			if (pos >= contraintes.length() || contraintes.charAt(pos) != ',')
+			inclut_min = !"(".equals(m.group("bmin"));
+			inclut_max = "]".equals(m.group("bmax"));
+			
+			try {
+				final String s_min = m.group("vmin");
+				v_minimale = s_min == null ? null : Version.read(s_min);
+			} catch (IllegalArgumentException iae) {
 				throw new VersionIntervalleFormatException(
-						String.format("L'intervalle n'est pas fermée: '%s'", contraintes));
-			
-			pos++;
-			if (contraintes.charAt(pos) == ')') {
-				inclut_max = false;
-				pos++;
-			} else if (contraintes.charAt(pos) == ']') {
-				inclut_max = true;
-				pos++;
-			} else {
-				Version.VersionBuilder b2 = new Version.VersionBuilder(contraintes, pos);
-				int fin = b2.read();
-				if (fin > pos) maximum = b2.version();
-				pos = fin;
-				if (pos >= contraintes.length() || (contraintes.charAt(pos) != ')' && contraintes.charAt(pos) != ']'))
-					throw new VersionIntervalleFormatException(
-							String.format("Mauvaise façon de fermer une intervalle: '%s'", contraintes));
-				inclut_max = contraintes.charAt(pos++) == ']';
+						"La version minimale " + m.group("vmin") + " n'a pas un format valide !");
 			}
-		}
-		if (contraintes.length() != pos) throw new VersionIntervalleFormatException(contraintes);
-		
-		if (minimum == null && maximum == null) return VersionIntervalle.ouvert();
-		else if (intervalle) {
-			VersionIntervalle v = new VersionIntervalle(minimum, maximum);
-			v.inclut_min = inclut_min;
-			v.inclut_max = inclut_max;
-			return v;
-		} else {
-			return new VersionIntervalle(minimum, precision_minimum);
-		}
+			
+			if (m.group(3) != null) { // intervalle large
+				try {
+					final String s_max = m.group("vmax");
+					v_maximale = s_max == null ? null : Version.read(s_max);
+				} catch (IllegalArgumentException iae) {
+					throw new VersionIntervalleFormatException(
+							"La version maximale " + m.group("vmax") + " n'a pas un format valide !");
+				}
+				
+				intervalle = new VersionIntervalle(v_minimale, v_maximale);
+			} else {
+				if (inclut_max) intervalle = new VersionIntervalle(v_minimale);
+				else intervalle = new VersionIntervalle(v_minimale, v_minimale.precision() + 1);
+			}
+			
+			intervalle.inclut_min = inclut_min;
+			intervalle.inclut_max = inclut_max;
+			
+			return intervalle;
+		} else
+			throw new VersionIntervalleFormatException("Ce n'est pas un intervalle de version valide: \"" + in + "\"");
 	}
 	
 	/**
@@ -161,11 +147,13 @@ public class VersionIntervalle {
 		for (Object o : entree) {
 			final String texte = o.toString();
 			int pos = 0;
+			
 			StringBuilder modid_builder = new StringBuilder();
 			VersionIntervalle versionIntervalle = VersionIntervalle.ouvert();
 			
+			char c;
 			while (pos < texte.length()) {
-				char c = texte.charAt(pos);
+				c = texte.charAt(pos++);
 				if (c == ',') {
 					final String modid = modid_builder.toString().toLowerCase();
 					if (resultat.containsKey(modid) && resultat.get(modid) != null) {
@@ -174,28 +162,28 @@ public class VersionIntervalle {
 					
 					modid_builder = new StringBuilder();
 					versionIntervalle = VersionIntervalle.ouvert();
+					
 				} else if (c == '@' && modid_builder.length() > 0) {
-					pos++;
-					if (pos >= texte.length()) {
-						throw new VersionIntervalleFormatException("Intervalle non spécifiée dans " + texte);
+					StringBuilder intervalle = new StringBuilder();
+					c = texte.charAt(pos++);
+					while (Character.isDigit(c) || c == ',' || c == '[' || c == ']'
+							|| c == '(' || c == ')' || c == '.' || c == '-' || c == '+') {
+						intervalle.append(c);
+						if (pos >= texte.length()) break;
+						c = texte.charAt(pos++);
 					}
 					
-					StringBuilder intervalle = new StringBuilder();
-					c = texte.charAt(pos);
-					while (pos < texte.length() && (Character.isDigit(c) || c == ',' || c == '[' || c == ']' || c == '('
-							|| c == ')' || c == '.' || c == '-' || c == '+')) {
-						intervalle.append(c);
-						pos++;
-						if (pos < texte.length()) c = texte.charAt(pos);
-					}
+					if (intervalle.length() == 0)
+						throw new VersionIntervalleFormatException("Intervalle vide dans " + texte);
+					
 					versionIntervalle = read(intervalle.toString());
 					
 				} else if (Character.isAlphabetic(c) || Character.isDigit(c)) {
-					modid_builder.append(c);
+					modid_builder.append((char) c);
 				} else {
+					System.err.println(c);
 					throw new VersionIntervalleFormatException(texte);
 				}
-				pos++;
 			}
 			
 			if (modid_builder.length() > 0) {
@@ -244,8 +232,8 @@ public class VersionIntervalle {
 	
 	public boolean englobe(VersionIntervalle intervalle) {
 		return (this.correspond(intervalle.minimum) || (!inclut_min && intervalle.minimum != null
-				&& this.minimum.compareTo(intervalle.minimum) == 0)) && (this.correspond(intervalle.maximum)
-				|| (!inclut_max && intervalle.maximum != null && this.maximum.compareTo(intervalle.maximum) == 0));
+				&& this.minimum.compareTo(intervalle.minimum) == 0)) && (this.correspond(intervalle.maximum) || (
+				!inclut_max && intervalle.maximum != null && this.maximum.compareTo(intervalle.maximum) == 0));
 	}
 	
 	@Override
