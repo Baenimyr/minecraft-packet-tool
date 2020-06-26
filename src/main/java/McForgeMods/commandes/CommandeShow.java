@@ -30,12 +30,20 @@ public class CommandeShow implements Callable<Integer> {
 		try {
 			depotLocal.importation();
 		} catch (IOException e) {
-			System.err.println(String.format("Erreur de lecture du dépot: %s %s", e.getClass(), e.getMessage()));
+			System.err
+					.println(String.format("[ERROR] Erreur de lecture du dépot: %s %s", e.getClass(), e.getMessage()));
 		}
 		final List<Mod> mods = new ArrayList<>();
 		final List<ModVersion> versions = new ArrayList<>();
 		
-		Map<String, VersionIntervalle> demandes = VersionIntervalle.lectureDependances(recherche);
+		final Map<String, VersionIntervalle> demandes;
+		try {
+			demandes = VersionIntervalle.lectureDependances(recherche);
+		} catch (IllegalArgumentException iae) {
+			System.err.println("[ERROR] " + iae.getMessage());
+			return 1;
+		}
+		
 		for (Map.Entry<String, VersionIntervalle> rech : demandes.entrySet()) {
 			Mod mod = depotLocal.getMod(rech.getKey());
 			if (mod == null) System.err.println(String.format("Mod inconnu: '%s'", rech.getKey()));

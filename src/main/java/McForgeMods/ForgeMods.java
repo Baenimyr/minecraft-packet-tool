@@ -148,7 +148,14 @@ public class ForgeMods implements Runnable {
 					.flatMap(modid -> depotInstallation.getModVersions(modid).stream()).collect(Collectors.toList());
 		} else if (mods != null && mods.size() > 0) {
 			final List<ModVersion> resultat = new ArrayList<>();
-			Map<String, VersionIntervalle> recherche = VersionIntervalle.lectureDependances(mods);
+			final Map<String, VersionIntervalle> recherche;
+			
+			try {
+				recherche = VersionIntervalle.lectureDependances(mods);
+			} catch (IllegalArgumentException iae) {
+				System.err.println("[ERROR] " + iae.getMessage());
+				return 1;
+			}
 			for (Map.Entry<String, VersionIntervalle> entry : recherche.entrySet()) {
 				String modid = entry.getKey();
 				VersionIntervalle version = entry.getValue();

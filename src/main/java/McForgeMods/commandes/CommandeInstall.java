@@ -84,21 +84,28 @@ public class CommandeInstall implements Callable<Integer> {
 			depotLocal.importation();
 			depotInstallation.analyseDossier(depotLocal);
 		} catch (IOException i) {
-			System.err.println("Erreur de lecture du dépot !");
+			System.err.println("[ERROR] Erreur de lecture du dépot !");
 			return 1;
 		}
 		
-		for (final Map.Entry<String, VersionIntervalle> demande : VersionIntervalle.lectureDependances(this.mods)
-				.entrySet()) {
+		final Map<String, VersionIntervalle> demandes;
+		try {
+			demandes = VersionIntervalle.lectureDependances(this.mods);
+		} catch (IllegalArgumentException iae) {
+			System.err.println("[ERROR] " + iae.getMessage());
+			return 1;
+		}
+		for (final Map.Entry<String, VersionIntervalle> demande : demandes.entrySet()) {
 			if (!depotLocal.getModids().contains(demande.getKey())) {
-				System.err.println(String.format("Modid inconnu: '%s'", demande.getKey()));
+				System.err.println(String.format("[ERROR] Modid inconnu: '%s'", demande.getKey()));
 				return ERREUR_MODID;
 			}
 			// Vérification que l'intervalle n'est pas trop large.
 			if (demande.getValue().minimum() == null && demande.getValue().maximum() == null && (
 					mcversion.minimum() == null || mcversion.maximum() == null)) {
-				System.err.println(String.format("Vous devez spécifier une version, pour le mod '%s' ou minecraft.",
-						demande.getKey()));
+				System.err.println(
+						String.format("[ERROR] Vous devez spécifier une version, pour le mod '%s' ou " + "minecraft.",
+								demande.getKey()));
 				return ERREUR_VERSION;
 			}
 			
@@ -254,12 +261,10 @@ public class CommandeInstall implements Callable<Integer> {
 			for (URL url : http) {
 				String nom = url.getPath();
 				nom = nom.substring(nom.lastIndexOf('/') + 1);
-				if (!nom.endsWith(".jar"))
-					nom = modVersion.toStringStandard() + ".jar";
+				if (!nom.endsWith(".jar")) nom = modVersion.toStringStandard() + ".jar";
 				
 				TelechargementHttp telechargement = new TelechargementHttp(url,
-						modVersion.dossierInstallation(minecraft.dossier)
-								.resolve(nom).toFile());
+						modVersion.dossierInstallation(minecraft.dossier).resolve(nom).toFile());
 				try {
 					HttpResponse<String> connexion = telechargement.recupereInformations();
 					
