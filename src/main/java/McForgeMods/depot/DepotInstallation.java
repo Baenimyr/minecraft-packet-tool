@@ -9,8 +9,13 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
+import org.tomlj.Toml;
+import org.tomlj.TomlArray;
+import org.tomlj.TomlParseResult;
+import org.tomlj.TomlTable;
 
 import java.io.*;
+import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
@@ -114,13 +119,13 @@ public class DepotInstallation extends Depot {
 		}
 	}
 	
-	private static ModVersion lectureMcMod(InputStream lecture) {
+	private static Optional<ModVersion> lectureMcMod(InputStream lecture) {
 		JSONTokener token = new JSONTokener(new NoNewlineReader(lecture));
 		JSONObject json;
 		JSONArray liste = new JSONArray(token);
 		json = liste.getJSONObject(0);
 		
-		if (!json.has("modid") || !json.has("name")) return null;
+		if (!json.has("modid") || !json.has("name")) return Optional.empty();
 		final String modid = json.getString("modid");
 		final String name = json.getString("name");
 		Version version, mcversion;
@@ -151,52 +156,91 @@ public class DepotInstallation extends Depot {
 				new VersionIntervalle(mcversion, mcversion.precision()));
 		
 		if (json.has("requiredMods")) {
-			VersionIntervalle.lectureDependances(json.getJSONArray("requiredMods"))
-					.forEach(modVersion::ajoutModRequis);
+			VersionIntervalle.lectureDependances(json.getJSONArray("requiredMods")).forEach(modVersion::ajoutModRequis);
 		}
 		if (json.has("dependencies")) {
-			VersionIntervalle.lectureDependances(json.getJSONArray("dependencies"))
-					.forEach(modVersion::ajoutModRequis);
+			VersionIntervalle.lectureDependances(json.getJSONArray("dependencies")).forEach(modVersion::ajoutModRequis);
 		}
-		if (json.has("dependants")) {
-			JSONArray dependants = json.getJSONArray("dependants");
-			dependants.forEach(d -> modVersion.ajoutDependant((String) d));
+		return Optional.of(modVersion);
+	}
+	
+	private static Optional<ModVersion> lectureModTOML(InputStream lecture) throws IOException {
+		TomlParseResult toml = Toml.parse(lecture);
+		TomlArray mods = toml.getArray("mods");
+		if (mods == null || mods.isEmpty()) {
+			System.err.println("[mods.toml] pas de liste 'mods'");
+			return Optional.empty();
 		}
-		return modVersion;
+		
+		TomlTable mod_info = mods.getTable(0);
+		if (mod_info == null || !mod_info.contains("modId")) {
+			System.err.println("[mods.toml] aucun 'modId'");
+			return Optional.empty();
+		}
+		final Mod mod = new Mod(mod_info.getString("modId"), mod_info.getString("displayName"));
+		mod.url = mod_info.contains("displayURL") ? mod_info.getString("displayURL") : null;
+		mod.updateJSON = mod_info.contains("updateJSONURL") ? mod_info.getString("updateJSONURL") : null;
+		mod.description = mod_info.contains("description") ? mod_info.getString("description") : null;
+		
+		
+		TomlArray dependencies_info = toml.getArray("dependencies." + mod.modid);
+		if (dependencies_info == null) {
+			System.err.println("[mods.toml] pas de liste 'dependencies." + mod.modid + "'");
+			return Optional.empty();
+		}
+		final Map<String, VersionIntervalle> dependencies = new HashMap<>();
+		VersionIntervalle mcversion = null;
+		for (int i = 0; i < dependencies_info.size(); i++) {
+			TomlTable dep_i = dependencies_info.getTable(i);
+			final String dep_modid = dep_i.getString("modId");
+			final VersionIntervalle dep_versions = VersionIntervalle.read(dep_i.getString("versionRange"));
+			
+			if (dep_modid.equals("minecraft")) {
+				mcversion = dep_versions;
+			} else {
+				dependencies.put(dep_modid, dep_versions);
+			}
+		}
+		
+		if (mcversion == null) {
+			System.err.println("[mods.toml] Aucune version minecraft spécifiée pour " + mod.modid);
+			return Optional.empty();
+		}
+		final ModVersion modVersion = new ModVersion(mod, Version.read(mod_info.getString("version")), mcversion);
+		modVersion.requiredMods.putAll(dependencies);
+		
+		return Optional.of(modVersion);
 	}
 	
 	/**
 	 * Cette fonction lit un fichier et tente d'extraire les informations relatives au mod.
 	 * <p>
-	 * Un mod est un fichier jar contenant dans sa racine un fichier <b>mcmod.info</b>. Ce fichier contient une
-	 * <b>liste</b> des mods que le fichier contient. Chaque mod définit un <i>modid</i>, un <i>name</i>, une
+	 * Un mod est un fichier jar contenant un fichier <b>mcmod.info</b> avant 1.14.4 et un fichier META-INF/mcmod .toml
+	 * à partir de minecraft 1.14.4. Ce fichier contient une <b>liste</b> des mods que le fichier contient. Chaque mod
+	 * définit un <i>modid</i>, un <i>name</i>, une
 	 * <i>version</i> et une <i>mcversion</i>. Le format de la version doit être compatible avec le format définit par
 	 * {@link Version}. La version minecraft peut être extraite de la <i>version</i> à la condition d'être sous le
 	 * format "<i>mcversion</i>-<i>version</i>".
 	 *
-	 * @return {@code true} si réussite: il s'agit bien d'un mod Minecraft Forge
+	 * @return un Optional non vide si réussi: il s'agit bien d'un mod Minecraft Forge
 	 * @see <a href="https://mcforge.readthedocs.io/en/latest/gettingstarted/structuring/">Fichier mcmod.info</a>
 	 */
-	private boolean importationJar(File fichier) throws IOException {
+	public static Optional<ModVersion> importationJar(File fichier) throws IOException {
 		try (ZipFile zip = new ZipFile(fichier)) {
-			ZipEntry mcmod = zip.getEntry("mcmod.info");
-			if (mcmod == null) return false;
-			BufferedInputStream lecture = new BufferedInputStream(zip.getInputStream(mcmod));
+			ZipEntry modToml = zip.getEntry("META-INF/mods.toml");
+			if (modToml != null) {
+				Optional<ModVersion> version = lectureModTOML(zip.getInputStream(modToml));
+				if (version.isPresent()) return version;
+			}
 			
-			ModVersion importe = lectureMcMod(lecture);
-			if (importe != null) {
-				final Mod mod = this.ajoutMod(importe.mod);
-				final ModVersion modVersion = new ModVersion(mod, importe.version, importe.mcversion);
-				modVersion.fusion(importe);
-				
-				this.ajoutModVersion(modVersion);
-				modVersion.ajoutURL(fichier.getAbsoluteFile().toURI().toURL());
-				modVersion.ajoutAlias(fichier.getName());
+			ZipEntry mcmod = zip.getEntry("mcmod.info");
+			if (mcmod != null) try (BufferedInputStream lecture = new BufferedInputStream(zip.getInputStream(mcmod))) {
+				return lectureMcMod(lecture);
 			}
 		} catch (JSONException | IllegalArgumentException ignored) {
 			// System.err.println("[DEBUG] [importation] '" + fichier.getName() + "':\t" + ignored.getMessage());
 		}
-		return false;
+		return Optional.empty();
 	}
 	
 	/**
@@ -219,22 +263,37 @@ public class DepotInstallation extends Depot {
 					dossiers.add(f);
 				else if (f.getName().endsWith(".jar")) {
 					try {
-						boolean succes = importationJar(f);
-						if (!succes && infos != null) {
+						Optional<ModVersion> importation = importationJar(f);
+						if (importation.isPresent()) {
+							final ModVersion importe = importation.get();
+							final Mod mod = this.ajoutMod(importe.mod);
+							final ModVersion modVersion = new ModVersion(mod, importe.version, importe.mcversion);
+							modVersion.fusion(importe);
+							
+							this.ajoutModVersion(modVersion);
+							modVersion.ajoutURL(f.getAbsoluteFile().toURI().toURL());
+							modVersion.ajoutAlias(f.getName());
+							continue;
+						}
+					} catch (IOException i) {
+						System.err.println(String.format("Erreur de lecture du fichier '%s': %s", f, i.getMessage()));
+					}
+					
+					try {
+						if (infos != null) {
 							Optional<ModVersion> version_alias = infos.rechercheAlias(f.getName());
 							if (version_alias.isPresent()) {
+								URL url_fichier = f.getAbsoluteFile().toURI().toURL();
 								// Ajout d'une version sans informations supplémentaires.
 								ModVersion local = this.ajoutModVersion(
 										new ModVersion(version_alias.get().mod, version_alias.get().version,
 												version_alias.get().mcversion));
 								local.fusion(version_alias.get()); // confiance d'avoir identifier le fichier
-								local.ajoutURL(f.getAbsoluteFile().toURI().toURL());
+								local.ajoutURL(url_fichier);
 								local.ajoutAlias(f.getName());
 							}
 						}
-						// System.err.println("Fichier jar incompatible: " + f.getName());
-					} catch (IOException i) {
-						System.err.println("Erreur sur '" + f.getName() + "': " + i.getMessage());
+					} catch (MalformedURLException ignored) {
 					}
 				}
 			}
@@ -264,10 +323,11 @@ public class DepotInstallation extends Depot {
 		this.status_installation.remove(version.mod.modid + " " + version.version);
 	}
 	
-	/** Importe les informations sur le status d'installation.
-	 *
-	 * Tous les status sont importés même si les mods ont disparus. Un mod pourrait ne pas être détecté ou ce serait
-	 * le résultat d'une mauvaise manipulation, la restauration de l'installation doit rester possible.
+	/**
+	 * Importe les informations sur le status d'installation.
+	 * <p>
+	 * Tous les status sont importés même si les mods ont disparus. Un mod pourrait ne pas être détecté ou ce serait le
+	 * résultat d'une mauvaise manipulation, la restauration de l'installation doit rester possible.
 	 */
 	public void statusImportation() {
 		File infos = dossier.resolve("mods").resolve(".mods.txt").toFile();

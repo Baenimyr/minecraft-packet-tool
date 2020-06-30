@@ -29,7 +29,6 @@ public class ModVersion {
 	/**
 	 * Mods, si présents, à charger avant celui-ci. Aucune intervalle de version n'est nécessaire.
 	 */
-	public final List<String>                   dependants   = new ArrayList<>(0);
 	public final List<String>                   alias        = new ArrayList<>(0);
 
     /*
@@ -70,14 +69,6 @@ public class ModVersion {
 		else this.requiredMods.put(modid, intervalle);
 	}
 	
-	/**
-	 * Ajoute un nouveau mod comme dépendant du mod actuel. Ajout sans doublons.
-	 */
-	public void ajoutDependant(String modid) {
-		modid = modid.toLowerCase().intern();
-		if (!this.dependants.contains(modid)) this.dependants.add(modid);
-	}
-	
 	public void ajoutAlias(String alias) {
 		if (!this.alias.contains(alias)) this.alias.add(alias);
 	}
@@ -89,8 +80,6 @@ public class ModVersion {
 		autre.requiredMods.forEach(this::ajoutModRequis);
 		for (URL url : autre.urls)
 			this.ajoutURL(url);
-		for (String dep : autre.dependants)
-			this.ajoutDependant(dep);
 		for (String alias : autre.alias)
 			this.ajoutAlias(alias);
 	}

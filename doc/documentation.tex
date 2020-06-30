@@ -4,7 +4,7 @@
 \usepackage[T1]{fontenc}
 \usepackage[margin=2cm]{geometry}
 \usepackage[french]{babel}
-\usepackage{hyperref}
+\usepackage[colorlinks=true]{hyperref}
 \usepackage{listings}
 
 
@@ -45,7 +45,7 @@ Pour ajouter une url vers un dépot distant utiliser la commande \texttt{add-rep
 Il existe différents format de dépôt distant, la plupart du temps la commande est capable de le détecter automatiquement.
 
 \textit{ForgeModsManager} peut installer et vérifier les mods dans un dossier minecraft.
-Pour les joueurs qui possèdent plusieurs installations pour différentes configuration (\textit{MultiMC}), le dossier utilisé par défaut est \textit{\$(USER\_HOME)/.minecraft} mais il peut être sélectionné manuellement avec l'option \texttt{--minecraft DOSSIER}.
+Pour les joueurs qui possèdent plusieurs installations pour différentes configuration (\textit{MultiMC}), le dossier utilisé par défaut est \textsf{\$(USER\_HOME)/.minecraft} mais il peut être sélectionné manuellement avec l'option \texttt{--minecraft DOSSIER}.
 
 \begin{code}
 	show list --minecraft $\sim$/.local/share/multimc/instances/INSTANCE/.minecraft
@@ -53,23 +53,23 @@ Pour les joueurs qui possèdent plusieurs installations pour différentes config
 
 \subsection{Dépendances}
 Les mods peuvent être reliés entre eux par une relation de dépendance.
-Les dépendances sont déclarées sous la forme \verb|required-after:modid@[min_version,max_version]| dans \verb|@Mod(String dependencies)| du code, ou dans le fichier \texttt{mcmod.info} dans le champs \texttt{dependencies}.
+Les dépendances sont déclarées sous la forme \verb|required-after:modid@[min_version,max_version]| dans \verb|@Mod(String dependencies)| du code, ou dans le fichier \texttt{mcmod.info} dans le champs \texttt{dependencies}\footnote{\url{https://mcforge.readthedocs.io/en/1.14.x/gettingstarted/structuring/}}.
 
-Une version est une suite d'entiers séparés par des points et définie une positions précise dans l'espace des versions.
+Une version\footnote{\url{https://semver.org/}} est une suite d'entiers séparés par des points et définie une positions précise dans l'espace des versions.
 Si une sous-version n'est pas spécifiée, elle est estimée à 0.
 La dépendance déclare un intervalle non vide de version demandée, lorsqu'une version spécifique est choisie l'intervalle sera alors de la forme [version, version].
-
-\paragraph{Rappel sur le format des intervalles}
-Un intervalle se situe entre deux points de l'espace des versions, ou être ouvert sur un côté.
-Si la borne n'est pas infinie, elle peut être incluse (\verb|[|) dans l'intervalle ou exclue (\verb|(|).
-\newline\textbf{Exemples}
-\verb|(3.45,)| est l'intervalle entre 3.45 exclue et $+\infty$.
-\verb|[5.23.8.256,5.23.9]| est l'intervalle entre 5.23.8.256 inclus et 5.23.9.0 inclus
 
 La dépendance vaut aussi pour la version de minecraft.
 Une version de minecraft est au moins spécifiée jusqu'au niveau 3 (ex: 1.12.2, 1.14.1, 1.14.2) alors que certains mods, surtout les librairies, sont compatibles pour tout un ensemble de version.
 Chaque version de mod déclare être compatible avec une version de minecraft, mais cette version sera interprétée comme un intervalle en regardant le nombre de sous versions significative ($\neq 0$).
-Par exemple \verb|1.12.2| devient \verb|[1.12.2, 1.12.3)| (1.12.2 inclus jusqu'à 1.12.3 exclus) alors que \verb|1.12| (pour \textit{codechickenlib}) devient \verb|[1.12, 1.13)|.
+Par exemple \verb|1.12.2| devient \verb|[1.12.2, 1.12.3)| (1.12.2 inclus jusqu'à 1.12.3 exclus) alors que \verb|1.12| devient \verb|[1.12, 1.13)|, ce qui inclut \verb|1.12.2| et \verb|1.12.4|.
+
+\paragraph{Rappel sur le format des intervalles}
+Un intervalle se situe entre deux points de l'espace des versions, ou être ouvert sur un côté.
+Si la borne n'est pas infinie, elle peut être incluse (\verb|[|) dans l'intervalle ou exclue (\verb|(|).
+\subparagraph{Exemples}
+\verb|(3.45,)| est l'intervalle entre 3.45 exclue et $+\infty$.
+\verb|[5.23.8.256,5.23.9]| est l'intervalle entre 5.23.8.256 inclus et 5.23.9.0 inclus
 
 %
 % ----------------------------------------
@@ -82,7 +82,7 @@ Les mods requis sont les mods choisis explicitement par l'utilisateur, alors que
 
 \subsection{Installation manuelle}
 \label{section:utilisation.manuelle}
-Lorsque l'utilisateur choisi d'installé un nouveau mod, ce mod est enregistré comme mod \textit{requis}.
+Lorsque l'utilisateur choisi d'installer un nouveau mod, ce mod est enregistré comme mod \textit{requis}.
 Puis les dépendances sont calculés à partir de tous les mods \textit{requis} de l'installation, si le nouveau mod est une version différente d'un mod présent, il le supplente.
 Enfin toutes les dépendances qui ne sont pas déjà satisfaite par l'installation actuelle sont téléchargées et installées.
 L'objectif est de limiter les changements, c'est pourquoi les mods présents ne sont pas mis à jour vers la version la plus récente compatible.
@@ -129,9 +129,11 @@ Le joueur peut sans problème compléter son installation avec d'autres mods, gr
 \subsection{Structure d'un dépôt}
 Un dépôt recense une liste de mods connus et les spécifications de ses versions.
 
-Les informations des mods mais indépendantes des versions sont sauvegardées dans le fichier \textit{Mods.json} à la racine du dépôt.
+Les informations des mods mais indépendantes des versions sont sauvegardées dans le fichier \textsf{Mods.json} à la racine du dépôt.
 Chaque clé est le modid du mod enregistré, le modid est sensé est universellement unique.
+La figure \ref{fig:Mods.json} montre le format du fichier \textsf{Mods.json}.
 
+\begin{figure}[h]
 \begin{verbatim}
 {
     "modid": {
@@ -142,14 +144,19 @@ Chaque clé est le modid du mod enregistré, le modid est sensé est universelle
     }
 }
 \end{verbatim}
+\caption{Description d'un mod \textit{modid} dans \textsf{Mods.json}}
+\label{fig:Mods.json}
+\end{figure}
 
-Pour chaque mod déclaré dans \textit{Mods.json}, il existe un fichier donnant toutes ses versions disponibles sous le nom \textit{m/modid/modid.json}.
+Pour chaque mod déclaré dans \textsf{Mods.json}, il existe un fichier donnant toutes ses versions disponibles sous le nom \textsf{m/modid.json}.
 Les mods sont regroupés dans des dossiers différents en fonction de la première lettre de leur modid.
 Le fichier de version donne pour chaque version, la liste des dépendances, la version minecraft associée, des urls pour le téléchargement et des noms de fichier que l'on sait être les mods.
 Il est préférable de spécifier plusieurs lien de téléchargement au cas où certains ne fonctionnerait plus.
+Cela donne la figure \ref{fig:cofhcore.json}
 
 \remarque Il est fortement déconseillé de donner des intervalles ouvertes pour les dépendances.
 
+\begin{figure}[h]
 \begin{verbatim}
 {
     "version": {
@@ -163,26 +170,33 @@ Il est préférable de spécifier plusieurs lien de téléchargement au cas où 
     }
 }
 \end{verbatim}
+\caption{Exemple de fichier \textsf{c/cofhcore.json}}
+\label{fig:cofhcore.json}
+\end{figure}
 
 Un url relatif sera considéré comme relatif à la racine du dépôt.
 C'est un bon moyen de diffuser les fichiers jar en les plaçant directement dans le dépôt.
 
-Pour les mods ne fournissant pas de fichier \textit{mcmod.info} valide, la liste des alias permet d'identifier les fichiers en donnant leur mod et leur version.
+Pour les mods ne fournissant pas de fichier \textsf{mcmod.info} ou \textsf{mods.toml} valide, la liste des alias permet d'identifier les fichiers en donnant leur mod et leur version.
 Cette méthode n'est pas idéale, mais généralement les fichiers ont des noms totalement uniques ou standards comme \verb|NOM-MCVERSION-VERSION-BUILD.jar|.
 
 \subsection{Dépôt local}
 \label{section:depot.local}
 Le dépôt local est une sauvegarde résumant toutes les informations récupérées sur les dépôt internet (voir section \ref{section:depot.internet}).
 Il permet toutes les fonctions standard sans à avoir à lire tous les dépôts disponibles.
-Par défaut, il se situe à \texttt{$\sim$/.minecraft/forgemods} mais le chemin d'accès est paramétrable avec l'option \texttt{--depot}.
+Par défaut, il se situe à \textsf{$\sim$/.minecraft/forgemods} mais le chemin d'accès est paramétrable avec l'option \texttt{--depot}.
 L'utilisation de cette option permet de construire et valider un dépôt qui sera ensuite publié sur internet.
 
 Le dépôt local peut également servir de cache pour les fichiers jar téléchargés.
-Sur demande explicite, les fichiers jar présents dans une installation et identifiés seront copiés dans la zone cache du dépôt et un url pointant vers les fichiers ajouté à la liste pour le téléchargement.
+Sur demande explicite, les fichiers jar présents dans une installation et identifiés seront copiés dans la zone cache du dépôt et un url pointant vers les fichiers ajoutés à la liste pour le téléchargement.
 Un fichier présent dans le cache sera préféré, au moment de l'installation, à un fichier devant être téléchargé.
 
-La commande \texttt{depot update} permet de mettre à jour le dépôt local à partir des dépôts internet (section \ref{section:depot.internet}).
-Pour cela, le dépôt est premièrement vidé puis les informations des dépôt sont \textit{fusionnées} entre elles: les urls et les alias sont accumulés sans doublons, si plusieurs intervalles de versions sont disponibles pour un même modid, seule l'intersection est conservée soit la restriction la plus sévère.
+\paragraph{Cache}
+Le dossier \textsf{./cache} permet de sauvegarder divers fichiers, notamment les fichiers jar pour les mettre immédiatement à portée.
+Par exemple le jar d'un mod \textit{Test} pourra être rangé à \textsf{./cache/t/Test-MCVERSION-VERSION.jar}.
+
+Le contenu du cache n'est pas synchronisé à partir des sources lors de la mise à jour.
+Ce dossier est réservé à l'usage du système local.
 
 \subsection{Dépôt d'installation}
 \label{section:depot.installation}
@@ -195,15 +209,22 @@ Si ces fichiers sont bien complétés, les fichiers détectés seront comptabili
 \subsubsection{Construction}
 Un dépôt internet n'est rien de plus qu'un des dépôts générés comme dépôt local (\ref{section:depot.local}), mais disponible sur internet.
 
-Un dépôt internet peut se présenté sous différents format: \texttt{dir} si l'url \textit{URL} est le chemin vers la racine du dépôt que les fichiers se trouvent aux urls \textit{URL/fichier.json}, \texttt{tar} si le dépôt a été placé dans un fichier tar et que l'url permet de lire directement le fichier au format tar.
+Un dépôt internet peut se présenté sous différents format: \texttt{dir} si l'url \textit{URL} est le chemin vers la racine du dépôt et que les fichiers se trouvent aux urls \textit{URL/fichier.json}, \texttt{tar} si le dépôt a été placé dans un fichier tar et que l'url permet de lire directement le fichier au format tar.
 
+\paragraph{Format tar}
+Le format tar permet de télécharger d'un seul coup tous les fichiers JSON du dépôt.
+Cependant, il est inutile d'y ajouter d'autres fichiers, en particulier le dossier cache.
+Le contenu du dossier cache sera lu indépendamment et seulement si nécessaire.
+
+\paragraph{Protocols}
 Les protocols de communication dépendent des capacités de la librairie standard, cependant les protocols http et https sont parfaitement fonctionnels tant que le serveur ne tente pas le \textit{Browser Integrity Check}.
 
 \subsubsection{Téléchargement}
 Au moment de la mise à jour du dépôt local, chaque dépôt internet déclaré dans la liste des sources est contacté et lu intégralement.
-Tous les mods déclarés dans \textit{Mods.json} du dépot doivent mener à un fichier contenant les informations de versions.
+Tous les mods déclarés dans \textsf{Mods.json} du dépot doivent mener à un fichier contenant les informations de versions.
 
-\remarque Le format tar est bien plus efficace pour la lecture car il évite l'ouverture d'une connexion pour chaque fichier: le dépôt est téléchargé entièrement en une fois puis lu depuis la mémoire vive.
+La commande \texttt{depot update} permet de mettre à jour le dépôt local à partir des dépôts internet (section \ref{section:depot.internet}).
+Pour cela, le dépôt est premièrement vidé puis les informations des dépôt sont \textit{fusionnées} entre elles: les urls et les alias sont accumulés sans doublons, si plusieurs intervalles de versions sont disponibles pour un même modid, seule l'intersection est conservée soit la restriction la plus sévère.
 
 %
 % ----------------------------------------

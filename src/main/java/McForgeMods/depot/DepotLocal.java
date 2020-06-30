@@ -11,6 +11,7 @@ import org.json.JSONTokener;
 
 import java.io.*;
 import java.net.MalformedURLException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Path;
 import java.util.*;
@@ -78,7 +79,7 @@ public class DepotLocal extends Depot {
 	}
 	
 	private File fichierModDepot(String modid) {
-		return dossier.resolve(modid.substring(0, 1)).resolve(modid).resolve(modid + ".json").toFile();
+		return dossier.resolve(modid.substring(0, 1)).resolve(modid + ".json").toFile();
 	}
 	
 	/**
@@ -169,7 +170,7 @@ public class DepotLocal extends Depot {
 						}
 				} else {
 					try {
-						mv.ajoutURL(new URL(json.getString("urls")));
+						mv.ajoutURL(new URL(this.dossier.toUri().toURL(), json.getString("urls")));
 					} catch (MalformedURLException u) {
 						u.printStackTrace();
 					}
@@ -181,13 +182,6 @@ public class DepotLocal extends Depot {
 				for (Map.Entry<String, VersionIntervalle> dependances : VersionIntervalle.lectureDependances(liste)
 						.entrySet())
 					mv.ajoutModRequis(dependances.getKey(), dependances.getValue());
-			}
-			
-			if (json.has("dependants")) {
-				JSONArray liste = json.getJSONArray("dependants");
-				for (int i = 0; i < liste.length(); i++) {
-					mv.ajoutDependant(liste.getString(i));
-				}
 			}
 			
 			if (json.has("alias")) {
@@ -265,18 +259,22 @@ public class DepotLocal extends Depot {
 		for (ModVersion mv : this.mod_version.get(mod)) {
 			JSONObject json = new JSONObject();
 			mv.urls.sort(Comparator.comparing(URL::toString));
-			mv.dependants.sort(String::compareTo);
 			mv.alias.sort(String::compareTo);
 			
 			json.put("mcversion", mv.mcversion.toStringMinimal());
 			
 			JSONArray urls = new JSONArray();
 			for (URL url : mv.urls) {
-				if (url.getProtocol().equals("file") && url.getHost().isEmpty()) {
-					Path path = Path.of(url.getPath());
-					if (path.startsWith(this.dossier)) urls.put(this.dossier.relativize(path));
-					else urls.put(url.toString());
-				} else urls.put(url.toString());
+				if (url.getProtocol().equals("file")) {
+					try {
+						Path path = Path.of(url.toURI().getPath());
+						if (path.startsWith(this.dossier)) {
+							urls.put(this.dossier.relativize(path));
+							continue;
+						}
+					} catch (URISyntaxException ignored) {}
+				}
+				urls.put(url.toString());
 			}
 			json.put("urls", urls);
 			
@@ -285,7 +283,6 @@ public class DepotLocal extends Depot {
 					.map(e -> e.getValue() != null ? e.getKey() + "@" + e.getValue() : e.getKey()).forEach(liste::put);
 			json.put("requiredMods", liste);
 			
-			json.put("dependants", new JSONArray(mv.dependants));
 			json.put("alias", new JSONArray(mv.alias));
 			json_total.put(mv.version.toString(), json);
 		}
@@ -305,7 +302,6 @@ public class DepotLocal extends Depot {
 			for (ModVersion modVersion : this.getModVersions(modid)) {
 				modVersion.urls.removeIf(url -> !url.getProtocol().equals("file"));
 				modVersion.requiredMods.clear();
-				modVersion.dependants.clear();
 				modVersion.alias.clear();
 			}
 			
