@@ -79,6 +79,8 @@ public class CommandeListe implements Callable<Integer> {
 					System.out.println();
 				}
 			}
+			
+			depotInstallation.close();
 			return 0;
 		}
 	}

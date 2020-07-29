@@ -170,6 +170,7 @@ public class CommandeDepot implements Runnable {
 				}
 			}
 			System.out.println(String.format("%d versions importées.", importation.size()));
+			installation.close();
 			
 			try {
 				depot.sauvegarde();

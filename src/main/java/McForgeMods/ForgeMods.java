@@ -196,6 +196,8 @@ public class ForgeMods implements Runnable {
 		for (String dep : modids) {
 			System.out.println(dep + " " + liste.get(dep));
 		}
+		
+		depotInstallation.close();
 		return 0;
 	}
 	
