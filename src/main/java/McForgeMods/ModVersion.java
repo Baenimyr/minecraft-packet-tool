@@ -13,8 +13,8 @@ import java.util.*;
  * @see Mod
  */
 public class ModVersion {
-	public final Mod     mod;
-	public final Version version;
+	public final String            modid;
+	public final Version           version;
 	public final VersionIntervalle mcversion;
 	
 	/**
@@ -38,8 +38,8 @@ public class ModVersion {
     List<String> screenshots;
      */
 	
-	public ModVersion(Mod mod, Version version, VersionIntervalle mcversion) {
-		this.mod = mod;
+	public ModVersion(String modid, Version version, VersionIntervalle mcversion) {
+		this.modid = modid.intern();
 		this.version = version;
 		this.mcversion = mcversion;
 	}
@@ -89,21 +89,21 @@ public class ModVersion {
 		if (this == o) return true;
 		if (o == null || getClass() != o.getClass()) return false;
 		ModVersion that = (ModVersion) o;
-		return mod.equals(that.mod) && version.equals(that.version);
+		return modid.equals(that.modid) && version.equals(that.version);
 	}
 	
 	@Override
 	public int hashCode() {
-		return Objects.hash(mod, version);
+		return Objects.hash(modid, version);
 	}
 	
 	@Override
 	public String toString() {
-		return String.format("'%s' %s %s", mod.name, version, mcversion);
+		return String.format("'%s' %s %s", modid, version, mcversion);
 	}
 	
 	public String toStringStandard() {
-		return String.format("%s-%s-%s", mod.modid, mcversion.toStringMinimal(), version);
+		return String.format("%s-%s-%s", modid, mcversion.toStringMinimal(), version);
 	}
 	
 	/** Dossier dans lequel placer les fichiers lorsque le mod est installé.

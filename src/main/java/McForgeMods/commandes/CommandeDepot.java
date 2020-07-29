@@ -4,6 +4,7 @@ import McForgeMods.ForgeMods;
 import McForgeMods.ModVersion;
 import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.ArbreDependance;
+import McForgeMods.depot.ArchiveMod;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
 import org.json.JSONException;
@@ -140,10 +141,12 @@ public class CommandeDepot implements Runnable {
 					final File fichier = new File(modid);
 					if (fichier.exists()) {
 						try {
-							Optional<ModVersion> mod = DepotInstallation.importationJar(fichier);
-							URL url = fichier.toURI().toURL();
-							mod.ifPresent(mv -> mv.urls.add(url));
-							mod.ifPresent(importation::add);
+							ArchiveMod mod = ArchiveMod.importationJar(fichier);
+							if (mod.modVersion != null) {
+								URL url = fichier.toURI().toURL();
+								mod.modVersion.urls.add(url);
+								importation.add(mod.modVersion);
+							}
 						} catch (IOException i) {
 							i.printStackTrace();
 						}
@@ -159,10 +162,7 @@ public class CommandeDepot implements Runnable {
 			}
 			
 			for (ModVersion version_client : importation) {
-				final ModVersion reelle = depot.ajoutModVersion(
-						new ModVersion(depot.ajoutMod(version_client.mod), version_client.version,
-								version_client.mcversion));
-				reelle.fusion(version_client);
+				final ModVersion reelle = depot.ajoutModVersion(version_client);
 				reelle.urls.removeIf(url -> url.getProtocol().equals("file"));
 				
 				if (include_file) {
@@ -193,14 +193,14 @@ public class CommandeDepot implements Runnable {
 					Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING);
 					
 					Optional<ModVersion> version_depot = depot
-							.getModVersion(depot.getMod(version.mod.modid), version.version);
+							.getModVersion(depot.getMod(version.modid), version.version);
 					if (version_depot.isPresent()) version_depot.get().ajoutURL(destination.toUri().toURL());
 				} catch (IOException | URISyntaxException e) {
 					System.err.println(String.format("Impossible de copier le fichier '%s'!", fichier.get()));
 				}
 			} else {
 				System.err.println(
-						String.format("Aucun fichier à copier pour le mod %s=%s", version.mod.modid, version.version));
+						String.format("Aucun fichier à copier pour le mod %s=%s", version.modid, version.version));
 			}
 		}
 	}

@@ -118,7 +118,7 @@ public class CommandeInstall implements Callable<Integer> {
 			for (ModVersion mversion : depotInstallation.getModVersions(modid)) {
 				if (mversion.mcversion.englobe(mcversion)
 						&& depotInstallation.statusMod(mversion) != DepotInstallation.StatusInstallation.AUTO
-						&& !arbre_dependances.listeModids().contains(mversion.mod.modid)) {
+						&& !arbre_dependances.listeModids().contains(mversion.modid)) {
 					// seulement les choix utilisateur les plus récents
 					arbre_dependances.ajoutMod(mversion);
 				}
@@ -172,7 +172,7 @@ public class CommandeInstall implements Callable<Integer> {
 		if (installations.size() != 0) {
 			System.out.println("Installation des nouveaux mods:");
 			StringJoiner joiner = new StringJoiner(", ");
-			installations.forEach(mv -> joiner.add(mv.mod.modid + "=" + mv.version));
+			installations.forEach(mv -> joiner.add(mv.modid + "=" + mv.version));
 			System.out.println(joiner.toString());
 		} else {
 			System.out.println("Pas de nouveaux mods à télécharger.");
@@ -181,8 +181,9 @@ public class CommandeInstall implements Callable<Integer> {
 		
 		if (!dry_run) {
 			for (ModVersion mversion : installations)
-				depotInstallation.installation(mversion, installation_manuelle.contains(mversion.mod.modid)
-						? DepotInstallation.StatusInstallation.MANUELLE : DepotInstallation.StatusInstallation.AUTO);
+				depotInstallation.installation(mversion,
+						installation_manuelle.contains(mversion.modid) ? DepotInstallation.StatusInstallation.MANUELLE
+								: DepotInstallation.StatusInstallation.AUTO);
 			depotInstallation.statusSauvegarde();
 			// Déclenche le téléchargement des mods
 			return telechargementMods(installations, depotInstallation);
@@ -250,7 +251,7 @@ public class CommandeInstall implements Callable<Integer> {
 				try {
 					Files.copy(source, cible);
 					synchronized (System.out) {
-						System.out.println(String.format("%-20s %-20s OK", modVersion.mod.modid, modVersion.version));
+						System.out.println(String.format("%-20s %-20s OK", modVersion.modid, modVersion.version));
 					}
 					return true;
 				} catch (IOException ignored) {
@@ -289,9 +290,8 @@ public class CommandeInstall implements Callable<Integer> {
 					long taille = telechargement.telechargement();
 					if (taille == 0) continue;
 					synchronized (System.out) {
-						System.out.println(
-								String.format("%-20s %-20s %.1f Ko", modVersion.mod.modid, modVersion.version,
-										(float) telechargement.telecharge / 1024));
+						System.out.println(String.format("%-20s %-20s %.1f Ko", modVersion.modid, modVersion.version,
+								(float) telechargement.telecharge / 1024));
 					}
 					return true;
 				} catch (IOException io) {
