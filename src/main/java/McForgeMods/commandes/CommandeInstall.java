@@ -358,8 +358,10 @@ public class CommandeInstall implements Callable<Integer> {
 		
 		private void validation() {
 			synchronized (this.minecraft) {
-				this.minecraft.installations.get(modVersion.modid).fichier = this.minecraft.dossier
-						.relativize(this.cible).toString();
+				this.minecraft.installations.stream()
+						.filter(i -> i.modid.equals(modVersion.modid) && i.version.equals(modVersion.version))
+						.findFirst()
+						.ifPresent(i -> i.fichier = this.minecraft.dossier.relativize(this.cible).toString());
 			}
 			this.suppressionAncienne();
 		}

@@ -12,9 +12,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -28,12 +26,12 @@ import java.util.stream.Collectors;
  * détecter cette erreur.
  */
 public class DepotInstallation extends Depot implements Closeable {
-	public final Path                      dossier;
-	public final Map<String, Installation> installations = new HashMap<>();
+	public final Path               dossier;
+	public final List<Installation> installations = new ArrayList<>();
 	/**
 	 * Version de minecraft pour l'installation.
 	 */
-	public       Version                   mcversion     = null;
+	public       Version            mcversion     = null;
 	
 	
 	/**
@@ -131,14 +129,14 @@ public class DepotInstallation extends Depot implements Closeable {
 				this.ajoutModVersion(modVersion);
 				
 				Installation installation;
-				if (this.installations.containsKey(modVersion.modid)) {
-					installation = this.installations.get(modVersion.modid);
-				} else {
+				Optional<Installation> present = this.installations.stream()
+						.filter(i -> i.modid.equals(modVersion.modid) && i.version.equals(modVersion.version))
+						.findFirst();
+				if (present.isEmpty()) {
 					installation = new Installation(modVersion.modid, modVersion.version);
 					installation.status = StatusInstallation.MANUELLE;
-					installation.fichier = this.dossier.relativize(resultat.fichier.toPath()).toString();
-					this.installations.put(installation.modid, installation);
-				}
+					this.installations.add(installation);
+				} else installation = present.get();
 				installation.fichier = dossier.resolve("mods").relativize(Path.of(resultat.fichier.getAbsolutePath()))
 						.toString();
 			} catch (MalformedURLException mue) {
@@ -155,7 +153,9 @@ public class DepotInstallation extends Depot implements Closeable {
 	 * manuel, les fichiers déjà présents peuvent être mise à jour mais pas supprimés.
 	 */
 	public StatusInstallation statusMod(ModVersion version) {
-		if (this.installations.containsKey(version.modid)) return this.installations.get(version.modid).status;
+		Optional<Installation> installation = this.installations.stream()
+				.filter(i -> i.modid.equals(version.modid) && i.version.equals(version.version)).findFirst();
+		if (installation.isPresent()) return installation.get().status;
 		return StatusInstallation.MANUELLE;
 	}
 	
@@ -163,12 +163,14 @@ public class DepotInstallation extends Depot implements Closeable {
 	 * Change le status associé à une version de mod.
 	 */
 	public void statusChange(ModVersion version, StatusInstallation status) {
-		if (this.installations.containsKey(version.modid)) {
-			this.installations.get(version.modid).status = status;
+		Optional<Installation> installation = this.installations.stream()
+				.filter(i -> i.modid.equals(version.modid) && i.version.equals(version.version)).findFirst();
+		if (installation.isPresent()) {
+			installation.get().status = status;
 		} else {
 			Installation i = new Installation(version);
 			i.status = status;
-			this.installations.put(i.modid, i);
+			this.installations.add(i);
 		}
 	}
 	
@@ -176,7 +178,7 @@ public class DepotInstallation extends Depot implements Closeable {
 	 * Efface le status associé à une version de mod.
 	 */
 	public void statusSuppression(ModVersion version) {
-		this.installations.remove(version.modid);
+		this.installations.removeIf(i -> i.modid.equals(version.modid) && i.version.equals(version.version));
 	}
 	
 	/**
@@ -202,19 +204,19 @@ public class DepotInstallation extends Depot implements Closeable {
 				if (MODS != null) {
 					for (String modid : MODS.keySet()) {
 						JSONObject INFOS = MODS.getJSONObject(modid);
-						Installation ins;
-						// TODO: vérifier version
-						if (this.installations.containsKey(modid)) ins = this.installations.get(modid);
-						else {
-							ins = new Installation(modid.intern(), Version.read(INFOS.getString("version")));
-							this.installations.put(modid.intern(), ins);
+						final Version version = Version.read(INFOS.getString("version"));
+						Optional<Installation> ins = this.installations.stream()
+								.filter(i -> i.modid.equals(modid) && i.version.equals(version)).findFirst();
+						if (ins.isEmpty()) {
+							ins = Optional.of(new Installation(modid.intern(), version));
+							this.installations.add(ins.get());
 						}
 						
-						ins.fichier = INFOS.getString("fichier");
+						ins.get().fichier = INFOS.getString("fichier");
 						String mode = INFOS.getString("mode");
-						if (mode.equalsIgnoreCase("auto")) ins.status = StatusInstallation.AUTO;
-						else if (mode.equalsIgnoreCase("verrouille")) ins.status = StatusInstallation.VERROUILLE;
-						else ins.status = StatusInstallation.MANUELLE;
+						if (mode.equalsIgnoreCase("auto")) ins.get().status = StatusInstallation.AUTO;
+						else if (mode.equalsIgnoreCase("verrouille")) ins.get().status = StatusInstallation.VERROUILLE;
+						else ins.get().status = StatusInstallation.MANUELLE;
 					}
 				}
 			} catch (IOException io) {
@@ -233,7 +235,7 @@ public class DepotInstallation extends Depot implements Closeable {
 			data.put("minecraft", minecraft);
 			
 			JSONObject MODS = new JSONObject();
-			for (Installation i : this.installations.values()) {
+			for (Installation i : this.installations) {
 				Map<String, Object> INFOS = new HashMap<>();
 				INFOS.put("version", i.version.toString());
 				INFOS.put("fichier", i.fichier);
@@ -288,13 +290,27 @@ public class DepotInstallation extends Depot implements Closeable {
 		public       String             fichier;
 		
 		public Installation(String modid, Version version) {
+			Objects.requireNonNull(modid);
+			Objects.requireNonNull(version);
 			this.modid = modid.intern();
 			this.version = version;
 		}
 		
 		public Installation(ModVersion modVersion) {
-			this.modid = modVersion.modid;
-			this.version = modVersion.version;
+			this(modVersion.modid, modVersion.version);
+		}
+		
+		@Override
+		public boolean equals(Object o) {
+			if (this == o) return true;
+			if (o == null || getClass() != o.getClass()) return false;
+			Installation that = (Installation) o;
+			return modid.equals(that.modid) && version.equals(that.version);
+		}
+		
+		@Override
+		public int hashCode() {
+			return Objects.hash(modid, version);
 		}
 	}
 }
