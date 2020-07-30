@@ -10,6 +10,8 @@ import McForgeMods.outils.TelechargementHttp;
 import picocli.CommandLine;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
@@ -76,8 +78,8 @@ public class CommandeInstall implements Callable<Integer> {
 		final ArbreDependance arbre_dependances = new ArbreDependance();
 		final List<String> installation_manuelle = new ArrayList<>();
 		
-		VersionIntervalle mcversion = this.mcversion != null ? VersionIntervalle.read(this.mcversion)
-				: VersionIntervalle.ouvert();
+		VersionIntervalle mcversion =
+				this.mcversion != null ? VersionIntervalle.read(this.mcversion) : VersionIntervalle.ouvert();
 		arbre_dependances.mcversion.intersection(mcversion);
 		
 		try {
@@ -171,11 +173,12 @@ public class CommandeInstall implements Callable<Integer> {
 		
 		if (installations.size() != 0) {
 			System.out.println("Installation des nouveaux mods:");
-			StringJoiner joiner = new StringJoiner(", ");
+			StringJoiner joiner = new StringJoiner(" ");
 			installations.forEach(mv -> joiner.add(mv.modid + "=" + mv.version));
-			System.out.println(joiner.toString());
+			System.out.println("\t" + joiner.toString());
 		} else {
 			System.out.println("Pas de nouveaux mods à télécharger.");
+			depotInstallation.close();
 			return 0;
 		}
 		
@@ -184,10 +187,11 @@ public class CommandeInstall implements Callable<Integer> {
 				depotInstallation.installation(mversion,
 						installation_manuelle.contains(mversion.modid) ? DepotInstallation.StatusInstallation.MANUELLE
 								: DepotInstallation.StatusInstallation.AUTO);
-			depotInstallation.statusSauvegarde();
 			// Déclenche le téléchargement des mods
-			return telechargementMods(installations, depotInstallation);
-		}
+			int retour = telechargementMods(installations, depotInstallation, depotLocal);
+			depotInstallation.close();
+			return retour;
+		} else depotInstallation.close();
 		return 0;
 	}
 	
@@ -201,42 +205,74 @@ public class CommandeInstall implements Callable<Integer> {
 	 * @param depotInstallation: dépôt lié à l'installation
 	 * @return 0 si tout s'est bien passé.
 	 */
-	private int telechargementMods(Collection<ModVersion> installations, final DepotInstallation depotInstallation) {
+	private int telechargementMods(Collection<ModVersion> installations, final DepotInstallation depotInstallation,
+			final DepotLocal depotLocal) {
 		
-		final List<TelechargementMod> telechargements = installations.stream()
-				.map(modVersion -> new TelechargementMod(modVersion, depotInstallation)).collect(Collectors.toList());
+		final List<InstallationMod> telechargements = installations.stream()
+				.map(modVersion -> new InstallationMod(modVersion, depotInstallation, depotLocal))
+				.collect(Collectors.toList());
 		
-		final Map<TelechargementMod, Future<Boolean>> tasks = new LinkedHashMap<>();
-		telechargements.forEach(t -> tasks.put(t, executor.submit(t)));
-		for (Map.Entry<TelechargementMod, Future<Boolean>> task : tasks.entrySet()) {
-			final TelechargementMod tele = task.getKey();
-			final Future<Boolean> future = task.getValue();
-			try {
-				if (future.get()) {
-					depotInstallation.suppressionConflits(tele.modVersion);
+		try {
+			List<Future<Void>> futures = executor.invokeAll(telechargements);
+			for (int i = 0; i < telechargements.size(); i++) {
+				final InstallationMod tele = telechargements.get(i);
+				final Future<Void> future = futures.get(i);
+				try {
+					future.get();
+				} catch (ExecutionException | InterruptedException erreur) {
+					// System.err.println(String.format("Erreur téléchargement de '%s': %s", tele.modVersion, erreur.getMessage()));
+					// erreur.printStackTrace(System.err);
 				}
-			} catch (ExecutionException | InterruptedException erreur) {
-				System.err.println(
-						String.format("Erreur téléchargement de '%s': %s", tele.modVersion, erreur.getMessage()));
-				// erreur.printStackTrace(System.err);
 			}
+		} catch (InterruptedException ie) {
+			return -1;
 		}
 		return 0;
 	}
 	
-	private static class TelechargementMod implements Callable<Boolean> {
+	/**
+	 * Suite d'instructions pour installer un mod. Il faut le télécharger, vérifier l'intégrité du fichier puis
+	 * enregistrer la nouvelle installation et enfin supprimer les versions obsolètes.
+	 */
+	private static class InstallationMod implements Callable<Void> {
+		final DepotLocal        local;
 		final ModVersion        modVersion;
 		final DepotInstallation minecraft;
+		Executor executor;
+		private Path cible = null;
 		
-		TelechargementMod(ModVersion modVersion, DepotInstallation minecraft) {
+		InstallationMod(ModVersion modVersion, DepotInstallation minecraft, DepotLocal local) {
 			this.modVersion = modVersion;
 			this.minecraft = minecraft;
+			this.local = local;
 		}
 		
-		@Override
-		public Boolean call() throws Exception {
+		/**
+		 * Change le nom du fichier de destination. Le fichier jar peut avoir n'importe quel nom et le recupère
+		 * généralement le meme que le fichier source.
+		 *
+		 * @param nom: nom du fichier, ne doit pas contenir de caractères comme '/'.
+		 */
+		private void renommerFichier(String nom) {
+			this.cible = modVersion.dossierInstallation(minecraft.dossier).resolve(nom);
+		}
+		
+		/**
+		 * Trouve un téléchargement et récupère le fichier. Tente tous les fichiers locaux possibles, principalement des
+		 * fichiers en cache à partir d'alias connus, puis les téléchargements http. Une requete HEAD est d'abord
+		 * envoyée afin de déterminer le nom et la taille du fichier, avant de télécharger le fichier.
+		 *
+		 * @return {@code true} en cas de succès.
+		 */
+		private boolean telechargement() throws IOException {
 			List<URL> fichiers = modVersion.urls.stream().filter(url -> url.getProtocol().equals("file"))
 					.collect(Collectors.toList());
+			// Ajoute les fichiers éventuellement dans le cache
+			for (String alias : modVersion.alias)
+				try {
+					fichiers.add(local.dossierCache(modVersion).resolve(alias).toUri().toURL());
+				} catch (MalformedURLException ignored) {
+				}
 			List<URL> http = modVersion.urls.stream()
 					.filter(url -> url.getProtocol().equals("http") || url.getProtocol().equals("https"))
 					.collect(Collectors.toList());
@@ -245,16 +281,16 @@ public class CommandeInstall implements Callable<Integer> {
 			
 			// Tentative de copie de fichier
 			for (URL url : fichiers) {
-				Path source = Path.of(url.getPath());
-				Path cible = modVersion.dossierInstallation(minecraft.dossier).resolve(source.getFileName());
-				
 				try {
+					Path source = Path.of(url.toURI().getPath());
+					if (!source.toFile().exists()) continue;
+					this.renommerFichier(source.getFileName().toString());
 					Files.copy(source, cible);
 					synchronized (System.out) {
 						System.out.println(String.format("%-20s %-20s OK", modVersion.modid, modVersion.version));
 					}
 					return true;
-				} catch (IOException ignored) {
+				} catch (URISyntaxException | IOException ignored) {
 				}
 			}
 			
@@ -279,8 +315,8 @@ public class CommandeInstall implements Callable<Integer> {
 					for (String info : content) {
 						Matcher m = filename.matcher(info);
 						if (m.find()) {
-							telechargement.fichier = modVersion.dossierInstallation(minecraft.dossier)
-									.resolve(m.group(1)).toFile();
+							this.renommerFichier(m.group(1));
+							telechargement.fichier = this.cible.toFile();
 							System.out.println(
 									"[Telechargement] [DEBUG] nouveau nom : " + telechargement.fichier.getName());
 							break;
@@ -294,14 +330,41 @@ public class CommandeInstall implements Callable<Integer> {
 								(float) telechargement.telecharge / 1024));
 					}
 					return true;
+				} catch (URISyntaxException | InterruptedException ignored) {
 				} catch (IOException io) {
-					System.err.println(io.getClass() + ":" + io.getMessage());
-					io.printStackTrace();
+					System.err.println(String.format("Impossible de contacter '%s'", url));
 				}
 			}
 			
 			System.err.println(String.format("Téléchargement échoué de %s", modVersion));
 			return false;
+		}
+		
+		private void verification() {
+			if (cible.toFile().exists()) this.validation();
+		}
+		
+		private void validation() {
+			synchronized (this.minecraft) {
+				this.minecraft.installations.get(modVersion.modid).fichier = this.minecraft.dossier
+						.relativize(this.cible).toString();
+			}
+			this.suppressionAncienne();
+		}
+		
+		/**
+		 * Supprime les anciennes versions.
+		 */
+		private void suppressionAncienne() {
+			synchronized (this.minecraft) {
+				this.minecraft.suppressionConflits(this.modVersion);
+			}
+		}
+		
+		@Override
+		public Void call() throws Exception {
+			if (this.telechargement()) this.verification();
+			return null;
 		}
 	}
 }

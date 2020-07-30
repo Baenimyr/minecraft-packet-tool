@@ -159,6 +159,7 @@ public class DepotInstallation extends Depot implements Closeable {
 							} else {
 								installation = new Installation(modVersion.modid, modVersion.version);
 								installation.status = StatusInstallation.MANUELLE;
+								installation.fichier = this.dossier.relativize(f.toPath()).toString();
 								this.installations.put(installation.modid, installation);
 							}
 							installation.fichier = dossier.resolve("mods").relativize(Path.of(f.getAbsolutePath()))
@@ -232,7 +233,10 @@ public class DepotInstallation extends Depot implements Closeable {
 						}
 						
 						ins.fichier = INFOS.getString("fichier");
-						ins.status = StatusInstallation.valueOf(INFOS.getString("mode"));
+						String mode = INFOS.getString("mode");
+						if (mode.equalsIgnoreCase("auto")) ins.status = StatusInstallation.AUTO;
+						else if (mode.equalsIgnoreCase("verrouille")) ins.status = StatusInstallation.VERROUILLE;
+						else ins.status = StatusInstallation.MANUELLE;
 					}
 				}
 			} catch (IOException io) {

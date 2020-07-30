@@ -272,6 +272,23 @@ Dans le dossier d'installation, se trouve le fichier de sauvegarde sous la forme
 La section "minecraft" contient les informations sur l'installation actuelle, avec la version de minecraft à utiliser.
 La section "mods" contient la configuration de tous les mods installés.
 
+\subsection{Téléchargement}
+Un mod a été choisi pour être téléchargé et placé dans le dossier \textit{MINECRAFT}.
+La suppression des anciennes versions doit être fait en dernier pour conserver l'installation actuelle en cas d'échec.
+
+\begin{enumerate}
+    \item Identifier une source valide pour le mod.
+Pour les téléchargements http, il s'agit d'envoyer une requête \texttt{HEAD}.
+Les fichiers sur le système de fichier (en cache) doivent être vérifié avec \texttt{File.exists}.
+    \item Récupérer le fichier.
+Le fichier est téléchargé/copier dans le dossier \textit{MINECRAFT}.
+    \item Vérifier le fichier.
+L'intégrité du fichier doit être vérifiée, soit par la taille, mais préférentiellement par le hachage.
+    \item Enregistrer dans le dossier d'installation que le mod est bien présent.
+\end{enumerate}
+
+Les 3 premières opérations peuvent être réalisées en parallèle pour optimiser l'attente réseau.
+
 \subsection{Système de fichier}
 Ce programme n'est conçu que pour écrire les fichiers dans le système de fichier actuel.
 Pour réaliser une installation de mod sur un serveur distant, il est possible de monter un dossier ftp dans le système de fichier ou exécuter le programme sur la machine distante, à condition qu'elle le puisse.

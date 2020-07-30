@@ -192,9 +192,9 @@ public class CommandeDepot implements Runnable {
 					destination.getParent().toFile().mkdirs();
 					Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING);
 					
-					Optional<ModVersion> version_depot = depot
-							.getModVersion(depot.getMod(version.modid), version.version);
-					if (version_depot.isPresent()) version_depot.get().ajoutURL(destination.toUri().toURL());
+					//Optional<ModVersion> version_depot = depot
+					//		.getModVersion(depot.getMod(version.modid), version.version);
+					//if (version_depot.isPresent()) version_depot.get().ajoutURL(destination.toUri().toURL());
 				} catch (IOException | URISyntaxException e) {
 					System.err.println(String.format("Impossible de copier le fichier '%s'!", fichier.get()));
 				}
