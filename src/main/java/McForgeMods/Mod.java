@@ -17,10 +17,13 @@ public class Mod implements Comparable<Mod> {
 	public       String updateJSON  = null;
 	
 	public Mod(String modid) {
+		Objects.requireNonNull(modid);
 		this.modid = modid.toLowerCase().intern();
 	}
 	
 	public Mod(String modid, String name) {
+		Objects.requireNonNull(modid);
+		Objects.requireNonNull(name);
 		this.modid = modid.toLowerCase().intern();
 		this.name = name;
 	}

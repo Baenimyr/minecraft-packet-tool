@@ -2,6 +2,7 @@ package McForgeMods.commandes;
 
 import McForgeMods.ForgeMods;
 import McForgeMods.ModVersion;
+import McForgeMods.Version;
 import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.ArbreDependance;
 import McForgeMods.depot.DepotInstallation;
@@ -48,7 +49,7 @@ public class CommandeInstall implements Callable<Integer> {
 	@CommandLine.Mixin
 	ForgeMods.DossiersOptions dossiers;
 	
-	@CommandLine.Option(names = {"-mc", "--mcversion"}, required = true)
+	@CommandLine.Option(names = {"-mc", "--mcversion"})
 	String mcversion;
 	
 	@CommandLine.Option(names = {"--no-dependencies"}, negatable = true, descriptionKey = "dependencies")
@@ -78,10 +79,6 @@ public class CommandeInstall implements Callable<Integer> {
 		final ArbreDependance arbre_dependances = new ArbreDependance();
 		final List<String> installation_manuelle = new ArrayList<>();
 		
-		VersionIntervalle mcversion =
-				this.mcversion != null ? VersionIntervalle.read(this.mcversion) : VersionIntervalle.ouvert();
-		arbre_dependances.mcversion.intersection(mcversion);
-		
 		try {
 			depotLocal.importation();
 			depotInstallation.analyseDossier(depotLocal);
@@ -89,6 +86,21 @@ public class CommandeInstall implements Callable<Integer> {
 			System.err.println("[ERROR] Erreur de lecture du dépot !");
 			return 1;
 		}
+		
+		if (this.mcversion != null) {
+			if (depotInstallation.mcversion == null) depotInstallation.mcversion = Version.read(this.mcversion);
+			else if (!depotInstallation.mcversion.equals(Version.read(this.mcversion))) {
+				System.err.println("[ERROR] Il est impossible de changer la version de minecraft ici.");
+				return 1;
+			}
+		} else if (depotInstallation.mcversion == null) {
+			System.err.println(
+					"Aucune version de minecraft spécifiée. Veuillez compléter l'option -mc une première fois.");
+			return 1;
+		}
+		final VersionIntervalle mcversion = new VersionIntervalle(depotInstallation.mcversion,
+				depotInstallation.mcversion.precision());
+		arbre_dependances.mcversion.intersection(mcversion);
 		
 		final Map<String, VersionIntervalle> demandes;
 		try {
