@@ -5,14 +5,12 @@ import McForgeMods.ModVersion;
 import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.ArbreDependance;
 import McForgeMods.depot.ArchiveMod;
-import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
 import org.json.JSONException;
 import picocli.CommandLine;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -25,7 +23,7 @@ import java.util.concurrent.Callable;
  * modifier les données.
  * <p>
  * Elle permet la lecture/ecriture des attributs des informations sauvegardées dans le dépot. La sous-commande
- * <i>import</i> associé avec une installation minecraft récupère les informations directement dans les
+ * <i>import</i> associée avec une installation minecraft récupère les informations directement dans les
  * <i>mcmod.info</i> des fichiers jar trouvés.
  */
 @CommandLine.Command(name = "depot", subcommands = {CommandeDepot.importation.class, CommandeUpdate.class},
@@ -105,9 +103,9 @@ public class CommandeDepot implements Runnable {
 	@CommandLine.Command(name = "import")
 	static class importation implements Callable<Integer> {
 		@CommandLine.Parameters(index = "0", arity = "0..*", paramLabel = "modid", descriptionKey = "modids")
-		String[] modids;
+		List<String> modids;
 		@CommandLine.Option(names = {"-a", "--all"}, defaultValue = "false")
-		boolean  all;
+		boolean      all;
 		@CommandLine.Option(names = {"-i", "--include-files"}, defaultValue = "false", descriptionKey = "include")
 		boolean  include_file;
 		
@@ -125,34 +123,29 @@ public class CommandeDepot implements Runnable {
 						i.getClass().getSimpleName(), i.getMessage()));
 				return 1;
 			}
-			DepotInstallation installation = new DepotInstallation(dossiers.minecraft);
-			installation.analyseDossier(depot);
+			List<ArchiveMod> archives = ArchiveMod.analyseDossier(dossiers.minecraft, depot);
 			
-			System.out.println(
-					String.format("%d mods chargés depuis '%s'.", installation.sizeModVersion(), installation.dossier));
+			System.out.println(String.format("%d mods chargés depuis '%s'.", archives.size(), dossiers.minecraft));
 			
-			final Collection<ModVersion> importation = new ArrayList<>();
+			final Collection<ArchiveMod> importation = new ArrayList<>();
 			if (all) {
-				for (String modid : installation.getModids()) {
-					importation.addAll(installation.getModVersions(modid));
-				}
-			} else if (modids != null && modids.length > 0) {
+				importation.addAll(archives);
+			} else if (modids != null && modids.size() > 0) {
+				archives.stream().filter(a -> modids.contains(a.mod.modid)).forEach(importation::add);
 				for (String modid : modids) {
 					final File fichier = new File(modid);
 					if (fichier.exists()) {
 						try {
 							ArchiveMod mod = ArchiveMod.importationJar(fichier);
-							if (mod.modVersion != null) {
+							if (mod.isPresent()) {
 								URL url = fichier.toURI().toURL();
 								mod.modVersion.urls.add(url);
-								importation.add(mod.modVersion);
+								importation.add(mod);
 							}
 						} catch (IOException i) {
 							i.printStackTrace();
 						}
-					} else if (installation.contains(modid)) {
-						importation.addAll(installation.getModVersions(modid));
-					} else {
+					} else if (archives.stream().noneMatch(a -> a.mod.modid.equals(modid))) {
 						System.err.println("Mod non reconnu: '" + modid + "'");
 					}
 				}
@@ -161,16 +154,16 @@ public class CommandeDepot implements Runnable {
 				return 2;
 			}
 			
-			for (ModVersion version_client : importation) {
-				final ModVersion reelle = depot.ajoutModVersion(version_client);
+			for (ArchiveMod version_client : importation) {
+				depot.getMod(version_client.mod.modid).fusion(version_client.mod);
+				final ModVersion reelle = depot.ajoutModVersion(version_client.modVersion);
 				reelle.urls.removeIf(url -> url.getProtocol().equals("file"));
 				
 				if (include_file) {
-					copieFichier(depot, version_client);
+					copieFichier(depot, version_client.modVersion, version_client.fichier);
 				}
 			}
 			System.out.println(String.format("%d versions importées.", importation.size()));
-			installation.close();
 			
 			try {
 				depot.sauvegarde();
@@ -183,24 +176,27 @@ public class CommandeDepot implements Runnable {
 			return 0;
 		}
 		
-		private void copieFichier(final DepotLocal depot, final ModVersion version) {
-			Optional<URL> fichier = version.urls.stream().filter(u -> u.getProtocol().equals("file")).findFirst();
-			if (fichier.isPresent()) {
-				try {
-					final Path source = Path.of(fichier.get().toURI());
-					final Path destination = depot.dossierCache(version).resolve(source.getFileName());
-					destination.getParent().toFile().mkdirs();
-					Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING);
-					
-					//Optional<ModVersion> version_depot = depot
-					//		.getModVersion(depot.getMod(version.modid), version.version);
-					//if (version_depot.isPresent()) version_depot.get().ajoutURL(destination.toUri().toURL());
-				} catch (IOException | URISyntaxException e) {
-					System.err.println(String.format("Impossible de copier le fichier '%s'!", fichier.get()));
-				}
-			} else {
-				System.err.println(
-						String.format("Aucun fichier à copier pour le mod %s=%s", version.modid, version.version));
+		/**
+		 * Copie un fichier jar dans le cache du dépot local.
+		 *
+		 * @param depot: depot local dont on remplit le cache
+		 * @param version: informations sur le mode, utiliser par le cache
+		 * @param source: fichier d'origine
+		 * @see DepotLocal#dossierCache(ModVersion)
+		 */
+		private void copieFichier(final DepotLocal depot, final ModVersion version, File source) {
+			try {
+				final Path destination = depot.dossierCache(version).resolve(source.getName());
+				if (destination.getParent().toFile().exists() || destination.getParent().toFile().mkdirs())
+					Files.copy(source.toPath(), destination, StandardCopyOption.REPLACE_EXISTING);
+				else System.err.println(
+						String.format("Impossible de créer le dossier '%s'", destination.getParent().toString()));
+				
+				//Optional<ModVersion> version_depot = depot
+				//		.getModVersion(depot.getMod(version.modid), version.version);
+				//if (version_depot.isPresent()) version_depot.get().ajoutURL(destination.toUri().toURL());
+			} catch (IOException e) {
+				System.err.println(String.format("Impossible de copier le fichier '%s'!", source));
 			}
 		}
 	}

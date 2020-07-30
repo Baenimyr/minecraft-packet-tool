@@ -18,8 +18,8 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.HashMap;
-import java.util.Map;
+import java.nio.file.Path;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -164,6 +164,55 @@ public class ArchiveMod {
 			// System.err.println("[DEBUG] [importation] '" + fichier.getName() + "':\t" + ignored.getMessage());
 		}
 		return archive;
+	}
+	
+	/**
+	 * Parcours un dossier et les sous-dossiers à la recherche de fichier de mod forge.
+	 * <p>
+	 * Pour chaque fichier jar trouvé, tente d'importer les informations. Le moindre échec invalide l'importation.
+	 *
+	 * @param dossier: dossier système à parcourir
+	 * @param infos: un dépôt complet qui contient des informations supplémentaires
+	 * @return la liste des archives détectées.
+	 */
+	public static List<ArchiveMod> analyseDossier(Path dossier, Depot infos) {
+		final List<ArchiveMod> resultats = new LinkedList<>();
+		Queue<File> dossiers = new LinkedList<>();
+		dossiers.add(dossier.toFile());
+		
+		while (!dossiers.isEmpty()) {
+			File doss = dossiers.poll();
+			File[] fichiers = doss.listFiles();
+			if (fichiers != null) for (File f : fichiers) {
+				if (f.isHidden()) ;
+				else if (f.isDirectory() && !f.getName().equals("memory_repo") && !f.getName().equals("libraries"))
+					dossiers.add(f);
+				else if (f.getName().endsWith(".jar")) {
+					ArchiveMod resultat = null;
+					try {
+						resultat = ArchiveMod.importationJar(f);
+					} catch (IOException i) {
+						System.err.println(String.format("[DepotInstallation] [ERROR] in '%s': %s", f, i.getMessage()));
+					}
+					
+					if (resultat == null && infos != null) {
+						// Recherche par nom de fichier
+						Optional<ModVersion> modVersion = infos.rechercheAlias(f.getName());
+						if (modVersion.isPresent()) {
+							resultat = new ArchiveMod();
+							resultat.mod = infos.getMod(modVersion.get().modid);
+							resultat.modVersion = modVersion.get();
+						}
+					}
+					
+					if (resultat != null && resultat.isPresent()) {
+						resultat.fichier = f;
+						resultats.add(resultat);
+					}
+				}
+			}
+		}
+		return resultats;
 	}
 	
 	public boolean isPresent() {

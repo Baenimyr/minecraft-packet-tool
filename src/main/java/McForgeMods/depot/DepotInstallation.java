@@ -12,7 +12,9 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -26,12 +28,12 @@ import java.util.stream.Collectors;
  * détecter cette erreur.
  */
 public class DepotInstallation extends Depot implements Closeable {
-	public final        Path                      dossier;
+	public final Path                      dossier;
+	public final Map<String, Installation> installations = new HashMap<>();
 	/**
 	 * Version de minecraft pour l'installation.
 	 */
-	public              Version                   mcversion         = null;
-	public final        Map<String, Installation> installations     = new HashMap<>();
+	public       Version                   mcversion     = null;
 	
 	
 	/**
@@ -109,67 +111,39 @@ public class DepotInstallation extends Depot implements Closeable {
 	}
 	
 	/**
-	 * Parcours un dossier et les sous-dossiers à la recherche de fichier de mod forge.
+	 * Parcours le sous-dossier `mods` pour trouver les fichiers de mods présents.
 	 * <p>
-	 * Pour chaque fichier jar trouvé, tente d'importer les informations. Le moindre échec invalide l'importation.
-	 *
-	 * @param infos: un dépôt complet qui contient des informations supplémentaires
+	 * Les informations relatives au mod sont fusionnées avec celles déjà connues. Les informations relatives à la
+	 * version de ce mod sont associées au fichier dont elles sont originaires. Aucune information ne provenant pas des
+	 * fichiers n'est ajoutée.
+	 * <p>
+	 * Si un fichier d'un mod non installé est trouvé, il est marqué comme installé manuellement.
 	 */
 	public void analyseDossier(Depot infos) {
-		Queue<File> dossiers = new LinkedList<>();
-		dossiers.add(dossier.resolve("mods").toFile());
-		
 		this.statusImportation();
-		while (!dossiers.isEmpty()) {
-			File doss = dossiers.poll();
-			File[] fichiers = doss.listFiles();
-			if (fichiers != null) for (File f : fichiers) {
-				if (f.isHidden()) ;
-				else if (f.isDirectory() && !f.getName().equals("memory_repo") && !f.getName().equals("libraries"))
-					dossiers.add(f);
-				else if (f.getName().endsWith(".jar")) {
-					ArchiveMod resultat = null;
-					try {
-						resultat = ArchiveMod.importationJar(f);
-					} catch (IOException i) {
-						System.err.println(String.format("[DepotInstallation] [ERROR] in '%s': %s", f, i.getMessage()));
-					}
-					
-					if (resultat == null && infos != null) {
-						Optional<ModVersion> modVersion = infos.rechercheAlias(f.getName());
-						if (modVersion.isPresent()) {
-							resultat = new ArchiveMod();
-							resultat.mod = this.getMod(modVersion.get().modid);
-							resultat.modVersion = modVersion.get();
-						}
-					}
-					
-					if (resultat != null && resultat.isPresent()) {
-						try {
-							final Mod mod = resultat.mod;
-							final ModVersion modVersion = resultat.modVersion;
-							modVersion.ajoutURL(f.getAbsoluteFile().toURI().toURL());
-							modVersion.ajoutAlias(f.getName());
-							this.getMod(mod.modid).fusion(mod);
-							this.ajoutModVersion(modVersion);
-							
-							Installation installation;
-							if (this.installations.containsKey(modVersion.modid)) {
-								installation = this.installations.get(modVersion.modid);
-							} else {
-								installation = new Installation(modVersion.modid, modVersion.version);
-								installation.status = StatusInstallation.MANUELLE;
-								installation.fichier = this.dossier.relativize(f.toPath()).toString();
-								this.installations.put(installation.modid, installation);
-							}
-							installation.fichier = dossier.resolve("mods").relativize(Path.of(f.getAbsolutePath()))
-									.toString();
-						} catch (MalformedURLException mue) {
-							System.err.println(String.format("[DepotInstallation] [ERROR] in '%s': %s", f.getName(),
-									mue.getMessage()));
-						}
-					}
+		for (ArchiveMod resultat : ArchiveMod.analyseDossier(dossier.resolve("mods"), infos)) {
+			try {
+				final Mod mod = resultat.mod;
+				final ModVersion modVersion = resultat.modVersion;
+				modVersion.ajoutURL(resultat.fichier.getAbsoluteFile().toURI().toURL());
+				modVersion.ajoutAlias(resultat.fichier.getName());
+				this.getMod(mod.modid).fusion(mod);
+				this.ajoutModVersion(modVersion);
+				
+				Installation installation;
+				if (this.installations.containsKey(modVersion.modid)) {
+					installation = this.installations.get(modVersion.modid);
+				} else {
+					installation = new Installation(modVersion.modid, modVersion.version);
+					installation.status = StatusInstallation.MANUELLE;
+					installation.fichier = this.dossier.relativize(resultat.fichier.toPath()).toString();
+					this.installations.put(installation.modid, installation);
 				}
+				installation.fichier = dossier.resolve("mods").relativize(Path.of(resultat.fichier.getAbsolutePath()))
+						.toString();
+			} catch (MalformedURLException mue) {
+				System.err.println(String.format("[DepotInstallation] [ERROR] in '%s': %s", resultat.fichier.getName(),
+						mue.getMessage()));
 			}
 		}
 	}
@@ -185,7 +159,9 @@ public class DepotInstallation extends Depot implements Closeable {
 		return StatusInstallation.MANUELLE;
 	}
 	
-	/** Change le status associé à une version de mod. */
+	/**
+	 * Change le status associé à une version de mod.
+	 */
 	public void statusChange(ModVersion version, StatusInstallation status) {
 		if (this.installations.containsKey(version.modid)) {
 			this.installations.get(version.modid).status = status;
@@ -196,7 +172,9 @@ public class DepotInstallation extends Depot implements Closeable {
 		}
 	}
 	
-	/** Efface le status associé à une version de mod. */
+	/**
+	 * Efface le status associé à une version de mod.
+	 */
 	public void statusSuppression(ModVersion version) {
 		this.installations.remove(version.modid);
 	}
