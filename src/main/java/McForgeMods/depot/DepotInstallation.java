@@ -98,7 +98,6 @@ public class DepotInstallation extends Depot {
 			}
 			
 			this.statusSuppression(mversion);
-			this.statusSauvegarde();
 		}
 	}
 	
@@ -365,7 +364,7 @@ public class DepotInstallation extends Depot {
 		}
 	}
 	
-	public void statusSauvegarde() {
+	public void statusSauvegarde() throws IOException {
 		File infos = dossier.resolve("mods").resolve(".mods.txt").toFile();
 		try (FileOutputStream fos = new FileOutputStream(infos);
 			 BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos))) {
@@ -373,8 +372,6 @@ public class DepotInstallation extends Depot {
 				bw.write(mv + " " + this.status_installation.get(mv).nom);
 				bw.newLine();
 			}
-		} catch (IOException io) {
-			System.err.println(io.getClass() + ":" + io.getLocalizedMessage());
 		}
 	}
 	

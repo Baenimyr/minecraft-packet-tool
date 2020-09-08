@@ -186,7 +186,6 @@ public class CommandeInstall implements Callable<Integer> {
 						});
 				telechargements.put(mversion, t);
 			}
-			depotInstallation.statusSauvegarde();
 			telechargements.forEach((mversion, cf) -> {
 				try {
 					cf.get();
@@ -195,6 +194,13 @@ public class CommandeInstall implements Callable<Integer> {
 					System.err.printf("Erreur téléchargement de '%s': %s%n", mversion, erreur.getMessage());
 				}
 			});
+			
+			try {
+				depotInstallation.statusSauvegarde();
+			} catch (IOException e) {
+				System.err.println("Impossible de sauvegarder la configuration de l'installation.");
+				return 1;
+			}
 			// return telechargementMods(installations, depotInstallation);
 		}
 		return 0;
