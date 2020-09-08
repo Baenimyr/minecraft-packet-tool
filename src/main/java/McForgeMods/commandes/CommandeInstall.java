@@ -30,11 +30,9 @@ import java.util.stream.Collectors;
  */
 @CommandLine.Command(name = "install", sortOptions = false, resourceBundle = "mcforgemods/lang/Install")
 public class CommandeInstall implements Callable<Integer> {
-	static final int ERREUR_NOM       = 10;
-	static final int ERREUR_MODID     = ERREUR_NOM + 1;
-	static final int ERREUR_VERSION   = ERREUR_NOM + 2;
-	static final int ERREUR_RESSOURCE = 20;
-	static final int ERREUR_URL       = ERREUR_RESSOURCE + 1;
+	static final int ERREUR_NOM     = 10;
+	static final int ERREUR_MODID   = ERREUR_NOM + 1;
+	static final int ERREUR_VERSION = ERREUR_NOM + 2;
 	
 	static final ExecutorService executor = new ThreadPoolExecutor(0, 4, 1L, TimeUnit.SECONDS,
 			new LinkedBlockingQueue<>());
@@ -116,9 +114,9 @@ public class CommandeInstall implements Callable<Integer> {
 		// Ajout de toutes les installations manuelles dans l'installation
 		for (String modid : depotInstallation.getModids()) {
 			for (ModVersion mversion : depotInstallation.getModVersions(modid)) {
-				if (mversion.mcversion.englobe(mcversion)
-						&& depotInstallation.statusMod(mversion) != DepotInstallation.StatusInstallation.AUTO
-						&& !arbre_dependances.listeModids().contains(mversion.mod.modid)) {
+				if (depotInstallation.statusMod(mversion) != DepotInstallation.StatusInstallation.AUTO
+						&& !arbre_dependances.listeModids().contains(mversion.mod.modid) && mversion.mcversion
+						.englobe(mcversion)) {
 					// seulement les choix utilisateur les plus récents
 					arbre_dependances.ajoutContrainte(mversion);
 				}
@@ -222,6 +220,11 @@ public class CommandeInstall implements Callable<Integer> {
 			List<URL> http = modVersion.urls.stream()
 					.filter(url -> url.getProtocol().equals("http") || url.getProtocol().equals("https"))
 					.collect(Collectors.toList());
+			if (fichiers.size() == 0 && http.size() == 0) {
+				System.err.printf("[Install] aucun lien de téléchargement pour %s.%n", modVersion);
+				return false;
+			}
+			
 			Path dossier = modVersion.dossierInstallation(minecraft.dossier);
 			if (Files.notExists(dossier)) {
 				try {
@@ -233,16 +236,20 @@ public class CommandeInstall implements Callable<Integer> {
 			
 			// Tentative de copie de fichier
 			for (URL url : fichiers) {
-				Path source = Path.of(url.getPath());
-				Path cible = modVersion.dossierInstallation(minecraft.dossier).resolve(source.getFileName());
-				
 				try {
+					Path source = Path.of(url.toURI().getPath());
+					Path cible = modVersion.dossierInstallation(minecraft.dossier).resolve(source.getFileName());
+					
 					Files.copy(source, cible);
 					synchronized (System.out) {
 						System.out.printf("%-20s %-20s OK%n", modVersion.mod.modid, modVersion.version);
 					}
 					return true;
-				} catch (IOException ignored) {
+				} catch (URISyntaxException e) {
+					System.err.printf("Format d'url incorrect: '%s'%n", url.toString());
+				} catch (IOException e) {
+					System.err.printf("[Install] impossible de copier le fichier '%s'.%n", url.toString());
+					System.err.println("\t" + e.getMessage());
 				}
 			}
 			
@@ -283,8 +290,8 @@ public class CommandeInstall implements Callable<Integer> {
 					}
 					return true;
 				} catch (IOException | InterruptedException | URISyntaxException io) {
-					System.err.println(io.getClass() + ":" + io.getMessage());
-					io.printStackTrace();
+					System.err.printf("[Install] impossible de télécharger le fichier: %s%n", url);
+					System.err.println("\t" + io.getMessage());
 				}
 			}
 			

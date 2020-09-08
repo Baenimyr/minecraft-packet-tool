@@ -54,10 +54,10 @@ public class DepotInstallation extends Depot {
 			Path d = Path.of("").toAbsolutePath();
 			for (int i = d.getNameCount() - 1; i >= 0; i--)
 				if (d.getName(i).toString().equals(".minecraft")) {
-					this.dossier = d.subpath(0, i + 1);
+					this.dossier = d.subpath(0, i + 1).resolve("mods");
 					return;
 				}
-			this.dossier = Path.of(System.getProperty("user.home")).resolve(".minecraft");
+			this.dossier = Path.of(System.getProperty("user.home")).resolve(".minecraft").resolve("mods");
 		} else if (dossier.startsWith("~")) {
 			this.dossier = Path.of(System.getProperty("user.home")).resolve(dossier.subpath(1, dossier.getNameCount()));
 		} else {
@@ -251,7 +251,7 @@ public class DepotInstallation extends Depot {
 	 */
 	public void analyseDossier(Depot infos) {
 		Queue<File> dossiers = new LinkedList<>();
-		dossiers.add(dossier.resolve("mods").toFile());
+		dossiers.add(dossier.toFile());
 		
 		while (!dossiers.isEmpty()) {
 			File doss = dossiers.poll();
@@ -275,7 +275,7 @@ public class DepotInstallation extends Depot {
 							continue;
 						}
 					} catch (IOException i) {
-						System.err.println(String.format("Erreur de lecture du fichier '%s': %s", f, i.getMessage()));
+						System.err.printf("Erreur de lecture du fichier '%s': %s%n", f, i.getMessage());
 					}
 					
 					try {
@@ -338,12 +338,12 @@ public class DepotInstallation extends Depot {
 					String[] args = ligne.split(" ");
 					if (args.length == 3) {
 						if (!this.contains(args[0])) {
-							System.err.println(String.format("Mod '%s' disparu", args[0]));
+							System.err.printf("Mod '%s' disparu%n", args[0]);
 						} else {
 							Optional<ModVersion> mversion = this
 									.getModVersion(this.getMod(args[0]), Version.read(args[1]));
 							if (mversion.isEmpty()) {
-								System.err.println(String.format("Mod '%s' %s disparu", args[0], args[1]));
+								System.err.printf("Mod '%s' %s disparu%n", args[0], args[1]);
 							}
 						}
 						
