@@ -73,8 +73,8 @@ public class CommandeDepot implements Runnable {
 			
 			for (final String modid : modids) {
 				for (final ModVersion version : depot.getModVersions(modid)) {
-					ArbreDependance dependances = new ArbreDependance(Collections.singleton(version));
-					dependances.extension(depot);
+					ArbreDependance dependances = new ArbreDependance(depot, Collections.singleton(version));
+					dependances.resolution();
 					for (Map.Entry<String, VersionIntervalle> dep : dependances.requis().entrySet()) {
 						if (!dep.getKey().equals("forge")) {
 							if (!depot.contains(dep.getKey()) || depot.getModVersions(dep.getKey()).stream().noneMatch(

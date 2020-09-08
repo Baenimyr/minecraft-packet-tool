@@ -64,7 +64,7 @@ public class ForgeMods implements Runnable {
 						bw.write(u.toString());
 					}
 				} catch (MalformedURLException m) {
-					System.err.println(String.format("MalformedURL: '%s'", url));
+					System.err.printf("MalformedURL: '%s'%n", url);
 				}
 			}
 		} catch (IOException i) {
@@ -117,7 +117,7 @@ public class ForgeMods implements Runnable {
 		
 		modids.stream().sorted(String::compareTo).forEach(modid -> {
 			Mod mod = depotLocal.getMod(modid);
-			System.out.println(String.format("\u001b[32m%s\u001b[0m \"%s\"", mod.modid, mod.name));
+			System.out.printf("\u001B[32m%s\u001B[0m \"%s\"%n", mod.modid, mod.name);
 		});
 		
 		return 0;
@@ -165,11 +165,11 @@ public class ForgeMods implements Runnable {
 									.correspond(modVersion.version)).max(Comparator.comparing(mv -> mv.version));
 					if (trouvee.isPresent()) resultat.add(trouvee.get());
 					else {
-						System.err.println(String.format("Version inconnue pour '%s': '%s'", modid, version));
+						System.err.printf("Version inconnue pour '%s': '%s'%n", modid, version);
 						return 3;
 					}
 				} else {
-					System.err.println(String.format("Modid inconnu: '%s'", modid));
+					System.err.printf("Modid inconnu: '%s'%n", modid);
 					return 3;
 				}
 			}
@@ -180,15 +180,15 @@ public class ForgeMods implements Runnable {
 		}
 		
 		// Liste complète des dépendances nécessaire pour la liste des mods présent.
-		ArbreDependance arbre_dependances = new ArbreDependance(listeRecherche);
-		arbre_dependances.extension(depotLocal);
+		ArbreDependance arbre_dependances = new ArbreDependance(depotLocal, listeRecherche);
+		arbre_dependances.resolution();
 		Map<String, VersionIntervalle> liste;
 		if (missing) {
 			liste = depotInstallation.dependancesAbsentes(arbre_dependances.requis());
-			System.out.println(String.format("%d absents", liste.size()));
+			System.out.printf("%d absents%n", liste.size());
 		} else {
 			liste = arbre_dependances.requis();
-			System.out.println(String.format("%d dépendances", liste.size()));
+			System.out.printf("%d dépendances%n", liste.size());
 		}
 		
 		ArrayList<String> modids = new ArrayList<>(liste.keySet());

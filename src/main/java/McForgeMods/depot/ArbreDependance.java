@@ -10,27 +10,25 @@ import java.util.*;
  * intervalle de version valide, cependant un mod ne peut apparaitre qu'une seule fois dans l'arbre.
  */
 public class ArbreDependance {
-	private final Map<String, VersionIntervalle> mods        = new HashMap<>();
-	private final Map<String, Set<String>>       parents     = new HashMap<>();
-	private final Map<String, Set<String>>       dependances = new HashMap<>();
+	/** Source d'informations. */
+	private final Depot                          depot;
+	/** Versions sélectionnées */
+	private final Map<String, VersionIntervalle> contraintes = new HashMap<>();
 	public final  VersionIntervalle              mcversion   = VersionIntervalle.ouvert();
 	
-	public ArbreDependance() {
-	
+	public ArbreDependance(Depot depot) {
+		this.depot = depot;
 	}
 	
-	public ArbreDependance(Collection<ModVersion> versions) {
-		versions.forEach(this::ajoutMod);
+	public ArbreDependance(Depot depot, Collection<ModVersion> versions) {
+		this(depot);
+		versions.forEach(this::ajoutContrainte);
 	}
 	
 	/** Fixe un version pour le mod et recalcul les intervalles de dépendance. */
-	public void ajoutMod(ModVersion modVersion) {
+	public void ajoutContrainte(ModVersion modVersion) {
 		this.mcversion.intersection(modVersion.mcversion);
-		if (this.ajoutModIntervalle(modVersion.mod.modid, new VersionIntervalle(modVersion.version)))
-			for (String modid : modVersion.requiredMods.keySet()) {
-				this.ajoutDependance(modVersion.mod.modid, modid);
-				this.ajoutModIntervalle(modid, modVersion.requiredMods.get(modid));
-			}
+		this.ajoutContrainte(modVersion.mod.modid, new VersionIntervalle(modVersion.version));
 	}
 	
 	/**
@@ -38,42 +36,13 @@ public class ArbreDependance {
 	 * <p>
 	 * La nouvelle intervalle sera l'intersection entre l'intervalle actuelle et la nouvelle
 	 */
-	public boolean ajoutModIntervalle(String mod, VersionIntervalle versions) {
+	public void ajoutContrainte(String modid, VersionIntervalle versions) {
 		assert Objects.nonNull(versions);
-		if (!mods.containsKey(mod)) {
-			mods.put(mod, versions);
-			parents.put(mod, new HashSet<>());
-			dependances.put(mod, new HashSet<>());
-			return true;
+		if (!contraintes.containsKey(modid)) {
+			contraintes.put(modid, versions);
 		} else {
-			final VersionIntervalle avant = new VersionIntervalle(mods.get(mod));
-			mods.get(mod).intersection(versions);
-			return !mods.get(mod).equals(avant);
+			contraintes.get(modid).intersection(versions);
 		}
-	}
-	
-	/**
-	 * Enregistre une nouvelle dépendance.
-	 * <p>
-	 * Le mod requis est marqué comme nécessaire pour le mod parent.
-	 *
-	 * @param parent: mod à l'origine de la demande
-	 * @param requis: mod requis par le mod parent
-	 */
-	public void ajoutDependance(String parent, String requis) {
-		if (parents.containsKey(requis)) parents.get(requis).add(parent);
-		else {
-			parents.put(requis, new HashSet<>());
-			parents.get(requis).add(parent);
-		}
-		
-		if (dependances.containsKey(parent)) dependances.get(parent).add(requis);
-		else {
-			Set<String> dep = new HashSet<>();
-			dep.add(requis);
-			dependances.put(parent, dep);
-		}
-		this.ajoutModIntervalle(parent, VersionIntervalle.ouvert());
 	}
 	
 	/**
@@ -81,13 +50,12 @@ public class ArbreDependance {
 	 * <p>
 	 * La version la plus récente compatible du dépôt est utilisée pour déterminer les nouvelles dépendances.
 	 */
-	public Map<String, ModVersion> extension(Depot depot) {
-		Map<String, ModVersion> selection = new HashMap<>();
-		final LinkedList<String> temp = new LinkedList<>(this.mods.keySet());
+	public void resolution() throws IllegalArgumentException {
+		final LinkedList<String> temp = new LinkedList<>(this.contraintes.keySet());
 		
 		while (!temp.isEmpty()) {
 			final String modid = temp.removeFirst();
-			final VersionIntervalle vintervalle = this.intervalle(modid);
+			final VersionIntervalle vintervalle = this.contraintes.getOrDefault(modid, VersionIntervalle.ouvert());
 			
 			if (depot.contains(modid)) {
 				Optional<ModVersion> candidat = depot.getModVersions(modid).stream()
@@ -96,37 +64,33 @@ public class ArbreDependance {
 				
 				if (candidat.isPresent()) {
 					final ModVersion mversion = candidat.get();
-					this.ajoutMod(mversion);
-					selection.put(modid, mversion);
+					this.ajoutContrainte(mversion);
 					for (String d_modid : mversion.requiredMods.keySet()) {
 						if (!temp.contains(d_modid)) temp.addLast(d_modid);
+						this.ajoutContrainte(d_modid, mversion.requiredMods.get(d_modid));
 					}
 				}
 			}
 		}
-		return selection;
 	}
 	
 	public Set<String> listeModids() {
-		return this.mods.keySet();
+		return this.contraintes.keySet();
 	}
 	
 	public VersionIntervalle intervalle(String modid) {
-		return this.mods.getOrDefault(modid, VersionIntervalle.ouvert());
+		return this.contraintes.getOrDefault(modid, VersionIntervalle.ouvert());
 	}
 	
 	public Map<String, VersionIntervalle> requis() {
-		return this.mods;
+		return this.contraintes;
 	}
 	
 	public boolean contains(ModVersion mversion) {
-		return this.mods.containsKey(mversion.mod.modid) && this.mods.get(mversion.mod.modid)
-				.correspond(mversion.version);
+		return this.contraintes.containsKey(mversion.mod.modid) && this.contraintes.get(mversion.mod.modid).correspond(mversion.version);
 	}
 	
 	public void clear() {
-		this.mods.clear();
-		this.parents.clear();
-		this.dependances.clear();
+		this.contraintes.clear();
 	}
 }
