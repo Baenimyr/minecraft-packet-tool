@@ -210,15 +210,33 @@ public class ForgeMods implements Runnable {
 		Map<String, VersionIntervalle> versions = VersionIntervalle.lectureDependances(mods);
 		if (action == MarkAction.manual) {
 			for (String modid : versions.keySet()) {
-				if (depotInstallation.contains(modid)) depotInstallation.getModVersions(modid).stream()
-						.filter(mv -> versions.get(modid).correspond(mv.version)).forEach(mv -> depotInstallation
-								.statusChange(mv, DepotInstallation.StatusInstallation.MANUELLE));
+				if (depotInstallation.contains(modid)) for (ModVersion mv : depotInstallation.getModVersions(modid))
+					if (versions.get(modid).correspond(mv.version)) {
+						if (depotInstallation.estVerrouille(mv)) {
+							System.err.printf("%s est verrouillé%n", mv);
+						} else depotInstallation.statusChange(mv, true);
+					}
 			}
 		} else if (action == MarkAction.auto) {
 			for (String modid : versions.keySet()) {
-				depotInstallation.getModVersions(modid).stream()
-						.filter(mv -> versions.get(modid).correspond(mv.version))
-						.forEach(mv -> depotInstallation.statusChange(mv, DepotInstallation.StatusInstallation.AUTO));
+				if (depotInstallation.contains(modid)) for (ModVersion mv : depotInstallation.getModVersions(modid))
+					if (depotInstallation.estVerrouille(mv)) {
+						System.err.printf("%s est verrouillé%n", mv);
+					} else depotInstallation.statusChange(mv, false);
+			}
+		} else if (action == MarkAction.lock) {
+			for (String modid : versions.keySet()) {
+				if (depotInstallation.contains(modid)) for (ModVersion mv : depotInstallation.getModVersions(modid))
+					if (versions.get(modid).correspond(mv.version)) {
+						depotInstallation.verrouillerMod(mv, true);
+					}
+			}
+		} else if (action == MarkAction.unlock) {
+			for (String modid : versions.keySet()) {
+				if (depotInstallation.contains(modid)) for (ModVersion mv : depotInstallation.getModVersions(modid))
+					if (versions.get(modid).correspond(mv.version)) {
+						depotInstallation.verrouillerMod(mv, false);
+					}
 			}
 		} else {
 			System.err.println("Action inconnue: " + action);
@@ -234,7 +252,9 @@ public class ForgeMods implements Runnable {
 	
 	private enum MarkAction {
 		manual,
-		auto//, lock, unlock
+		auto,
+		lock,
+		unlock
 	}
 	
 	public static void main(String[] args) {

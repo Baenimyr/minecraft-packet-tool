@@ -62,12 +62,9 @@ public class CommandeListe implements Callable<Integer> {
 				Stream<ModVersion> versions = depotInstallation.getModVersions(modid).stream();
 				
 				if (mode != null) {
-					if (mode.manuels) versions = versions.filter(mv -> depotInstallation.statusMod(mv)
-							== DepotInstallation.StatusInstallation.MANUELLE);
-					else if (mode.auto) versions = versions
-							.filter(mv -> depotInstallation.statusMod(mv) == DepotInstallation.StatusInstallation.AUTO);
-					else if (mode.verrouille) versions = versions.filter(mv -> depotInstallation.statusMod(mv)
-							== DepotInstallation.StatusInstallation.VERROUILLE);
+					if (mode.manuels) versions = versions.filter(depotInstallation::estManuel);
+					else if (mode.auto) versions = versions.filter(mv -> !depotInstallation.estManuel(mv));
+					else if (mode.verrouille) versions = versions.filter(depotInstallation::estVerrouille);
 				}
 				
 				List<ModVersion> liste = versions.sorted(Comparator.comparing(mv -> mv.version))

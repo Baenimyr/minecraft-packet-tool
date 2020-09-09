@@ -114,9 +114,8 @@ public class CommandeInstall implements Callable<Integer> {
 		// Ajout de toutes les installations manuelles dans l'installation
 		for (String modid : depotInstallation.getModids()) {
 			for (ModVersion mversion : depotInstallation.getModVersions(modid)) {
-				if (depotInstallation.statusMod(mversion) != DepotInstallation.StatusInstallation.AUTO
-						&& !arbre_dependances.listeModids().contains(mversion.mod.modid) && mversion.mcversion
-						.englobe(mcversion)) {
+				if (depotInstallation.estManuel(mversion) && !arbre_dependances.listeModids()
+						.contains(mversion.mod.modid) && mversion.mcversion.englobe(mcversion)) {
 					// seulement les choix utilisateur les plus récents
 					arbre_dependances.ajoutContrainte(mversion);
 				}
@@ -175,9 +174,7 @@ public class CommandeInstall implements Callable<Integer> {
 						.thenAcceptAsync(succes -> {
 							if (succes) {
 								synchronized (depotInstallation) {
-									depotInstallation.installation(mversion, demandes.containsKey(mversion.mod.modid)
-											? DepotInstallation.StatusInstallation.MANUELLE
-											: DepotInstallation.StatusInstallation.AUTO);
+									depotInstallation.installation(mversion, demandes.containsKey(mversion.mod.modid));
 									depotInstallation.suppressionConflits(mversion);
 								}
 							}

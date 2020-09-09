@@ -38,11 +38,12 @@ import java.util.zip.ZipFile;
  * détecter cette erreur.
  */
 public class DepotInstallation extends Depot {
-	public static final Pattern                         minecraft_version   = Pattern.compile(
+	public static final Pattern                       minecraft_version   = Pattern.compile(
 			"^(1\\.14(\\.[1-4])?|1\\.13(\\.[1-2])?|1\\.12(\\.[1-2])?|1\\.11(\\.[1-2])?|1\\.10(\\.[1-2])?|1\\.9(\\"
 					+ ".[1-4])?|1\\.8(\\.1)?|1\\.7(\\.[1-9]|(10))?|1\\.6\\.[1-4]|1\\.5(\\.[1-2])?)-");
-	public final        Path                            dossier;
-	private final       Map<String, StatusInstallation> status_installation = new HashMap<>();
+	public final        Path                          dossier;
+	private final       Map<ModVersion, Installation> status_installation = new HashMap<>();
+	public              VersionIntervalle             minecraft           = null;
 	
 	/**
 	 * Ouvre un dossier pour l'installation des mods. Par défaut, ce dossier est ~/.minecraft/mods.
@@ -50,19 +51,22 @@ public class DepotInstallation extends Depot {
 	 * @param dossier d'installation ou {@code null}
 	 */
 	public DepotInstallation(Path dossier) {
+		Path dos = Path.of(System.getProperty("user.home")).resolve(".minecraft");
 		if (dossier == null) {
 			Path d = Path.of("").toAbsolutePath();
-			for (int i = d.getNameCount() - 1; i >= 0; i--)
+			int i;
+			for (i = d.getNameCount() - 1; i >= 0; i--) {
 				if (d.getName(i).toString().equals(".minecraft")) {
-					this.dossier = d.subpath(0, i + 1).resolve("mods");
-					return;
+					dos = d.subpath(0, i + 1);
+					break;
 				}
-			this.dossier = Path.of(System.getProperty("user.home")).resolve(".minecraft").resolve("mods");
+			}
 		} else if (dossier.startsWith("~")) {
-			this.dossier = Path.of(System.getProperty("user.home")).resolve(dossier.subpath(1, dossier.getNameCount()));
+			dos = Path.of(System.getProperty("user.home")).resolve(dossier.subpath(1, dossier.getNameCount()));
 		} else {
-			this.dossier = dossier.toAbsolutePath();
+			dos = dossier.toAbsolutePath();
 		}
+		this.dossier = dos;
 	}
 	
 	/**
@@ -71,10 +75,10 @@ public class DepotInstallation extends Depot {
 	 * Le téléchargement du fichier est effectué en amont. Cette action ne doit être réalisée que si le fichier est
 	 * maintenant présent.
 	 *
-	 * @param status de l'installation
+	 * @param manuel: si l'installation est manuelle ou automatique
 	 */
-	public void installation(ModVersion mversion, StatusInstallation status) {
-		this.statusChange(mversion, status);
+	public void installation(ModVersion mversion, boolean manuel) {
+		this.statusChange(mversion, manuel);
 	}
 	
 	/**
@@ -84,7 +88,6 @@ public class DepotInstallation extends Depot {
 	 * fonction désinstalle même si cette version est la dépendance d'un autre mod.
 	 */
 	public void desinstallation(ModVersion mversion) {
-		this.statusChange(mversion, StatusInstallation.AUTO);
 		if (this.contains(mversion.mod)) {
 			this.mod_version.get(mversion.mod).remove(mversion);
 			
@@ -301,25 +304,40 @@ public class DepotInstallation extends Depot {
 		this.statusImportation();
 	}
 	
-	/**
-	 * Retourne le status d'installation d'un mod.
-	 * <p>
-	 * Si aucune information n'est disponible, cette version est considérée comme installée manuellement. En mode
-	 * manuel, les fichiers déjà présents peuvent être mise à jour mais pas supprimés.
-	 */
-	public StatusInstallation statusMod(ModVersion version) {
-		return this.status_installation
-				.getOrDefault(version.mod.modid + " " + version.version, StatusInstallation.MANUELLE);
+	public boolean estManuel(ModVersion version) {
+		return this.status_installation.containsKey(version) && this.status_installation.get(version).manuel;
 	}
 	
 	/** Change le status associé à une version de mod. */
-	public void statusChange(ModVersion version, StatusInstallation status) {
-		this.status_installation.put(version.mod.modid + " " + version.version, status);
+	public void statusChange(ModVersion version, boolean manuel) {
+		if (this.status_installation.containsKey(version)) {
+			Installation i = this.status_installation.get(version);
+			i.manuel = manuel;
+		} else {
+			Installation i = new Installation();
+			i.manuel = manuel;
+			this.status_installation.put(version, i);
+		}
+	}
+	
+	public boolean estVerrouille(ModVersion version) {
+		return this.status_installation.containsKey(version) && this.status_installation.get(version).verrou;
+	}
+	
+	public void verrouillerMod(ModVersion version, boolean verrou) {
+		if (this.status_installation.containsKey(version)) {
+			Installation i = this.status_installation.get(version);
+			i.verrou = verrou;
+		} else {
+			Installation i = new Installation();
+			i.verrou = verrou;
+			this.status_installation.put(version, i);
+		}
 	}
 	
 	/** Efface le status associé à une version de mod. */
 	public void statusSuppression(ModVersion version) {
-		this.status_installation.remove(version.mod.modid + " " + version.version);
+		this.status_installation.remove(version);
 	}
 	
 	/**
@@ -329,33 +347,43 @@ public class DepotInstallation extends Depot {
 	 * résultat d'une mauvaise manipulation, la restauration de l'installation doit rester possible.
 	 */
 	public void statusImportation() {
-		File infos = dossier.resolve("mods").resolve(".mods.txt").toFile();
+		File infos = dossier.resolve("mods").resolve(".mods.json").toFile();
 		if (infos.exists()) {
-			try (FileInputStream fis = new FileInputStream(infos);
-				 BufferedReader br = new BufferedReader(new InputStreamReader(fis))) {
-				String ligne;
-				while ((ligne = br.readLine()) != null) {
-					String[] args = ligne.split(" ");
-					if (args.length == 3) {
-						if (!this.contains(args[0])) {
-							System.err.printf("Mod '%s' disparu%n", args[0]);
+			try (FileInputStream fis = new FileInputStream(infos)) {
+				JSONObject racine = new JSONObject(new JSONTokener(fis));
+				
+				if (racine.has("minecraft")) {
+					JSONObject minecraft = racine.getJSONObject("minecraft");
+					this.minecraft = VersionIntervalle.read(minecraft.getString("version"));
+				}
+				
+				if (racine.has("mods")) {
+					JSONObject mods = racine.getJSONObject("mods");
+					for (String modid : mods.keySet()) {
+						JSONObject mod_data = mods.getJSONObject(modid);
+						if (mod_data != null && this.contains(modid)) {
+							try {
+								final Mod mod = this.getMod(modid);
+								final Version version = Version.read(mod_data.getString("version"));
+								final boolean manual = mod_data.getBoolean("manual");
+								final boolean verrou = mod_data.getBoolean("locked");
+								
+								Optional<ModVersion> modVersion = this.getModVersion(mod, version);
+								if (modVersion.isPresent()) {
+									Installation i = new Installation();
+									i.manuel = manual;
+									i.verrou = verrou;
+									this.status_installation.put(modVersion.get(), i);
+								} else {
+									System.err.printf("%s:%s n'existe plus%n", mod, version);
+								}
+							} catch (NullPointerException ignored) {
+							} catch (JSONException jsonException) {
+								jsonException.printStackTrace();
+							}
 						} else {
-							Optional<ModVersion> mversion = this
-									.getModVersion(this.getMod(args[0]), Version.read(args[1]));
-							if (mversion.isEmpty()) {
-								System.err.printf("Mod '%s' %s disparu%n", args[0], args[1]);
-							}
+							System.err.printf("%s n'existe pas%n", modid);
 						}
-						
-						StatusInstallation status = StatusInstallation.MANUELLE;
-						for (StatusInstallation s : StatusInstallation.values())
-							if (s.nom.equalsIgnoreCase(args[2])) {
-								status = s;
-								break;
-							}
-						
-						// Enregistre le status même si le fichier à disparu
-						this.status_installation.put(args[0] + " " + args[1], status);
 					}
 				}
 			} catch (IOException io) {
@@ -365,34 +393,34 @@ public class DepotInstallation extends Depot {
 	}
 	
 	public void statusSauvegarde() throws IOException {
-		File infos = dossier.resolve("mods").resolve(".mods.txt").toFile();
+		File infos = dossier.resolve("mods").resolve(".mods.json").toFile();
 		try (FileOutputStream fos = new FileOutputStream(infos);
 			 BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos))) {
-			for (String mv : this.status_installation.keySet()) {
-				bw.write(mv + " " + this.status_installation.get(mv).nom);
-				bw.newLine();
+			JSONObject racine = new JSONObject();
+			
+			if (this.minecraft != null) {
+				JSONObject minecraft = new JSONObject();
+				minecraft.put("version", this.minecraft.toString());
+				racine.put("minecraft", minecraft);
 			}
+			
+			JSONObject mods = new JSONObject();
+			racine.put("mods", mods);
+			for (final String modid : this.getModids())
+				for (final ModVersion modVersion : this.getModVersions(modid)) {
+					JSONObject mod_data = new JSONObject();
+					mod_data.put("version", modVersion.version);
+					mod_data.put("manual", this.estManuel(modVersion));
+					mod_data.put("locked", this.estVerrouille(modVersion));
+					mods.put(modid, mod_data);
+				}
+			
+			racine.write(bw, 4, 4);
 		}
 	}
 	
-	/** Status d'une installation de mod. */
-	public enum StatusInstallation {
-		/** Installation explicite par l'utilisateur. */
-		MANUELLE("manuel"),
-		/** Installation automatique comme dépendance. */
-		AUTO("auto"),
-		/** Installation vérouillée. Le mod ne peut pas être supprimé, même s'il génère des erreurs. */
-		VERROUILLE("verrouille");
-		
-		final String nom;
-		
-		StatusInstallation(String nom) {
-			this.nom = nom;
-		}
-		
-		@Override
-		public String toString() {
-			return this.nom;
-		}
+	private static class Installation {
+		public boolean manuel = true;
+		public boolean verrou = false;
 	}
 }
