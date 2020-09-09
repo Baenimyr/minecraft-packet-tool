@@ -199,6 +199,44 @@ public class ForgeMods implements Runnable {
 		return 0;
 	}
 	
+	@CommandLine.Command(name = "mark")
+	public int mark(@CommandLine.Option(names = {"-d", "--depot"}) Path depot,
+			@CommandLine.Option(names = {"-m", "--minecraft"}) Path minecraft,
+			@CommandLine.Parameters(arity = "1", paramLabel = "action") MarkAction action,
+			@CommandLine.Parameters(arity = "1..n", paramLabel = "mods") ArrayList<String> mods) {
+		final DepotLocal depotLocal = new DepotLocal(depot);
+		final DepotInstallation depotInstallation = new DepotInstallation(minecraft);
+		depotInstallation.analyseDossier(depotLocal);
+		Map<String, VersionIntervalle> versions = VersionIntervalle.lectureDependances(mods);
+		if (action == MarkAction.manual) {
+			for (String modid : versions.keySet()) {
+				if (depotInstallation.contains(modid)) depotInstallation.getModVersions(modid).stream()
+						.filter(mv -> versions.get(modid).correspond(mv.version)).forEach(mv -> depotInstallation
+								.statusChange(mv, DepotInstallation.StatusInstallation.MANUELLE));
+			}
+		} else if (action == MarkAction.auto) {
+			for (String modid : versions.keySet()) {
+				depotInstallation.getModVersions(modid).stream()
+						.filter(mv -> versions.get(modid).correspond(mv.version))
+						.forEach(mv -> depotInstallation.statusChange(mv, DepotInstallation.StatusInstallation.AUTO));
+			}
+		} else {
+			System.err.println("Action inconnue: " + action);
+			return 1;
+		}
+		try {
+			depotInstallation.statusSauvegarde();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return 0;
+	}
+	
+	private enum MarkAction {
+		manual,
+		auto//, lock, unlock
+	}
+	
 	public static void main(String[] args) {
 		CommandLine cl = new CommandLine(new ForgeMods());
 		System.exit(cl.execute(args));
