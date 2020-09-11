@@ -4,14 +4,16 @@ import McForgeMods.ForgeMods;
 import McForgeMods.depot.DepotDistant;
 import McForgeMods.depot.DepotLocal;
 import McForgeMods.outils.Sources;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.json.JSONException;
 import picocli.CommandLine;
-import tar.FichierTar;
 
 import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -70,19 +72,22 @@ public class CommandeUpdate implements Callable<Integer> {
 			System.out.println(String.format("%d/%d\t%s", ++i, sources.size(), url));
 			try {
 				if (src.get(url) == Sources.SourceType.TAR) {
-					try (InputStream s = url.openStream()) {
-						final FichierTar tar = new FichierTar(s);
+					try (InputStream s = url.openStream(); TarArchiveInputStream tar = new TarArchiveInputStream(s)) {
+						final Map<String, ByteArrayInputStream> fichiers = new HashMap<>();
+						TarArchiveEntry entry;
+						while ((entry = tar.getNextTarEntry()) != null) {
+							fichiers.put(entry.getName(), new ByteArrayInputStream(tar.readAllBytes()));
+						}
 						
 						depotLocal.synchronisationDepot(new DepotDistant() {
 							@Override
 							public InputStream fichierIndexDepot() throws IOException {
-								return tar.fichier("Mods.json").getInputStream();
+								return fichiers.get("Mods.json");
 							}
 							
 							@Override
 							public InputStream fichierModDepot(String modid) throws IOException {
-								return tar.fichier(modid.substring(0, 1) + "/" + modid + "/" + modid + ".json")
-										.getInputStream();
+								return fichiers.get(modid.charAt(0) + "/" + modid + "/" + modid + ".json");
 							}
 						});
 					} catch (FileNotFoundException fnfe) {

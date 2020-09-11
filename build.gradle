@@ -27,6 +27,7 @@ archivesBaseName = "ForgeMods"
 
 dependencies {
     compile 'org.json:json:20200518'
+    compile 'org.apache.commons:commons-compress:1.20'
     compile 'info.picocli:picocli:4.2.0'
     compile 'org.tomlj:tomlj:1.0.0'
     // annotationProcessor 'info.picocli:picocli-codegen:4.2.0'
