@@ -190,49 +190,34 @@ Ce format permet la création de \textit{modpack}s, incluant même des fichiers 
 \subsection{Structure d'un dépôt}
 Un dépôt recense une liste de mods connus et les spécifications de ses versions.
 
-Les informations des mods mais indépendantes des versions sont sauvegardées dans le fichier \textsf{Mods.json} à la racine du dépôt.
-Chaque clé est le modid du mod enregistré, le modid est sensé est universellement unique.
-La figure \ref{fig:Mods.json} montre le format du fichier \textsf{Mods.json}.
+\subsubsection{Mods.json}
+Pour chaque paquet découvert dans le dépot, les informations de contrôle doivent être extraites et rassemblées dans le fichier \texttt{Mods.json} (ou version compressée).
+Lors de la mise à jour du dépôt, les fichiers de paquet ne seront pas téléchargés.
+Seuls le fichier \texttt{Mods.json} le sera et doit contenir tout le nécessaire.
 
 \begin{figure}[h]
 \begin{verbatim}
-{
-    "modid": {
-        "description": "Simple description du mod, purement informatif.",
-        "name": "Nom associé",
-        "url": "Lien vers le site du mod",
-        "updateJSON": "URL pour détecter les mises à jour"
-    }
-}
-\end{verbatim}
-\caption{Description d'un mod \textit{modid} dans \textsf{Mods.json}}
-\label{fig:Mods.json}
-\end{figure}
-
-Pour chaque mod déclaré dans \textsf{Mods.json}, il existe un fichier donnant toutes ses versions disponibles sous le nom \textsf{m/modid.json}.
-Les mods sont regroupés dans des dossiers différents en fonction de la première lettre de leur modid.
-Le fichier de version donne pour chaque version, la liste des dépendances, la version minecraft associée, des urls pour le téléchargement et des noms de fichier que l'on sait être les mods.
-Il est préférable de spécifier plusieurs lien de téléchargement au cas où certains ne fonctionnerait plus.
-Cela donne la figure \ref{fig:cofhcore.json}
-
-\remarque Il est fortement déconseillé de donner des intervalles ouvertes pour les dépendances.
-
-\begin{figure}[h]
-\begin{verbatim}
-{
-    "version": {
-        "mcversion": "1.14",
+[
+    {
+        "name": "biomesoplenty",
+        "version": "7.0.1.2399",
         "dependencies": [
             "forge@[14.26.4.2705,14.29)",
-            "codechickenlib@[3.2.2,4.0.0)"
+            "modid@[3.2.2,4.0.0)"
         ],
-        "urls": ["URL_1.jar", "URL_2.jar"],
-        "alias": ["Nom connu.jar", "NOM-1.14-version.jar"]
-    }
-}
+        "description": "Une description toute simple",
+        "filename": "biomesoplenty-7.0.1.2399.tar"
+        "files": {
+            "mods/BiomesOPlenty-1.12.2-7.0.1.2399-universal.jar": {
+                "sha256": "00000000000000000000000000000000"
+            }
+        }
+    },
+    {...}
+]
 \end{verbatim}
 \caption{Exemple de fichier \textsf{Mods.json}}
-\label{fig:cofhcore.json}
+\label{fig:Mods.json}
 \end{figure}
 
 \subsubsection{Génération automatique}
