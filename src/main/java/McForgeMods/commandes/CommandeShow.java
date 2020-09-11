@@ -70,8 +70,8 @@ public class CommandeShow implements Callable<Integer> {
 		}
 		
 		for (ModVersion version : versions) {
-			System.out.println(String.format("%s %s [%s]", version.mod.modid, version.version,
-					version.mcversion.toStringMinimal()));
+			System.out.println(
+					String.format("%s %s [%s]", version.modid, version.version, version.mcversion.toStringMinimal()));
 			StringJoiner joiner = new StringJoiner(",");
 			version.requiredMods.entrySet().stream().sorted(Map.Entry.comparingByKey())
 					.forEach(e -> joiner.add(e.getKey() + "@" + e.getValue()));

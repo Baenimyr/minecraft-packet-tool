@@ -76,6 +76,13 @@ public class CommandeListe implements Callable<Integer> {
 					System.out.println();
 				}
 			}
+			
+			try {
+				depotInstallation.close();
+			} catch (IOException e) {
+				System.err.println("Impossible de sauvegarder la configuration de l'installation.");
+				return 1;
+			}
 			return 0;
 		}
 	}

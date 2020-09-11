@@ -2,6 +2,7 @@ package McForgeMods.commandes;
 
 import McForgeMods.ForgeMods;
 import McForgeMods.ModVersion;
+import McForgeMods.Version;
 import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.ArbreDependance;
 import McForgeMods.depot.DepotInstallation;
@@ -10,6 +11,7 @@ import McForgeMods.outils.TelechargementHttp;
 import picocli.CommandLine;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.http.HttpResponse;
@@ -46,7 +48,7 @@ public class CommandeInstall implements Callable<Integer> {
 	@CommandLine.Mixin
 	ForgeMods.DossiersOptions dossiers;
 	
-	@CommandLine.Option(names = {"-mc", "--mcversion"}, required = true)
+	@CommandLine.Option(names = {"-mc", "--mcversion"})
 	String mcversion;
 	
 	@CommandLine.Option(names = {"--no-dependencies"}, negatable = true, descriptionKey = "dependencies")
@@ -75,10 +77,6 @@ public class CommandeInstall implements Callable<Integer> {
 		/* Liste des mods à installer. */
 		final ArbreDependance arbre_dependances = new ArbreDependance(depotLocal);
 		
-		VersionIntervalle mcversion = this.mcversion != null ? VersionIntervalle.read(this.mcversion)
-				: VersionIntervalle.ouvert();
-		arbre_dependances.mcversion.intersection(mcversion);
-		
 		try {
 			depotLocal.importation();
 			depotInstallation.analyseDossier(depotLocal);
@@ -86,6 +84,19 @@ public class CommandeInstall implements Callable<Integer> {
 			System.err.println("[ERROR] Erreur de lecture du dépot !");
 			return 1;
 		}
+		
+		if (this.mcversion != null) {
+			if (depotInstallation.mcversion == null) depotInstallation.mcversion = VersionIntervalle.read(this.mcversion);
+			else if (!depotInstallation.mcversion.equals(Version.read(this.mcversion))) {
+				System.err.println("[ERROR] Il est impossible de changer la version de minecraft ici.");
+				return 1;
+			}
+		} else if (depotInstallation.mcversion == null) {
+			System.err.println(
+					"Aucune version de minecraft spécifiée. Veuillez compléter l'option -mc une première fois.");
+			return 1;
+		};
+		arbre_dependances.mcversion.intersection(depotInstallation.mcversion);
 		
 		/* Liste des installations explicitement demandées par l'utilisateur. */
 		final Map<String, VersionIntervalle> demandes;
@@ -102,7 +113,7 @@ public class CommandeInstall implements Callable<Integer> {
 			}
 			// Vérification que l'intervalle n'est pas trop large.
 			if (demande.getValue().minimum() == null && demande.getValue().maximum() == null && (
-					mcversion.minimum() == null || mcversion.maximum() == null)) {
+					depotInstallation.mcversion.minimum() == null || depotInstallation.mcversion.maximum() == null)) {
 				System.err.printf("[ERROR] Vous devez spécifier une version, pour le mod '%s' ou " + "minecraft.%n",
 						demande.getKey());
 				return ERREUR_VERSION;
@@ -115,7 +126,7 @@ public class CommandeInstall implements Callable<Integer> {
 		for (String modid : depotInstallation.getModids()) {
 			for (ModVersion mversion : depotInstallation.getModVersions(modid)) {
 				if (depotInstallation.estManuel(mversion) && !arbre_dependances.listeModids()
-						.contains(mversion.mod.modid) && mversion.mcversion.englobe(mcversion)) {
+						.contains(mversion.modid) && mversion.mcversion.englobe(depotInstallation.mcversion)) {
 					// seulement les choix utilisateur les plus récents
 					arbre_dependances.ajoutContrainte(mversion);
 				}
@@ -157,63 +168,80 @@ public class CommandeInstall implements Callable<Integer> {
 		
 		if (installations.size() != 0) {
 			System.out.println("Installation des nouveaux mods:");
-			StringJoiner joiner = new StringJoiner(", ");
-			installations.forEach(mv -> joiner.add(mv.mod.modid + "=" + mv.version));
-			System.out.println(joiner.toString());
+			StringJoiner joiner = new StringJoiner(" ");
+			installations.forEach(mv -> joiner.add(mv.modid + "=" + mv.version));
+			System.out.println("\t" + joiner.toString());
+			
+			if (!dry_run) {
+				// Déclenche le téléchargement des mods
+				Map<ModVersion, CompletableFuture<Void>> telechargements = new HashMap<>();
+				for (ModVersion mversion : installations) {
+					CompletableFuture<Void> t = CompletableFuture
+							.supplyAsync(new InstallationMod(mversion, depotInstallation, depotLocal), executor).thenAcceptAsync(succes -> {
+								if (succes) {
+									synchronized (depotInstallation) {
+										depotInstallation.installation(mversion, demandes.containsKey(mversion.modid));
+										depotInstallation.suppressionConflits(mversion);
+									}
+								}
+							});
+					telechargements.put(mversion, t);
+				}
+				telechargements.forEach((mversion, cf) -> {
+					try {
+						cf.get();
+					} catch (InterruptedException ignored) {
+					} catch (ExecutionException erreur) {
+						System.err.printf("Erreur téléchargement de '%s': %s%n", mversion, erreur.getMessage());
+					}
+				});
+			}
 		} else {
 			System.out.println("Pas de nouveaux mods à télécharger.");
 			return 0;
 		}
 		
-		if (!dry_run) {
-			// Déclenche le téléchargement des mods
-			Map<ModVersion, CompletableFuture<Void>> telechargements = new HashMap<>();
-			for (ModVersion mversion : installations) {
-				CompletableFuture<Void> t = CompletableFuture
-						.supplyAsync(new TelechargementMod(mversion, depotInstallation), executor)
-						.thenAcceptAsync(succes -> {
-							if (succes) {
-								synchronized (depotInstallation) {
-									depotInstallation.installation(mversion, demandes.containsKey(mversion.mod.modid));
-									depotInstallation.suppressionConflits(mversion);
-								}
-							}
-						});
-				telechargements.put(mversion, t);
-			}
-			telechargements.forEach((mversion, cf) -> {
-				try {
-					cf.get();
-				} catch (InterruptedException ignored) {
-				} catch (ExecutionException erreur) {
-					System.err.printf("Erreur téléchargement de '%s': %s%n", mversion, erreur.getMessage());
-				}
-			});
-			
-			try {
-				depotInstallation.statusSauvegarde();
-			} catch (IOException e) {
-				System.err.println("Impossible de sauvegarder la configuration de l'installation.");
-				return 1;
-			}
-			// return telechargementMods(installations, depotInstallation);
+		try {
+			depotInstallation.close();
+		} catch (IOException e) {
+			System.err.println("Impossible de sauvegarder la configuration de l'installation.");
+			return 1;
 		}
 		return 0;
 	}
 	
-	private static class TelechargementMod implements Supplier<Boolean> {
+	private static class InstallationMod implements Supplier<Boolean> {
+		final DepotLocal        local;
 		final ModVersion        modVersion;
 		final DepotInstallation minecraft;
+		private Path cible = null;
 		
-		TelechargementMod(ModVersion modVersion, DepotInstallation minecraft) {
+		InstallationMod(ModVersion modVersion, DepotInstallation minecraft, DepotLocal local) {
 			this.modVersion = modVersion;
 			this.minecraft = minecraft;
+			this.local = local;
+		}
+		
+		/**
+		 * Change le nom du fichier de destination. Le fichier jar peut avoir n'importe quel nom et le recupère
+		 * généralement le meme que le fichier source.
+		 *
+		 * @param nom: nom du fichier, ne doit pas contenir de caractères comme '/'.
+		 */
+		private void renommerFichier(String nom) {
+			this.cible = modVersion.dossierInstallation(minecraft.dossier).resolve(nom);
 		}
 		
 		@Override
 		public Boolean get() {
 			List<URL> fichiers = modVersion.urls.stream().filter(url -> url.getProtocol().equals("file"))
 					.collect(Collectors.toList());
+			// Ajoute les fichiers éventuellement dans le cache
+			for (String alias : modVersion.alias)
+				try {
+					fichiers.add(local.dossierCache(modVersion).resolve(alias).toUri().toURL());
+				} catch (MalformedURLException ignored) {
+				}
 			List<URL> http = modVersion.urls.stream()
 					.filter(url -> url.getProtocol().equals("http") || url.getProtocol().equals("https"))
 					.collect(Collectors.toList());
@@ -235,11 +263,11 @@ public class CommandeInstall implements Callable<Integer> {
 			for (URL url : fichiers) {
 				try {
 					Path source = Path.of(url.toURI().getPath());
-					Path cible = modVersion.dossierInstallation(minecraft.dossier).resolve(source.getFileName());
-					
+					if (!source.toFile().exists()) continue;
+					this.renommerFichier(source.getFileName().toString());
 					Files.copy(source, cible);
 					synchronized (System.out) {
-						System.out.printf("%-20s %-20s OK%n", modVersion.mod.modid, modVersion.version);
+						System.out.printf("%-20s %-20s OK%n", modVersion.modid, modVersion.version);
 					}
 					return true;
 				} catch (URISyntaxException e) {
@@ -271,8 +299,8 @@ public class CommandeInstall implements Callable<Integer> {
 					for (String info : content) {
 						Matcher m = filename.matcher(info);
 						if (m.find()) {
-							telechargement.fichier = modVersion.dossierInstallation(minecraft.dossier)
-									.resolve(m.group(1)).toFile();
+							this.renommerFichier(m.group(1));
+							telechargement.fichier = this.cible.toFile();
 							System.out.println(
 									"[Telechargement] [DEBUG] nouveau nom : " + telechargement.fichier.getName());
 							break;
@@ -282,7 +310,7 @@ public class CommandeInstall implements Callable<Integer> {
 					long taille = telechargement.telechargement();
 					if (taille == 0) continue;
 					synchronized (System.out) {
-						System.out.printf("%-20s %-20s %.1f Ko%n", modVersion.mod.modid, modVersion.version,
+						System.out.printf("%-20s %-20s %.1f Ko%n", modVersion.modid, modVersion.version,
 								(float) telechargement.telecharge / 1024);
 					}
 					return true;

@@ -80,6 +80,9 @@ Si la borne n'est pas infinie, elle peut être incluse (\verb|[|) dans l'interva
 Une installation de mod est composé de mods \textit{requis} et de mods \textit{nécessaires}.
 Les mods requis sont les mods choisis explicitement par l'utilisateur, alors que les mods nécessaires sont les dépendances des mods requis, choisis par le système pour assurer le fonctionnement du jeu.
 
+Un dossier minecraft ne peut contenir que des mods pour une UNIQUE version de minecraft à la fois.
+Pour créer plusieurs installations avec plusieurs versions, vous pouvez utiliser un outil comme MultiMC. % TODO ajouter référence
+
 \subsection{Installation manuelle}
 \label{section:utilisation.manuelle}
 Lorsque l'utilisateur choisi d'installer un nouveau mod, ce mod est enregistré comme mod \textit{requis}.
@@ -201,7 +204,8 @@ Ce dossier est réservé à l'usage du système local.
 \subsection{Dépôt d'installation}
 \label{section:depot.installation}
 Le dépôt d'installation est un dépôt virtuel rassemblant les informations et présence des mods installés.
-Une installation minecraft et les mods présents dans le dossier \texttt{mods} peut être analysée grâce aux fichiers \texttt{mcmod.info} présents dans les archives jar.
+
+Une installation minecraft et les mods présents dans le dossier \texttt{mods} peuvent être analysés grâce aux fichiers \texttt{mcmod.info} présents dans les archives jar.
 Si ces fichiers sont bien complétés, les fichiers détectés seront comptabilisés, autrement la recherche par \textit{alias} peut retrouver le mod et la version associée à un fichier, à condition que le fichier porte un nom connu et sans ambiguïté.
 
 \subsection{Dépôt internet}
@@ -244,6 +248,46 @@ Une fois le choix de version propagée à toutes les dépendances, on obtient un
 \subsection{Status de l'installation}
 Chaque version installée possède l'un des états d'installation suivant: AUTO si le mod est installé comme dépendance d'un autre, MANUEL si l'utilisateur l'a installé explicitement, VÉRROUILLÉ pour conserver le mod malgrès des erreurs.
 Le status des fichiers installés est sauvegardé dans le fichier \textit{.minecraft/mods/.mods.txt}
+
+Dans le dossier d'installation, se trouve le fichier de sauvegarde sous la forme:
+\begin{verbatim}
+{
+    "minecraft": {
+        "version": "1.XX.X"
+    },
+    "mods": {
+        "cofhcore": {
+            "fichier": "CoFHCore-1.12.2-4.6.3.27-universal.jar",
+            "mode": "auto",
+            "version": "4.6.3.27"
+        },
+        "modid": {
+            "fichier": "...",
+            "mode": "manuel",
+            "version: "X.X.XX"
+        }
+    }
+\end{verbatim}
+
+La section "minecraft" contient les informations sur l'installation actuelle, avec la version de minecraft à utiliser.
+La section "mods" contient la configuration de tous les mods installés.
+
+\subsection{Téléchargement}
+Un mod a été choisi pour être téléchargé et placé dans le dossier \textit{MINECRAFT}.
+La suppression des anciennes versions doit être fait en dernier pour conserver l'installation actuelle en cas d'échec.
+
+\begin{enumerate}
+    \item Identifier une source valide pour le mod.
+Pour les téléchargements http, il s'agit d'envoyer une requête \texttt{HEAD}.
+Les fichiers sur le système de fichier (en cache) doivent être vérifié avec \texttt{File.exists}.
+    \item Récupérer le fichier.
+Le fichier est téléchargé/copier dans le dossier \textit{MINECRAFT}.
+    \item Vérifier le fichier.
+L'intégrité du fichier doit être vérifiée, soit par la taille, mais préférentiellement par le hachage.
+    \item Enregistrer dans le dossier d'installation que le mod est bien présent.
+\end{enumerate}
+
+Les 3 premières opérations peuvent être réalisées en parallèle pour optimiser l'attente réseau.
 
 \subsection{Système de fichier}
 Ce programme n'est conçu que pour écrire les fichiers dans le système de fichier actuel.

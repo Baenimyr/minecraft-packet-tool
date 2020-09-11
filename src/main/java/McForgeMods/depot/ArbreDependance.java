@@ -28,7 +28,7 @@ public class ArbreDependance {
 	/** Fixe un version pour le mod et recalcul les intervalles de dépendance. */
 	public void ajoutContrainte(ModVersion modVersion) {
 		this.mcversion.intersection(modVersion.mcversion);
-		this.ajoutContrainte(modVersion.mod.modid, new VersionIntervalle(modVersion.version));
+		this.ajoutContrainte(modVersion.modid, new VersionIntervalle(modVersion.version));
 	}
 	
 	/**
@@ -87,7 +87,7 @@ public class ArbreDependance {
 	}
 	
 	public boolean contains(ModVersion mversion) {
-		return this.contraintes.containsKey(mversion.mod.modid) && this.contraintes.get(mversion.mod.modid).correspond(mversion.version);
+		return this.contraintes.containsKey(mversion.modid) && this.contraintes.get(mversion.modid).correspond(mversion.version);
 	}
 	
 	public void clear() {

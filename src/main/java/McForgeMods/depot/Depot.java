@@ -16,8 +16,8 @@ import java.util.*;
  * minecraft.
  */
 public class Depot {
-	protected final Map<String, Mod>          mods        = new HashMap<>();
-	protected final Map<Mod, Set<ModVersion>> mod_version = new HashMap<>();
+	protected final Map<String, Mod>             mods        = new HashMap<>();
+	protected final Map<String, Set<ModVersion>> mod_version = new HashMap<>();
 	
 	/**
 	 * Renvoit la liste complète, sans doublons, des mods présents dans le dépôt.
@@ -27,9 +27,15 @@ public class Depot {
 	}
 	
 	/**
-	 * Renvoit le mod, et les informations qu'il contient, associé au modid.
+	 * Chaque dépot gère ses propres instances de {@link Mod} utilisées dans les {@link ModVersion} disponibles dans le
+	 * dépot. Si il n'y a aucune instance disponible pour le modid, une nouvelle est crée et enregistrée.
+	 *
+	 * @return l'unique instance de ce dépot associée au `modid`.
 	 */
 	public Mod getMod(String modid) {
+		if (!this.mods.containsKey(modid)) {
+			this.mods.put(modid.intern(), new Mod(modid));
+		}
 		return this.mods.get(modid);
 	}
 	
@@ -39,14 +45,14 @@ public class Depot {
 	 * @return un ensemble, ou {@code null}
 	 */
 	public Set<ModVersion> getModVersions(Mod mod) {
-		return this.mod_version.get(mod);
+		return this.mod_version.get(mod.modid);
 	}
 	
 	/**
 	 * Similaire à {@link #getModVersions(Mod)}.
 	 */
 	public Set<ModVersion> getModVersions(String modid) {
-		return this.getModVersions(this.getMod(modid));
+		return this.mod_version.get(modid);
 	}
 	
 	/**
@@ -76,42 +82,20 @@ public class Depot {
 	 * @return {@code true} si le mod à la version demandée est connu de ce dépôt.
 	 */
 	public boolean contains(ModVersion modVersion) {
-		return this.contains(modVersion.mod) && this.mod_version.get(modVersion.mod).contains(modVersion);
-	}
-	
-	/**
-	 * Enregistre un nouveau mod dans le dépot.
-	 * <p>
-	 * Si le mod existe déjà, les informations utiles sont importées. Le mod est copié avant d'être ajouté au dépôt pour
-	 * éviter les modifications partagées entres instances. Pour modifier les valeurs de l'instance enregistrée, il faut
-	 * utiliser la valeur de retour de cette fonction ou {@link #getMod(String)}.
-	 *
-	 * @return l'instance réellement sauvegardée.
-	 */
-	public Mod ajoutMod(Mod mod) {
-		if (this.mods.containsKey(mod.modid)) {
-			Mod present = this.mods.get(mod.modid);
-			present.fusion(mod);
-			return present;
-		} else {
-			final Mod copie = mod.copy();
-			this.mods.put(mod.modid, copie);
-			this.mod_version.put(copie, new HashSet<>(2));
-			return copie;
-		}
+		return this.contains(modVersion.modid) && this.mod_version.get(modVersion.modid).contains(modVersion);
 	}
 	
 	/**
 	 * Enregistre une nouvelle version d'un mod dans le dépot.
 	 * <p>
 	 * De préférence, l'instance de mod utilisée à {@link ModVersion#mod} doit correspondre à celle renvoyée par {@link
-	 * #ajoutMod(Mod)}. Il faut également que l'instance enregistrée ici ne correspondent pas à une instance enregistrée
-	 * dans un autre dépôt afin d'éviter les modifications partagées entre dépôt.
+	 * #getMod(String)}. Il faut également que l'instance enregistrée ici ne correspondent pas à une instance
+	 * enregistrée dans un autre dépôt afin d'éviter les modifications partagées entre dépôt.
 	 */
 	public ModVersion ajoutModVersion(final ModVersion modVersion) {
-		Mod mod = this.ajoutMod(modVersion.mod);
+		if (!mod_version.containsKey(modVersion.modid)) mod_version.put(modVersion.modid, new HashSet<>());
 		
-		final Collection<ModVersion> liste = this.mod_version.get(mod);
+		final Collection<ModVersion> liste = this.mod_version.get(modVersion.modid);
 		Optional<ModVersion> present = liste.stream().filter(m -> m.version.equals(modVersion.version)).findFirst();
 		if (present.isPresent()) {
 			present.get().fusion(modVersion);
@@ -158,9 +142,9 @@ public class Depot {
 	public Map<String, VersionIntervalle> dependancesAbsentes(final Map<String, VersionIntervalle> demande) {
 		final Map<String, VersionIntervalle> absents = new HashMap<>();
 		for (Map.Entry<String, VersionIntervalle> dep : demande.entrySet()) {
-			if (!this.contains(dep.getKey()) || this.getModVersions(dep.getKey()).stream()
-					.noneMatch(m -> dep.getValue().equals(VersionIntervalle.ouvert()) || dep.getValue().correspond(m.version))) absents.put(dep.getKey(),
-					dep.getValue());
+			if (!this.contains(dep.getKey()) || this.getModVersions(dep.getKey()).stream().noneMatch(
+					m -> dep.getValue().equals(VersionIntervalle.ouvert()) || dep.getValue().correspond(m.version)))
+				absents.put(dep.getKey(), dep.getValue());
 		}
 		return absents;
 	}

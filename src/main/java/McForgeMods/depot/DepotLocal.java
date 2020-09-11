@@ -75,7 +75,7 @@ public class DepotLocal extends Depot {
 	 * @return le chemin vers le dossier, ne donne pas de nom au fichier
 	 */
 	public Path dossierCache(ModVersion modVersion) {
-		return dossier.resolve("cache").resolve(modVersion.mod.modid);
+		return dossier.resolve("cache").resolve(modVersion.modid);
 	}
 	
 	private File fichierModDepot(String modid) {
@@ -127,7 +127,8 @@ public class DepotLocal extends Depot {
 		
 		for (String modid : json.keySet()) {
 			JSONObject data = json.getJSONObject(modid);
-			Mod mod = this.ajoutMod(new Mod(modid, data.getString("name")));
+			Mod mod = this.getMod(modid);
+			mod.name = data.getString("name");
 			if (data.has("url")) {
 				String url = data.getString("url");
 				mod.url = url.length() == 0 ? null : url;
@@ -140,7 +141,6 @@ public class DepotLocal extends Depot {
 				String updateJSON = data.getString("updateJSON");
 				mod.updateJSON = updateJSON.length() == 0 ? null : updateJSON;
 			}
-			this.ajoutMod(mod);
 		}
 	}
 	
@@ -156,8 +156,8 @@ public class DepotLocal extends Depot {
 		
 		for (String version : json_total.keySet()) {
 			JSONObject json = json_total.getJSONObject(version);
-			final ModVersion mv = this.ajoutModVersion(new ModVersion(this.getMod(modid), Version.read(version),
-					VersionIntervalle.read(json.getString("mcversion"))));
+			final ModVersion mv = this.ajoutModVersion(
+					new ModVersion(modid, Version.read(version), VersionIntervalle.read(json.getString("mcversion"))));
 			
 			if (json.has("urls")) {
 				Object url = json.get("urls");
@@ -253,10 +253,9 @@ public class DepotLocal extends Depot {
 	 * Dans le dossier de dépôt, le fichier de sauvegarde se situe en <i>./m/modid/modid.json</i>
 	 */
 	private void ecritureFichierMod(String modid, final OutputStream outputStream) throws IOException {
-		final Mod mod = this.getMod(modid);
 		final JSONObject json_total = new JSONObject();
 		
-		for (ModVersion mv : this.mod_version.get(mod)) {
+		for (ModVersion mv : this.mod_version.get(modid)) {
 			JSONObject json = new JSONObject();
 			mv.urls.sort(Comparator.comparing(URL::toString));
 			mv.alias.sort(String::compareTo);
@@ -305,7 +304,7 @@ public class DepotLocal extends Depot {
 				modVersion.alias.clear();
 			}
 			
-			this.mod_version.get(this.getMod(modid)).removeIf(mv -> mv.urls.isEmpty());
+			this.mod_version.get(modid).removeIf(mv -> mv.urls.isEmpty());
 		}
 	}
 	
@@ -326,8 +325,7 @@ public class DepotLocal extends Depot {
 		}
 		
 		final List<String> modids = new ArrayList<>(this.getModids());
-		for (int i = 0; i < modids.size(); i++) {
-			String modid = modids.get(i);
+		for (String modid : modids) {
 			try (InputStream is = depot_distant.fichierModDepot(modid)) {
 				this.lectureFichierMod(modid, is);
 				// float progres = (float) i / modids.size();
