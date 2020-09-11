@@ -53,14 +53,15 @@ Pour les joueurs qui possèdent plusieurs installations pour différentes config
 
 \subsection{Dépendances}
 Les mods peuvent être reliés entre eux par une relation de dépendance.
-Les dépendances sont déclarées sous la forme \verb|required-after:modid@[min_version,max_version]| dans \verb|@Mod(String dependencies)| du code, ou dans le fichier \texttt{mcmod.info} dans le champs \texttt{dependencies}\footnote{\url{https://mcforge.readthedocs.io/en/1.14.x/gettingstarted/structuring/}}.
+Les dépendances sont déclarées sous la forme \verb|required-after:modid@[min_version,max_version]| dans \verb|@Mod(String dependencies)| du code, ou dans les fichiers \texttt{mcmod.info} ou \texttt{META-INF/mods.toml} dans le champs \texttt{dependencies}\footnote{\url{https://mcforge.readthedocs.io/en/1.14.x/gettingstarted/structuring/}}.
+Seuls ses derniers fichiers peuvent être lus pour les analyses automatiques.
 
 Une version\footnote{\url{https://semver.org/}} est une suite d'entiers séparés par des points et définie une positions précise dans l'espace des versions.
 Si une sous-version n'est pas spécifiée, elle est estimée à 0.
 La dépendance déclare un intervalle non vide de version demandée, lorsqu'une version spécifique est choisie l'intervalle sera alors de la forme [version, version].
 
 La dépendance vaut aussi pour la version de minecraft.
-Une version de minecraft est au moins spécifiée jusqu'au niveau 3 (ex: 1.12.2, 1.14.1, 1.14.2) alors que certains mods, surtout les librairies, sont compatibles pour tout un ensemble de version.
+Une version de minecraft est au moins spécifiée jusqu'au niveau 3 (ex: 1.12.2, 1.14.1, 1.14.2) alors que certains mods, surtout les librairies, sont compatibles pour tout un ensemble de version (comme 1.12).
 Chaque version de mod déclare être compatible avec une version de minecraft, mais cette version sera interprétée comme un intervalle en regardant le nombre de sous versions significative ($\neq 0$).
 Par exemple \verb|1.12.2| devient \verb|[1.12.2, 1.12.3)| (1.12.2 inclus jusqu'à 1.12.3 exclus) alors que \verb|1.12| devient \verb|[1.12, 1.13)|, ce qui inclut \verb|1.12.2| et \verb|1.12.4|.
 
@@ -90,13 +91,53 @@ Puis les dépendances sont calculés à partir de tous les mods \textit{requis} 
 Enfin toutes les dépendances qui ne sont pas déjà satisfaite par l'installation actuelle sont téléchargées et installées.
 L'objectif est de limiter les changements, c'est pourquoi les mods présents ne sont pas mis à jour vers la version la plus récente compatible.
 
+\subsubsection{Données d'installation}
+Le fichier \texttt{mods/.mods.json} donnent les données d'installation, notamment la version de minecraft utilisée ici et pour chaque installation:
+\begin{itemize}
+    \item manual (booleen): s'il s'agit d'une installation manuelle ou automatique
+    \item locked (boolean): si cette version est verrouillée.
+        Une version verrouillée ne peut pas être désinstallée.
+        Cela implique également qu'elle ne peut pas être mise à jour.
+\end{itemize}
+
+Ces paramètres peuvent être modifiés grâce à la commande \textbf{mark}.
+
+\begin{figure}
+\begin{verbatim}
+{
+    "minecraft": {
+		"version": "1.XX.X"
+    },
+    "mods": {
+        "cofhcore": {
+            "fichier": "CoFHCore-1.12.2-4.6.3.27-universal.jar",
+            "version": "4.6.3.27",
+            "manual": false,
+            "locked": false
+        },
+        "modid": {
+            "fichier": "...",
+            "version: "X.X.XX"
+            "manual": true,
+            "locked": false
+        }
+	}
+}
+\end{verbatim}
+\caption{Fichier .mods.json}
+\end{figure}
+
+La section "minecraft" contient les informations sur l'installation actuelle, avec la version de minecraft à utiliser.
+La section "mods" contient la configuration de tous les mods installés.
+
+
 \subsection{Vérification}
 Dès que des mods sont présents dans le dossier \texttt{.minecraft/mods}, il est possible de vérifier l'installation.
 La vérification consiste à s'assurer que tous les mods nécessaires sont présents et dans les bonnes versions.
-L'utilisateur peut choisir de télécharger lui même les corrections, d'utiliser la commande d'installation vu à la section \ref{section:utilisation.manuelle} ou de mettre à jour (section \ref{section:utilisation.miseajour}).
+Pour permettre au non-utilisateurs du programme de manipuller les fichiers à la main, la disparition d'un fichier installé par le programme invalide son installation.
+Les autres fichiers installés en même temps sont laissés en place, mais le mod n'est plus considéré comme installé et devra être réinstaller manuellement.
 
 La commande \texttt{show dependencies} permet de calculer et afficher tous les mods nécessaires et les versions pour lesquels ils sont utilisables.
-Le calcul peut être limité à une selection de mods \textit{requis} ou aux mods \textit{requis} de l'installation.
 
 \subsection{Mise à jour}
 \label{section:utilisation.miseajour}
@@ -115,7 +156,7 @@ Il n'y a aucune réinstallation automatique des dépendances, cela doit se faire
 Puisque les mods peuvent être manipulés à la main, la commande \texttt{autoremove} permet de supprimer les mods \textit{nécessaires} dont les dépendants ont disparus.
 
 \subsection{Recherche}
-% TODO:
+La commande \textbf{search} permet de trouver une \textit{regex} dans les modids ou les noms de mod connus.
 
 \subsection{Compatibilité serveur}
 Un serveur minecraft forge déclare les mods qu'il utilise et leurs versions afin que le client vérifie la compatibilité.
@@ -129,6 +170,23 @@ Le joueur peut sans problème compléter son installation avec d'autres mods, gr
 %
 \section{Dépôts}
 \label{section:depot}
+\subsection{Paquet}
+Les mods sont installés à partir de paquets.
+Chaque paquets sont des archives qui contiennent les informations du paquets dans un fichier \texttt{nom.json} et les fichiers qu'il installe dans le dossier \texttt{data}.
+
+Le fichier d'information indique
+\begin{itemize}
+    \item l'identifiant du paquet, généralement le modid du mod qu'il contient.
+    \item la version du paquet
+    \item les dépendances obligatoires au format \textit{modid}@\textit{versions}
+    % \item les dépendances recommandées
+    \item la version de minecraft compatible
+    \item des informations sur les fichiers installés, comme des sommes de contrôle.
+\end{itemize}
+
+Un paquet peut ne contenir aucun fichier mais des dépendances.
+Ce format permet la création de \textit{modpack}s, incluant même des fichiers de configuration.
+
 \subsection{Structure d'un dépôt}
 Un dépôt recense une liste de mods connus et les spécifications de ses versions.
 
@@ -173,15 +231,16 @@ Cela donne la figure \ref{fig:cofhcore.json}
     }
 }
 \end{verbatim}
-\caption{Exemple de fichier \textsf{c/cofhcore.json}}
+\caption{Exemple de fichier \textsf{Mods.json}}
 \label{fig:cofhcore.json}
 \end{figure}
 
-Un url relatif sera considéré comme relatif à la racine du dépôt.
-C'est un bon moyen de diffuser les fichiers jar en les plaçant directement dans le dépôt.
+\subsubsection{Génération automatique}
+Les paquets peuvent être générés automatiquement à partir des fichiers jar.
+Pour les mods ne fournissant pas de fichier \textsf{mcmod.info} ou \textsf{mods.toml} valide, il est impossible d'utiliser cette fonctionnalité.
 
-Pour les mods ne fournissant pas de fichier \textsf{mcmod.info} ou \textsf{mods.toml} valide, la liste des alias permet d'identifier les fichiers en donnant leur mod et leur version.
-Cette méthode n'est pas idéale, mais généralement les fichiers ont des noms totalement uniques ou standards comme \verb|NOM-MCVERSION-VERSION-BUILD.jar|.
+À partir d'un ensemble de paquet, il faut maintenant générer le fichier \texttt{Mods.json}.
+
 
 \subsection{Dépôt local}
 \label{section:depot.local}
@@ -190,13 +249,11 @@ Il permet toutes les fonctions standard sans à avoir à lire tous les dépôts 
 Par défaut, il se situe à \textsf{$\sim$/.minecraft/forgemods} mais le chemin d'accès est paramétrable avec l'option \texttt{--depot}.
 L'utilisation de cette option permet de construire et valider un dépôt qui sera ensuite publié sur internet.
 
-Le dépôt local peut également servir de cache pour les fichiers jar téléchargés.
-Sur demande explicite, les fichiers jar présents dans une installation et identifiés seront copiés dans la zone cache du dépôt et un url pointant vers les fichiers ajoutés à la liste pour le téléchargement.
+Le dépôt local peut également servir de cache pour les paquets téléchargés.
 Un fichier présent dans le cache sera préféré, au moment de l'installation, à un fichier devant être téléchargé.
 
 \paragraph{Cache}
-Le dossier \textsf{./cache} permet de sauvegarder divers fichiers, notamment les fichiers jar pour les mettre immédiatement à portée.
-Par exemple le jar d'un mod \textit{Test} pourra être rangé à \textsf{./cache/t/Test-MCVERSION-VERSION.jar}.
+Le dossier \textsf{./cache} permet de sauvegarder divers fichiers, notamment les paquets pour les mettre immédiatement à portée.
 
 Le contenu du cache n'est pas synchronisé à partir des sources lors de la mise à jour.
 Ce dossier est réservé à l'usage du système local.
@@ -205,26 +262,24 @@ Ce dossier est réservé à l'usage du système local.
 \label{section:depot.installation}
 Le dépôt d'installation est un dépôt virtuel rassemblant les informations et présence des mods installés.
 
-Une installation minecraft et les mods présents dans le dossier \texttt{mods} peuvent être analysés grâce aux fichiers \texttt{mcmod.info} présents dans les archives jar.
-Si ces fichiers sont bien complétés, les fichiers détectés seront comptabilisés, autrement la recherche par \textit{alias} peut retrouver le mod et la version associée à un fichier, à condition que le fichier porte un nom connu et sans ambiguïté.
+Une installation minecraft et les mods présents dans le dossier \texttt{mods} peuvent être analysés grâce aux fichiers \texttt{mcmod.info} ou \texttt{META-INF/mods.toml} présents dans les archives jar.
+Si ces fichiers sont bien complétés, les fichiers détectés seront comptabilisés, autrement la recherche par nom de fichier peut retrouver le mod et la version associée à un fichier, à condition que le fichier porte un nom connu.
 
 \subsection{Dépôt internet}
 \label{section:depot.internet}
 \subsubsection{Construction}
 Un dépôt internet n'est rien de plus qu'un des dépôts générés comme dépôt local (\ref{section:depot.local}), mais disponible sur internet.
 
-Un dépôt internet peut se présenté sous différents format: \texttt{dir} si l'url \textit{URL} est le chemin vers la racine du dépôt et que les fichiers se trouvent aux urls \textit{URL/fichier.json}, \texttt{tar} si le dépôt a été placé dans un fichier tar et que l'url permet de lire directement le fichier au format tar.
+Un dépôt internet peut se présenter sous différents format: \texttt{http} si l'url \textit{URL} est le chemin vers la racine du dépôt et que les fichiers se trouvent aux urls \textit{URL/fichier.json}, \texttt{tar} si le dépôt a été placé dans un fichier tar et que l'url permet de lire directement le fichier au format tar.
+Un dépôt peut cumuler différents formats grâce aux protocols spécifiés dans l'url.
 
-\paragraph{Format tar}
-Le format tar permet de télécharger d'un seul coup tous les fichiers JSON du dépôt.
-Cependant, il est inutile d'y ajouter d'autres fichiers, en particulier le dossier cache.
-Le contenu du dossier cache sera lu indépendamment et seulement si nécessaire.
+Par exemple un dépot tar compressé gzip accessible par ftp aura un URL de la forme \textit{tar:gz:ftp://web.net/main}
 
 \paragraph{Protocols}
-Les protocols de communication dépendent des capacités de la librairie standard, cependant les protocols http et https sont parfaitement fonctionnels tant que le serveur ne tente pas le \textit{Browser Integrity Check}.
+Les protocols de communication dépendent des capacités de la librairie Apache VFS \footnote{\url{http://commons.apache.org/proper/commons-vfs/filesystems.html}}, cependant les protocols http et https sont parfaitement fonctionnels tant que le serveur ne tente pas le \textit{Browser Integrity Check}.
 
 \subsubsection{Téléchargement}
-Au moment de la mise à jour du dépôt local, chaque dépôt internet déclaré dans la liste des sources est contacté et lu intégralement.
+Au moment de la mise à jour du dépôt local, chaque dépôt internet déclaré dans la liste des sources est contacté et seuls les fichiers d'information sont téléchargés.
 Tous les mods déclarés dans \textsf{Mods.json} du dépot doivent mener à un fichier contenant les informations de versions.
 
 La commande \texttt{depot update} permet de mettre à jour le dépôt local à partir des dépôts internet (section \ref{section:depot.internet}).
@@ -235,56 +290,32 @@ Pour cela, le dépôt est premièrement vidé puis les informations des dépôt 
 % ----------------------------------------
 %
 \section{Fonctionnement Interne}
+
 \subsection{Résolution des dépendances}
-La résolution des dépendances nécessite des informations qui peuvent changer d'une version de mod à l'autre.
-Les mods demandés sont seulement identifiés par leur \textit{modid} car l'arbre ne dispose en principe d'aucun dépôt comme source d'information.
-On obtient dans un premier temps une association $modid \rightarrow versions$.
+Par hypothèse les dépendances sont croissantes avec la version et il n'existe pas de conflit.
+Cela signifie que pour toute version $v_b > v_a$, pour toute dépendance $d$ utile au deux versions ($v_b \Rightarrow d@i_b$, $v_a \Rightarrow d@i_a$), l'intervalle de version $i_b$ doit être supérieur ou égal à $i_a$.
 
-Pour résoudre les dépendances de dépendances, il faut donc choisir une version comme source d'information en utilisant un dépôt référence.
-Ce choix est repoussé au plus tard possible, et ce sera la version la plus récente qui sera choisie parmi toutes les versions compatibles.
-Il faut donc que toutes les versions soient renseignées correctement.
-Une fois le choix de version propagée à toutes les dépendances, on obtient une liste de mod et la version choisie.
+1) Chaque installation demandée (commande + donnée d'installation) réduit à une seule version possible les mods installés manuellement.
+La réduction de l'intervalle pour un mod, réduit immédiatement l'intervalle des mods dépendants.
 
-\subsection{Status de l'installation}
-Chaque version installée possède l'un des états d'installation suivant: AUTO si le mod est installé comme dépendance d'un autre, MANUEL si l'utilisateur l'a installé explicitement, VÉRROUILLÉ pour conserver le mod malgrès des erreurs.
-Le status des fichiers installés est sauvegardé dans le fichier \textit{.minecraft/mods/.mods.txt}
+2) Pour chaque mod \textit{libre}, si la dépendance est déjà satisfaite (version installée comprise dans l'intervalle), l'intervalle est réduite à cette unique version.
 
-Dans le dossier d'installation, se trouve le fichier de sauvegarde sous la forme:
-\begin{verbatim}
-{
-    "minecraft": {
-        "version": "1.XX.X"
-    },
-    "mods": {
-        "cofhcore": {
-            "fichier": "CoFHCore-1.12.2-4.6.3.27-universal.jar",
-            "mode": "auto",
-            "version": "4.6.3.27"
-        },
-        "modid": {
-            "fichier": "...",
-            "mode": "manuel",
-            "version: "X.X.XX"
-        }
-    }
-\end{verbatim}
-
-La section "minecraft" contient les informations sur l'installation actuelle, avec la version de minecraft à utiliser.
-La section "mods" contient la configuration de tous les mods installés.
+3) S'il reste encore des mods pour lesquels l'intervalle de version est suffisamment large, la version choisie est la version maximale disponible.
+Cette dernière résolution se fait dans l'ordre topologique.
 
 \subsection{Téléchargement}
 Un mod a été choisi pour être téléchargé et placé dans le dossier \textit{MINECRAFT}.
 La suppression des anciennes versions doit être fait en dernier pour conserver l'installation actuelle en cas d'échec.
 
 \begin{enumerate}
-    \item Identifier une source valide pour le mod.
+	\item Identifier une source valide pour le mod.
 Pour les téléchargements http, il s'agit d'envoyer une requête \texttt{HEAD}.
 Les fichiers sur le système de fichier (en cache) doivent être vérifié avec \texttt{File.exists}.
-    \item Récupérer le fichier.
+	\item Récupérer le fichier.
 Le fichier est téléchargé/copier dans le dossier \textit{MINECRAFT}.
-    \item Vérifier le fichier.
+	\item Vérifier le fichier.
 L'intégrité du fichier doit être vérifiée, soit par la taille, mais préférentiellement par le hachage.
-    \item Enregistrer dans le dossier d'installation que le mod est bien présent.
+	\item Enregistrer dans le dossier d'installation que le mod est bien présent.
 \end{enumerate}
 
 Les 3 premières opérations peuvent être réalisées en parallèle pour optimiser l'attente réseau.
@@ -293,13 +324,5 @@ Les 3 premières opérations peuvent être réalisées en parallèle pour optimi
 Ce programme n'est conçu que pour écrire les fichiers dans le système de fichier actuel.
 Pour réaliser une installation de mod sur un serveur distant, il est possible de monter un dossier ftp dans le système de fichier ou exécuter le programme sur la machine distante, à condition qu'elle le puisse.
 Dans le cas d'un dossier distant monté, l'OS s'occupe de tout donc cela dépend de ses capacités.
-
-\newpage
-\section{À faire}
-Commande désinstallation et \texttt{autoremove}
-
-Écriture des fichiers sur un serveur distant en ftp (automatique si monté sur le système).
-
-Récupération des paramètres d'un serveur (liste des mods).
 	
 \end{document}
