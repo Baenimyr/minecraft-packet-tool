@@ -2,8 +2,6 @@ package McForgeMods.depot;
 
 import McForgeMods.Mod;
 import McForgeMods.ModVersion;
-import McForgeMods.Version;
-import McForgeMods.VersionIntervalle;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -11,48 +9,23 @@ import org.json.JSONTokener;
 
 import java.io.*;
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
- * <h2>Format du dépot</h2>
- * <ul>
- * <li>
- * fichier Mods.json: index contenant la liste des mods disponibles et les informations générales écrites par la
- * fonction {@link #sauvegarde()}.
- * {
- *     "<i>modid</i>": {
- *         "name": "<i>name</i>",
- *         "description": "<i>description</i>",
- *         "url": "<i>URL</i>",
- *         "updateJSON": "<i>URL</i>",
- *         ... },
- *     ... }
- * </li>
- * <li>
- * pour un modid <i>test</i>, le fichier
- * <i>t/test/test.json</i> contient les informations relatives à chaque version disponibles, écrites par la fonction
- * {@link #ecritureFichierMod(String, OutputStream)} sous le format:
- * {
- *     <i>version</i>: {
- *         "mcversion": "1.12.2",
- *         "urls": [<i>liens de téléchargement</i>],
- *         ... },
- *     ... }
- * </li>
- * </ul>
- *
  * @see Mod
  * @see ModVersion
  */
 public class DepotLocal extends Depot {
+	public final Path                           dossier;
+	public final Map<ModVersion, ArchivePaquet> archives = new HashMap<>();
 	
-	public final Path dossier;
-	
-	/** Ouvre un dépôt local.
-	 * Si aucun chemin n'est spécifié, l'emplacement par défaut est ~/.minecraft/forgemods
+	/**
+	 * Ouvre un dépôt local. Si aucun chemin n'est spécifié, l'emplacement par défaut est ~/.minecraft/forgemods
+	 *
 	 * @param dossier du dépôt ou {@code null}
 	 */
 	public DepotLocal(Path dossier) {
@@ -65,12 +38,10 @@ public class DepotLocal extends Depot {
 		}
 	}
 	
-	private File fichierIndexDepot() {
-		return dossier.resolve("Mods.json").toFile();
-	}
-	
-	/** Fournit un dossier de mod en cache.
-	 * Les fichiers de mods peuvent être sauvegardés pour être installé sans téléchargement.
+	/**
+	 * Fournit un dossier de mod en cache. Les fichiers de mods peuvent être sauvegardés pour être installé sans
+	 * téléchargement.
+	 *
 	 * @param modVersion: version à sauvegarder. Permet de séparer les éléments du cache.
 	 * @return le chemin vers le dossier, ne donne pas de nom au fichier
 	 */
@@ -78,8 +49,33 @@ public class DepotLocal extends Depot {
 		return dossier.resolve("cache").resolve(modVersion.modid);
 	}
 	
-	private File fichierModDepot(String modid) {
-		return dossier.resolve(modid.substring(0, 1)).resolve(modid + ".json").toFile();
+	private File fichierIndexDepot() {
+		return dossier.resolve("Mods.json").toFile();
+	}
+	
+	/**
+	 * Analyse le fichier d'index pour importer les mods. L'index doit être un JSON dont les clés au premier niveau sont
+	 * les modids.
+	 *
+	 * @param input contenu du fichier d'index.
+	 */
+	private void lectureFichierIndex(final InputStream input) throws JSONException {
+		JSONTokener tokener = new JSONTokener(new BufferedInputStream(input));
+		JSONArray mods = new JSONArray(tokener);
+		
+		for (int i = 0; i < mods.length(); i++) {
+			try {
+				JSONObject data = mods.getJSONObject(i);
+				ModVersion modVersion = ModVersion.lecturePaquet(data);
+				ArchivePaquet paquet = new ArchivePaquet();
+				paquet.fichier = new URI(data.getString("filename"));
+				if (data.has("sha256")) paquet.SHA256 = data.getString("sha256");
+				
+				this.ajoutModVersion(modVersion);
+				this.archives.put(modVersion, paquet);
+			} catch (URISyntaxException ignored) {
+			}
+		}
 	}
 	
 	/**
@@ -97,104 +93,11 @@ public class DepotLocal extends Depot {
 		} catch (JSONException je) {
 			throw new JSONException("Erreur lecture fichier 'Mods.json'", je);
 		}
-		
-		ArrayList<String> modids = new ArrayList<>(getModids());
-		Collections.sort(modids);
-		for (String modid : modids) {
-			final File nom_fichier = fichierModDepot(modid);
-			if (!nom_fichier.exists()) System.err.println("Le fichier de données pour '" + modid + "' n'existe pas.");
-			
-			try (FileInputStream fichier = new FileInputStream(nom_fichier)) {
-				BufferedInputStream buff = new BufferedInputStream(fichier);
-				if (buff.available() == 0) return;
-				lectureFichierMod(modid, buff);
-			} catch (JSONException je) {
-				throw new JSONException("Erreur lecture fichier '" + nom_fichier + "'", je);
-			}
-		}
-		System.err.flush();
 	}
 	
 	/**
-	 * Analyse le fichier d'index pour importer les mods. L'index doit être un JSON dont les clés au premier niveau sont
-	 * les modids.
-	 *
-	 * @param input contenu du fichier d'index.
-	 */
-	private void lectureFichierIndex(final InputStream input) throws JSONException {
-		JSONTokener tokener = new JSONTokener(new BufferedInputStream(input));
-		JSONObject json = new JSONObject(tokener);
-		
-		for (String modid : json.keySet()) {
-			JSONObject data = json.getJSONObject(modid);
-			Mod mod = this.getMod(modid);
-			mod.name = data.getString("name");
-			if (data.has("url")) {
-				String url = data.getString("url");
-				mod.url = url.length() == 0 ? null : url;
-			}
-			if (data.has("description")) {
-				String description = data.getString("description");
-				mod.description = description.length() == 0 ? null : description;
-			}
-			if (data.has("updateJSON")) {
-				String updateJSON = data.getString("updateJSON");
-				mod.updateJSON = updateJSON.length() == 0 ? null : updateJSON;
-			}
-		}
-	}
-	
-	/**
-	 * Analyse le fichier associé à un mod particulier pour extraire les informations de version.
-	 *
-	 * @param modid: identifiant du mod associé à ses informations.
-	 * @param input contenu du fichier
-	 */
-	private void lectureFichierMod(final String modid, final InputStream input) {
-		JSONTokener tokener = new JSONTokener(input);
-		JSONObject json_total = new JSONObject(tokener);
-		
-		for (String version : json_total.keySet()) {
-			JSONObject json = json_total.getJSONObject(version);
-			final ModVersion mv = this.ajoutModVersion(
-					new ModVersion(modid, Version.read(version), VersionIntervalle.read(json.getString("mcversion"))));
-			
-			if (json.has("urls")) {
-				Object url = json.get("urls");
-				if (url instanceof JSONArray) {
-					for (int i = 0; i < ((JSONArray) url).length(); i++)
-						try {
-							mv.ajoutURL(new URL(this.dossier.toUri().toURL(), ((JSONArray) url).getString(i)));
-						} catch (MalformedURLException u) {
-							u.printStackTrace();
-						}
-				} else {
-					try {
-						mv.ajoutURL(new URL(this.dossier.toUri().toURL(), json.getString("urls")));
-					} catch (MalformedURLException u) {
-						u.printStackTrace();
-					}
-				}
-			}
-			
-			if (json.has("requiredMods")) {
-				JSONArray liste = json.getJSONArray("requiredMods");
-				for (Map.Entry<String, VersionIntervalle> dependances : VersionIntervalle.lectureDependances(liste)
-						.entrySet())
-					mv.ajoutModRequis(dependances.getKey(), dependances.getValue());
-			}
-			
-			if (json.has("alias")) {
-				JSONArray liste = json.getJSONArray("alias");
-				for (int i = 0; i < liste.length(); i++)
-					mv.ajoutAlias(liste.getString(i));
-			}
-		}
-	}
-	
-	/**
-	 * Enregistre la liste des mods dans le fichier <i>Mods.json</i> à la racine du dépôt. Sauvegarde les informations
-	 * d'un mod ({@link #ecritureFichierMod(String, OutputStream)}) en même temps.
+	 * Enregistre la liste des mods dans le fichier <i>Mods.json</i> à la racine du dépôt. Sauvegarde une partie des
+	 * informations de {@link ModVersion} pour un aperçu rapide.
 	 */
 	public void sauvegarde() throws IOException {
 		if (!this.dossier.toFile().exists() && !this.dossier.toFile().mkdirs()) return;
@@ -202,19 +105,6 @@ public class DepotLocal extends Depot {
 		try (FileOutputStream fichier = new FileOutputStream(fichierIndexDepot());
 			 BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(fichier)) {
 			ecritureFichierIndex(bufferedOutputStream);
-		}
-		
-		ArrayList<String> liste = new ArrayList<>(this.getModids());
-		Collections.sort(liste);
-		for (String modid : liste) {
-			File fichier_mod = fichierModDepot(modid);
-			if (!fichier_mod.getParentFile().exists()) fichier_mod.getParentFile().mkdirs();
-			try (FileOutputStream donnees = new FileOutputStream(fichier_mod);
-				 BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(donnees)) {
-				this.ecritureFichierMod(modid, bufferedOutputStream);
-			} catch (FileNotFoundException f) {
-				System.err.println(String.format("Impossible d'écrire le fichier '%s'.", fichier_mod.toString()));
-			}
 		}
 	}
 	
@@ -226,74 +116,30 @@ public class DepotLocal extends Depot {
 	 * @param outputStream: flux d'écriture.
 	 */
 	private void ecritureFichierIndex(final OutputStream outputStream) throws IOException {
-		JSONObject json = new JSONObject();
-		List<String> modids = new ArrayList<>(mods.keySet());
-		modids.sort(String::compareToIgnoreCase);
+		JSONArray mods = new JSONArray();
 		
-		for (String modid : modids) {
-			final JSONObject data = new JSONObject();
-			final Mod mod = this.mods.get(modid);
-			data.put("name", mod.name);
-			if (mod.url != null && mod.url.length() > 0) data.put("url", mod.url);
-			if (mod.description != null && mod.description.length() > 0) data.put("description", mod.description);
-			if (mod.updateJSON != null && mod.updateJSON.length() > 0) data.put("updateJSON", mod.updateJSON);
-			json.put(modid, data);
-		}
+		for (String modid : this.getModids())
+			for (ModVersion modVersion : this.getModVersions(modid)) {
+				final JSONObject data = new JSONObject();
+				modVersion.ecriturePaquet(data);
+				ArchivePaquet archive = this.archives.get(modVersion);
+				data.put("filename", archive.fichier.toString());
+				if (archive.SHA256 != null) {
+					data.put("sha256", archive.SHA256);
+				}
+				
+				mods.put(data);
+			}
 		
 		try (OutputStreamWriter writer = new OutputStreamWriter(outputStream)) {
 			simpleJson.JSONWriter jwriter = new simpleJson.JSONWriter();
-			jwriter.write(json, writer);
+			jwriter.write(mods, writer);
 		}
 	}
 	
 	/**
-	 * Enregistre les informations d'un mod. Enregistre toutes les versions disponibles ainsi que les informations de
-	 * celles-ci.
+	 * Efface toute information non essentielle du dépôt.
 	 * <p>
-	 * Dans le dossier de dépôt, le fichier de sauvegarde se situe en <i>./m/modid/modid.json</i>
-	 */
-	private void ecritureFichierMod(String modid, final OutputStream outputStream) throws IOException {
-		final JSONObject json_total = new JSONObject();
-		
-		for (ModVersion mv : this.mod_version.get(modid)) {
-			JSONObject json = new JSONObject();
-			mv.urls.sort(Comparator.comparing(URL::toString));
-			mv.alias.sort(String::compareTo);
-			
-			json.put("mcversion", mv.mcversion.toStringMinimal());
-			
-			JSONArray urls = new JSONArray();
-			for (URL url : mv.urls) {
-				if (url.getProtocol().equals("file")) {
-					try {
-						Path path = Path.of(url.toURI().getPath());
-						if (path.startsWith(this.dossier)) {
-							urls.put(this.dossier.relativize(path));
-							continue;
-						}
-					} catch (URISyntaxException ignored) {}
-				}
-				urls.put(url.toString());
-			}
-			json.put("urls", urls);
-			
-			JSONArray liste = new JSONArray();
-			mv.requiredMods.entrySet().stream().sorted(Map.Entry.comparingByKey())
-					.map(e -> e.getValue() != null ? e.getKey() + "@" + e.getValue() : e.getKey()).forEach(liste::put);
-			json.put("requiredMods", liste);
-			
-			json.put("alias", new JSONArray(mv.alias));
-			json_total.put(mv.version.toString(), json);
-		}
-		
-		try (OutputStreamWriter writer = new OutputStreamWriter(outputStream)) {
-			simpleJson.JSONWriter jwriter = new simpleJson.JSONWriter();
-			jwriter.write(json_total, writer);
-		}
-	}
-	
-	/** Efface toute information non essentielle du dépôt.
-	 *
 	 * Si des versions de mods sont sauvegardées localement, une minimum d'information est conservé.
 	 */
 	public void clear() {
@@ -306,6 +152,11 @@ public class DepotLocal extends Depot {
 			
 			this.mod_version.get(modid).removeIf(mv -> mv.urls.isEmpty());
 		}
+	}
+	
+	private static class ArchivePaquet {
+		URI    fichier;
+		String SHA256 = null;
 	}
 	
 	/**
@@ -323,20 +174,6 @@ public class DepotLocal extends Depot {
 		try (InputStream is = depot_distant.fichierIndexDepot()) {
 			this.lectureFichierIndex(new BufferedInputStream(is));
 		}
-		
-		final List<String> modids = new ArrayList<>(this.getModids());
-		for (String modid : modids) {
-			try (InputStream is = depot_distant.fichierModDepot(modid)) {
-				this.lectureFichierMod(modid, is);
-				// float progres = (float) i / modids.size();
-				//System.out.print(String.format("\r[%s>%s] %d/%d     ", "=".repeat((int) (50. * progres)),
-				//		" ".repeat((int) (50 * (1. - progres) - 1)), (i + 1), modids.size()));
-			} catch (FileNotFoundException f) {
-				System.err.println(
-						String.format("Les données de version pour le mod '%s' ne sont pas disponibles.", modid));
-			}
-		}
 		System.out.println();
-		System.out.println(String.format("%d mods récupérés.", modids.size()));
 	}
 }

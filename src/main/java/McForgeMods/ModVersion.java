@@ -1,5 +1,8 @@
 package McForgeMods;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.net.URL;
 import java.nio.file.Path;
 import java.util.*;
@@ -13,9 +16,11 @@ import java.util.*;
  * @see Mod
  */
 public class ModVersion {
-	public final String            modid;
-	public final Version           version;
-	public final VersionIntervalle mcversion;
+	public final String                    modid;
+	public final Version                   version;
+	public final VersionIntervalle         mcversion;
+	/** Liste des fichiers associés à l'installation. */
+	public final List<FichierInstallation> fichiers = new ArrayList<>();
 	
 	/**
 	 * Liste des liens menant au fichier (localement ou un url)
@@ -30,13 +35,7 @@ public class ModVersion {
 	 * Mods, si présents, à charger avant celui-ci. Aucune intervalle de version n'est nécessaire.
 	 */
 	public final List<String>                   alias        = new ArrayList<>(0);
-
-    /*
-    List<String> authorList;
-    String credits;
-    String logoFile;
-    List<String> screenshots;
-     */
+	public       String                         description  = null;
 	
 	public ModVersion(String modid, Version version, VersionIntervalle mcversion) {
 		this.modid = modid.intern();
@@ -106,13 +105,69 @@ public class ModVersion {
 		return String.format("%s-%s-%s", modid, mcversion.toStringMinimal(), version);
 	}
 	
-	/** Dossier dans lequel placer les fichiers lorsque le mod est installé.
-	 * Ne donne pas le nom du fichier parce que celui-ci n'est pas standardisé.
+	/** Lit les informations relatives à un paquet. */
+	public static ModVersion lecturePaquet(JSONObject json) {
+		ModVersion modVersion = new ModVersion(json.getString("name"), Version.read(json.getString("version")),
+				VersionIntervalle.read(json.getString("mcversion")));
+		modVersion.description = json.optString("description", null);
+		
+		if (json.has("dependencies")) {
+			JSONArray depen = json.getJSONArray("dependencies");
+			Map<String, VersionIntervalle> dependences = VersionIntervalle.lectureDependances(depen);
+			dependences.forEach(modVersion::ajoutModRequis);
+		}
+		
+		if (json.has("files")) {
+			JSONObject files = json.getJSONObject("files");
+			for (String nom : files.keySet()) {
+				FichierInstallation fichier = new FichierInstallation(Path.of(nom));
+				modVersion.fichiers.add(fichier);
+			}
+		}
+		
+		return modVersion;
+	}
+	
+	/**
+	 * Dossier dans lequel placer les fichiers lorsque le mod est installé. Ne donne pas le nom du fichier parce que
+	 * celui-ci n'est pas standardisé.
 	 *
 	 * @param minecraft: dossier minecraft racine
 	 * @return le dossier d'installation
 	 */
+	@Deprecated
 	public Path dossierInstallation(Path minecraft) {
 		return minecraft.resolve("mods");
+	}
+	
+	/** Enregistre toutes les informations du mod dans l'objet json. */
+	public void ecriturePaquet(JSONObject json) {
+		json.put("name", this.modid);
+		json.put("version", this.version);
+		json.put("mcversion", this.mcversion);
+		if (this.description != null) json.put("description", this.description);
+		
+		JSONArray dependencies = new JSONArray();
+		for (String modid : this.requiredMods.keySet()) {
+			dependencies.put(modid + "@" + this.requiredMods.get(modid).toString());
+		}
+		
+		JSONObject files = new JSONObject();
+		for (FichierInstallation fichier : this.fichiers) {
+			JSONObject fichier_metadata = new JSONObject();
+			
+			files.put(fichier.nom.toString(), fichier_metadata);
+		}
+		
+		json.put("dependencies", dependencies);
+		json.put("files", files);
+	}
+	
+	public static class FichierInstallation {
+		public final Path nom;
+		
+		public FichierInstallation(Path nom) {
+			this.nom = nom;
+		}
 	}
 }
