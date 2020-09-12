@@ -1,7 +1,7 @@
 package McForgeMods.commandes;
 
 import McForgeMods.ForgeMods;
-import McForgeMods.ModVersion;
+import McForgeMods.PaquetMinecraft;
 import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.DepotLocal;
 import picocli.CommandLine;
@@ -35,7 +35,7 @@ public class CommandeShow implements Callable<Integer> {
 			System.err.printf("[ERROR] Erreur de lecture du dépot: %s %s%n", e.getClass(), e.getMessage());
 		}
 		
-		final List<ModVersion> versions = new ArrayList<>();
+		final List<PaquetMinecraft> versions = new ArrayList<>();
 		
 		final Map<String, VersionIntervalle> demandes;
 		try {
@@ -48,7 +48,7 @@ public class CommandeShow implements Callable<Integer> {
 		for (Map.Entry<String, VersionIntervalle> rech : demandes.entrySet()) {
 			if (!depotLocal.contains(rech.getKey())) System.err.printf("Mod inconnu: '%s'%n", rech.getKey());
 			else {
-				List<ModVersion> modVersion = depotLocal.getModVersions(rech.getKey()).stream()
+				List<PaquetMinecraft> modVersion = depotLocal.getModVersions(rech.getKey()).stream()
 						.filter(v -> rech.getValue().correspond(v.version)).collect(Collectors.toList());
 				if (modVersion.size() > 0) versions.addAll(modVersion);
 				else System.err.println(
@@ -56,7 +56,7 @@ public class CommandeShow implements Callable<Integer> {
 			}
 		}
 		
-		for (ModVersion version : versions) {
+		for (PaquetMinecraft version : versions) {
 			System.out.printf("%s %s [%s]: %s%n", version.modid, version.version, version.mcversion.toStringMinimal(),
 					version.description);
 			StringJoiner joiner = new StringJoiner(",");

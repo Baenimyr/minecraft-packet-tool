@@ -109,7 +109,7 @@ public class ForgeMods implements Runnable {
 		}
 		
 		modids.stream().sorted(String::compareTo).forEach(modid -> {
-			Optional<ModVersion> modVersion = depotLocal.getModVersions(modid).stream()
+			Optional<PaquetMinecraft> modVersion = depotLocal.getModVersions(modid).stream()
 					.max(Comparator.comparing(mv -> mv.version));
 			modVersion.ifPresent(mod -> System.out.printf("\u001B[32m%s\u001B[0m \"%s\"%n", mod.modid, mod.version));
 		});
@@ -135,14 +135,14 @@ public class ForgeMods implements Runnable {
 		depotInstallation.analyseDossier();
 		
 		// Liste des versions pour lesquels chercher les dépendances.
-		List<ModVersion> listeRecherche;
+		List<PaquetMinecraft> listeRecherche;
 		
 		if (all) {
 			listeRecherche = depotInstallation.getModids().stream().map(depotInstallation::informations)
 					.map(ins -> depotLocal.getModVersion(ins.modid, ins.version)).filter(Optional::isPresent)
 					.map(Optional::get).collect(Collectors.toList());
 		} else if (mods != null && mods.size() > 0) {
-			final List<ModVersion> resultat = new ArrayList<>();
+			final List<PaquetMinecraft> resultat = new ArrayList<>();
 			final Map<String, VersionIntervalle> recherche;
 			
 			try {
@@ -155,7 +155,7 @@ public class ForgeMods implements Runnable {
 				String modid = entry.getKey();
 				VersionIntervalle version = entry.getValue();
 				if (depotLocal.contains(modid)) {
-					Optional<ModVersion> trouvee = depotLocal.getModVersions(modid).stream()
+					Optional<PaquetMinecraft> trouvee = depotLocal.getModVersions(modid).stream()
 							.filter(modVersion -> version.equals(VersionIntervalle.ouvert()) || version
 									.correspond(modVersion.version)).max(Comparator.comparing(mv -> mv.version));
 					if (trouvee.isPresent()) resultat.add(trouvee.get());

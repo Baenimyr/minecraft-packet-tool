@@ -1,7 +1,7 @@
 package McForgeMods.depot;
 
 import McForgeMods.Mod;
-import McForgeMods.ModVersion;
+import McForgeMods.PaquetMinecraft;
 import McForgeMods.Version;
 import McForgeMods.VersionIntervalle;
 import org.json.JSONException;
@@ -66,7 +66,7 @@ public class DepotInstallation implements Closeable {
 	 *
 	 * @param manuel: si l'installation est manuelle ou automatique
 	 */
-	public void installation(ModVersion mversion, boolean manuel) {
+	public void installation(PaquetMinecraft mversion, boolean manuel) {
 		this.statusChange(mversion, manuel);
 	}
 	
@@ -79,7 +79,7 @@ public class DepotInstallation implements Closeable {
 	public void desinstallation(String id) {
 		if (this.installations.containsKey(id)) {
 			Installation installation = this.installations.get(id);
-			Optional<ModVersion> modVersion = this.depot.getModVersion(installation.modid, installation.version);
+			Optional<PaquetMinecraft> modVersion = this.depot.getModVersion(installation.modid, installation.version);
 			if (modVersion.isPresent()) {
 				// TODO: suppression fichiers
 			}
@@ -96,7 +96,7 @@ public class DepotInstallation implements Closeable {
 	 *
 	 * @param statique version à conserver
 	 */
-	public void suppressionConflits(ModVersion statique) {
+	public void suppressionConflits(PaquetMinecraft statique) {
 		if (this.installations.containsKey(statique.modid)
 				&& this.installations.get(statique.modid).version != statique.version) {
 			this.desinstallation(statique.modid);
@@ -106,15 +106,16 @@ public class DepotInstallation implements Closeable {
 	/**
 	 * Vérifie l'integrité d'une installation.
 	 * <p>
-	 * Les fichiers déclarés dans {@link ModVersion#fichiers} doivent être présents, il s'il dispose d'une somme de
+	 * Les fichiers déclarés dans {@link PaquetMinecraft#fichiers} doivent être présents, il s'il dispose d'une somme de
 	 * contrôle elle doit être toujours valide.
 	 *
 	 * @param paquet: installation à vérifier
 	 * @return {@code false} à la moindre erreur.
 	 */
-	public boolean verificationIntegrite(ModVersion paquet) {
-		for (ModVersion.FichierInstallation fichier : paquet.fichiers) {
-			final Path chemin_absolu = this.dossier.resolve(fichier.nom);
+	public boolean verificationIntegrite(PaquetMinecraft paquet) {
+		for (PaquetMinecraft.FichierMetadata fichier : paquet.fichiers) {
+			final Path chemin_absolu;
+			chemin_absolu = Path.of(fichier.path);
 			if (!Files.exists(chemin_absolu)) return false;
 		}
 		return true;
@@ -133,7 +134,7 @@ public class DepotInstallation implements Closeable {
 		this.statusImportation();
 		for (ArchiveMod resultat : ArchiveMod.analyseDossier(dossier.resolve("mods"), this.depot)) {
 			final Mod mod = resultat.mod;
-			ModVersion modVersion = resultat.modVersion;
+			PaquetMinecraft modVersion = resultat.modVersion;
 			modVersion = this.depot.ajoutModVersion(modVersion);
 			
 			Installation installation;
@@ -155,12 +156,12 @@ public class DepotInstallation implements Closeable {
 		return this.installations.get(id);
 	}
 	
-	public boolean estManuel(ModVersion version) {
+	public boolean estManuel(PaquetMinecraft version) {
 		return this.installations.containsKey(version.modid) && this.installations.get(version.modid).manuel;
 	}
 	
 	/** Change le status associé à une version de mod. */
-	public void statusChange(ModVersion version, boolean manuel) {
+	public void statusChange(PaquetMinecraft version, boolean manuel) {
 		if (this.installations.containsKey(version.modid)) {
 			Installation i = this.installations.get(version.modid);
 			i.manuel = manuel;
@@ -171,11 +172,11 @@ public class DepotInstallation implements Closeable {
 		}
 	}
 	
-	public boolean estVerrouille(ModVersion version) {
+	public boolean estVerrouille(PaquetMinecraft version) {
 		return this.installations.containsKey(version.modid) && this.installations.get(version.modid).verrou;
 	}
 	
-	public void verrouillerMod(ModVersion version, boolean verrou) {
+	public void verrouillerMod(PaquetMinecraft version, boolean verrou) {
 		if (this.installations.containsKey(version.modid)) {
 			Installation i = this.installations.get(version.modid);
 			i.verrou = verrou;

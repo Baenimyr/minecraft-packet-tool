@@ -1,6 +1,6 @@
 package McForgeMods.depot;
 
-import McForgeMods.ModVersion;
+import McForgeMods.PaquetMinecraft;
 import McForgeMods.Version;
 
 import java.util.*;
@@ -14,7 +14,7 @@ import java.util.*;
  * minecraft.
  */
 public class Depot {
-	protected final Map<String, Set<ModVersion>> mod_version = new HashMap<>();
+	protected final Map<String, Set<PaquetMinecraft>> mod_version = new HashMap<>();
 	
 	/**
 	 * Renvoit la liste complète, sans doublons, des mods présents dans le dépôt.
@@ -28,17 +28,17 @@ public class Depot {
 	 *
 	 * @return un ensemble, ou {@code null}
 	 */
-	public Set<ModVersion> getModVersions(String modid) {
+	public Set<PaquetMinecraft> getModVersions(String modid) {
 		return this.mod_version.get(modid);
 	}
 	
 	/**
 	 * Cherche une version particulière d'un mod. Pour vérifier qu'une version est disponible, utiliser {@link
-	 * #contains(ModVersion)}.
+	 * #contains(PaquetMinecraft)}.
 	 *
-	 * @return {@link Optional<ModVersion>} si la version est disponible ou non.
+	 * @return {@link Optional< PaquetMinecraft >} si la version est disponible ou non.
 	 */
-	public Optional<ModVersion> getModVersion(String mod, Version version) {
+	public Optional<PaquetMinecraft> getModVersion(String mod, Version version) {
 		return this.contains(mod) ? this.getModVersions(mod).stream().filter(mv -> mv.version.equals(version)).findAny()
 				: Optional.empty();
 	}
@@ -50,18 +50,19 @@ public class Depot {
 	/**
 	 * @return {@code true} si le mod à la version demandée est connu de ce dépôt.
 	 */
-	public boolean contains(ModVersion modVersion) {
+	public boolean contains(PaquetMinecraft modVersion) {
 		return this.contains(modVersion.modid) && this.mod_version.get(modVersion.modid).contains(modVersion);
 	}
 	
 	/**
 	 * Enregistre une nouvelle version d'un mod dans le dépot.
 	 */
-	public ModVersion ajoutModVersion(final ModVersion modVersion) {
+	public PaquetMinecraft ajoutModVersion(final PaquetMinecraft modVersion) {
 		if (!mod_version.containsKey(modVersion.modid)) mod_version.put(modVersion.modid, new HashSet<>());
 		
-		final Collection<ModVersion> liste = this.mod_version.get(modVersion.modid);
-		Optional<ModVersion> present = liste.stream().filter(m -> m.version.equals(modVersion.version)).findFirst();
+		final Collection<PaquetMinecraft> liste = this.mod_version.get(modVersion.modid);
+		Optional<PaquetMinecraft> present = liste.stream().filter(m -> m.version.equals(modVersion.version))
+				.findFirst();
 		if (present.isPresent()) {
 			present.get().fusion(modVersion);
 			return present.get();

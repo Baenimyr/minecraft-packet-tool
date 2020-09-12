@@ -1,6 +1,6 @@
 package McForgeMods.depot;
 
-import McForgeMods.ModVersion;
+import McForgeMods.PaquetMinecraft;
 import McForgeMods.VersionIntervalle;
 
 import java.util.*;
@@ -20,13 +20,13 @@ public class ArbreDependance {
 		this.depot = depot;
 	}
 	
-	public ArbreDependance(Depot depot, Collection<ModVersion> versions) {
+	public ArbreDependance(Depot depot, Collection<PaquetMinecraft> versions) {
 		this(depot);
 		versions.forEach(this::ajoutContrainte);
 	}
 	
 	/** Fixe un version pour le mod et recalcul les intervalles de dépendance. */
-	public void ajoutContrainte(ModVersion modVersion) {
+	public void ajoutContrainte(PaquetMinecraft modVersion) {
 		this.mcversion.intersection(modVersion.mcversion);
 		this.ajoutContrainte(modVersion.modid, new VersionIntervalle(modVersion.version));
 	}
@@ -58,12 +58,12 @@ public class ArbreDependance {
 			final VersionIntervalle vintervalle = this.contraintes.getOrDefault(modid, VersionIntervalle.ouvert());
 			
 			if (depot.contains(modid)) {
-				Optional<ModVersion> candidat = depot.getModVersions(modid).stream()
+				Optional<PaquetMinecraft> candidat = depot.getModVersions(modid).stream()
 						.filter(mv -> mv.mcversion.englobe(this.mcversion))
 						.filter(mv -> vintervalle.correspond(mv.version)).max(Comparator.comparing(mv -> mv.version));
 				
 				if (candidat.isPresent()) {
-					final ModVersion mversion = candidat.get();
+					final PaquetMinecraft mversion = candidat.get();
 					this.ajoutContrainte(mversion);
 					for (String d_modid : mversion.requiredMods.keySet()) {
 						if (!temp.contains(d_modid)) temp.addLast(d_modid);
@@ -86,8 +86,9 @@ public class ArbreDependance {
 		return this.contraintes;
 	}
 	
-	public boolean contains(ModVersion mversion) {
-		return this.contraintes.containsKey(mversion.modid) && this.contraintes.get(mversion.modid).correspond(mversion.version);
+	public boolean contains(PaquetMinecraft mversion) {
+		return this.contraintes.containsKey(mversion.modid) && this.contraintes.get(mversion.modid)
+				.correspond(mversion.version);
 	}
 	
 	public void clear() {

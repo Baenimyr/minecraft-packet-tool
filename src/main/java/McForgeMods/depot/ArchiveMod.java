@@ -1,7 +1,7 @@
 package McForgeMods.depot;
 
 import McForgeMods.Mod;
-import McForgeMods.ModVersion;
+import McForgeMods.PaquetMinecraft;
 import McForgeMods.Version;
 import McForgeMods.VersionIntervalle;
 import McForgeMods.outils.NoNewlineReader;
@@ -32,12 +32,12 @@ import java.util.zip.ZipFile;
  * avec celle utilisée par un dépot. Cette classe réunis les informations extraites telle quelle de l'archive jar.
  */
 public class ArchiveMod {
-	public static final Pattern    minecraft_version = Pattern.compile(
+	public static final Pattern         minecraft_version = Pattern.compile(
 			"^(1\\.14(\\.[1-4])?|1\\.13(\\.[1-2])?|1\\.12(\\.[1-2])?|1\\.11(\\.[1-2])?|1\\.10(\\.[1-2])?|1\\.9(\\"
 					+ ".[1-4])?|1\\.8(\\.1)?|1\\.7(\\.[1-9]|(10))?|1\\.6\\.[1-4]|1\\.5(\\.[1-2])?)-");
-	public              File       fichier;
-	public              Mod        mod               = null;
-	public              ModVersion modVersion        = null;
+	public              File            fichier;
+	public              Mod             mod               = null;
+	public              PaquetMinecraft modVersion        = null;
 	
 	private static void lectureMcMod(ArchiveMod archive, InputStream lecture) {
 		JSONTokener token = new JSONTokener(new NoNewlineReader(lecture));
@@ -73,7 +73,8 @@ public class ArchiveMod {
 		if (archive.mod.url != null && archive.mod.url.length() == 0) archive.mod.url = null;
 		if (archive.mod.updateJSON != null && archive.mod.updateJSON.length() == 0) archive.mod.updateJSON = null;
 		
-		archive.modVersion = new ModVersion(modid, version, new VersionIntervalle(mcversion, mcversion.precision()));
+		archive.modVersion = new PaquetMinecraft(modid, version,
+				new VersionIntervalle(mcversion, mcversion.precision()));
 		
 		if (json.has("requiredMods")) {
 			VersionIntervalle.lectureDependances(json.getJSONArray("requiredMods"))
@@ -128,7 +129,8 @@ public class ArchiveMod {
 			System.err.println("[mods.toml] Aucune version minecraft spécifiée pour " + archive.mod.modid);
 			return;
 		}
-		archive.modVersion = new ModVersion(archive.mod.modid, Version.read(mod_info.getString("version")), mcversion);
+		archive.modVersion = new PaquetMinecraft(archive.mod.modid, Version.read(mod_info.getString("version")),
+				mcversion);
 		archive.modVersion.requiredMods.putAll(dependencies);
 	}
 	

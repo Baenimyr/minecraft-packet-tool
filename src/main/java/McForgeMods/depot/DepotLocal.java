@@ -1,7 +1,7 @@
 package McForgeMods.depot;
 
 import McForgeMods.Mod;
-import McForgeMods.ModVersion;
+import McForgeMods.PaquetMinecraft;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -9,18 +9,17 @@ import org.json.JSONTokener;
 
 import java.io.*;
 import java.net.MalformedURLException;
-import java.net.URL;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
  * @see Mod
- * @see ModVersion
+ * @see PaquetMinecraft
  */
 public class DepotLocal extends Depot {
-	public final Path                           dossier;
-	public final Map<ModVersion, ArchivePaquet> archives = new HashMap<>();
+	public final Path                                                  dossier;
+	public final Map<PaquetMinecraft, PaquetMinecraft.FichierMetadata> archives = new HashMap<>();
 	
 	/**
 	 * Ouvre un dépôt local. Si aucun chemin n'est spécifié, l'emplacement par défaut est ~/.minecraft/forgemods
@@ -44,7 +43,7 @@ public class DepotLocal extends Depot {
 	 * @param modVersion: version à sauvegarder. Permet de séparer les éléments du cache.
 	 * @return le chemin vers le dossier, ne donne pas de nom au fichier
 	 */
-	public Path dossierCache(ModVersion modVersion) {
+	public Path dossierCache(PaquetMinecraft modVersion) {
 		return dossier.resolve("cache").resolve(modVersion.modid);
 	}
 	
@@ -63,17 +62,13 @@ public class DepotLocal extends Depot {
 		JSONArray mods = new JSONArray(tokener);
 		
 		for (int i = 0; i < mods.length(); i++) {
-			try {
-				JSONObject data = mods.getJSONObject(i);
-				ModVersion modVersion = ModVersion.lecturePaquet(data);
-				ArchivePaquet paquet = new ArchivePaquet();
-				paquet.fichier = new URL(data.getString("filename"));
-				if (data.has("sha256")) paquet.SHA256 = data.getString("sha256");
-				
-				this.ajoutModVersion(modVersion);
-				this.archives.put(modVersion, paquet);
-			} catch (MalformedURLException ignored) {
-			}
+			JSONObject data = mods.getJSONObject(i);
+			PaquetMinecraft modVersion = PaquetMinecraft.lecturePaquet(data);
+			PaquetMinecraft.FichierMetadata paquet = new PaquetMinecraft.FichierMetadata(data.getString("filename"));
+			if (data.has("sha256")) paquet.SHA256 = data.getString("sha256");
+			
+			this.ajoutModVersion(modVersion);
+			this.archives.put(modVersion, paquet);
 		}
 	}
 	
@@ -96,7 +91,7 @@ public class DepotLocal extends Depot {
 	
 	/**
 	 * Enregistre la liste des mods dans le fichier <i>Mods.json</i> à la racine du dépôt. Sauvegarde une partie des
-	 * informations de {@link ModVersion} pour un aperçu rapide.
+	 * informations de {@link PaquetMinecraft} pour un aperçu rapide.
 	 */
 	public void sauvegarde() throws IOException {
 		if (!this.dossier.toFile().exists() && !this.dossier.toFile().mkdirs()) return;
@@ -118,11 +113,11 @@ public class DepotLocal extends Depot {
 		JSONArray mods = new JSONArray();
 		
 		for (String modid : this.getModids())
-			for (ModVersion modVersion : this.getModVersions(modid)) {
+			for (PaquetMinecraft modVersion : this.getModVersions(modid)) {
 				final JSONObject data = new JSONObject();
 				modVersion.ecriturePaquet(data);
-				ArchivePaquet archive = this.archives.get(modVersion);
-				data.put("filename", archive.fichier.toString());
+				PaquetMinecraft.FichierMetadata archive = this.archives.get(modVersion);
+				data.put("filename", archive.path.toString());
 				if (archive.SHA256 != null) {
 					data.put("sha256", archive.SHA256);
 				}
@@ -143,11 +138,6 @@ public class DepotLocal extends Depot {
 	 */
 	public void clear() {
 		this.mod_version.clear();
-	}
-	
-	public static class ArchivePaquet {
-		public URL    fichier;
-		public String SHA256 = null;
 	}
 	
 	/**

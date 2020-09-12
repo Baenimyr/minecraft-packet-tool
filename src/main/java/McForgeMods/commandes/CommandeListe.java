@@ -1,7 +1,7 @@
 package McForgeMods.commandes;
 
 import McForgeMods.ForgeMods;
-import McForgeMods.ModVersion;
+import McForgeMods.PaquetMinecraft;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
 import picocli.CommandLine;
@@ -40,12 +40,12 @@ public class CommandeListe implements Callable<Integer> {
 			List<String> modids = new ArrayList<>(depotLocal.getModids());
 			modids.sort(String::compareTo);
 			for (String modid : modids) {
-				List<ModVersion> versions = new ArrayList<>(depotLocal.getModVersions(modid));
+				List<PaquetMinecraft> versions = new ArrayList<>(depotLocal.getModVersions(modid));
 				versions.sort(Comparator.comparing(mv -> mv.version));
 				
 				if (all || versions.size() > 0) {
 					System.out.print(modid + ":");
-					for (ModVersion mv : versions) System.out.print(" " + mv.version);
+					for (PaquetMinecraft mv : versions) System.out.print(" " + mv.version);
 					System.out.println();
 				}
 			}

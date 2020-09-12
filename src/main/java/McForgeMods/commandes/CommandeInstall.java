@@ -1,7 +1,7 @@
 package McForgeMods.commandes;
 
 import McForgeMods.ForgeMods;
-import McForgeMods.ModVersion;
+import McForgeMods.PaquetMinecraft;
 import McForgeMods.Version;
 import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.ArbreDependance;
@@ -137,7 +137,7 @@ public class CommandeInstall implements Callable<Integer> {
 		demandées. Si le dépot d'installation contient déjà un mod qui satisfait la condition, aucun téléchargement
 		n'est nécessaire.
 		 */
-		final List<ModVersion> installations = new ArrayList<>();
+		final List<PaquetMinecraft> installations = new ArrayList<>();
 		for (final String modid : arbre_dependances.listeModids()) {
 			final VersionIntervalle intervalle_requis = arbre_dependances.intervalle(modid);
 			if (modid.equalsIgnoreCase("forge")) continue;
@@ -148,7 +148,7 @@ public class CommandeInstall implements Callable<Integer> {
 				System.err.printf("Modid requis inconnu: '%s'%n", modid);
 				if (!this.force) return ERREUR_MODID;
 			} else {
-				Optional<ModVersion> candidat = depotLocal.getModVersions(modid).stream()
+				Optional<PaquetMinecraft> candidat = depotLocal.getModVersions(modid).stream()
 						.filter(mv -> intervalle_requis.correspond(mv.version))
 						.max(Comparator.comparing(mv -> mv.version));
 				if (candidat.isPresent()) {
@@ -169,8 +169,8 @@ public class CommandeInstall implements Callable<Integer> {
 			
 			if (!dry_run) {
 				// Déclenche le téléchargement des mods
-				Map<ModVersion, CompletableFuture<Void>> telechargements = new HashMap<>();
-				for (ModVersion mversion : installations) {
+				Map<PaquetMinecraft, CompletableFuture<Void>> telechargements = new HashMap<>();
+				for (PaquetMinecraft mversion : installations) {
 					CompletableFuture<Void> t = CompletableFuture
 							.supplyAsync(new TelechargementArchive(depotLocal, mversion), executor)
 							.thenApplyAsync(url -> {
@@ -214,10 +214,10 @@ public class CommandeInstall implements Callable<Integer> {
 	}
 	
 	private static class TelechargementArchive implements Supplier<URL> {
-		final DepotLocal depotLocal;
-		final ModVersion version;
+		final DepotLocal      depotLocal;
+		final PaquetMinecraft version;
 		
-		public TelechargementArchive(DepotLocal depot, ModVersion version) {
+		public TelechargementArchive(DepotLocal depot, PaquetMinecraft version) {
 			this.depotLocal = depot;
 			this.version = version;
 		}
@@ -231,7 +231,7 @@ public class CommandeInstall implements Callable<Integer> {
 								.toString());
 				FileObject dest = filesystem.resolveFile(dest_url);
 				if (!dest.exists()) {
-					FileObject fichier = filesystem.resolveFile(depotLocal.archives.get(version).fichier);
+					FileObject fichier = filesystem.resolveFile(depotLocal.archives.get(version).path);
 					dest.copyFrom(fichier, new FileDepthSelector());
 				}
 				// verifier sha256
@@ -258,22 +258,21 @@ public class CommandeInstall implements Callable<Integer> {
 			try {
 				FileSystemManager filesystem = VFS.getManager();
 				FileObject farchive = filesystem.resolveFile(archive);
-				FileObject mods = farchive.resolveFile("mods.json");
+				FileObject mods = farchive.resolveFile(PaquetMinecraft.INFOS);
 				
 				InputStream is = mods.getContent().getInputStream();
 				JSONObject json = new JSONObject(is);
-				ModVersion modVersion = ModVersion.lecturePaquet(json);
+				PaquetMinecraft modVersion = PaquetMinecraft.lecturePaquet(json);
 				
-				FileObject data = farchive.resolveFile("data");
-				
-				for (ModVersion.FichierInstallation fichier : modVersion.fichiers) {
-					FileObject src = farchive.resolveFile(fichier.nom.toString());
-					FileObject dest = filesystem
-							.resolveFile(this.depotInstallation.dossier.toAbsolutePath().resolve(fichier.nom).toUri());
+				FileObject data = farchive.resolveFile(PaquetMinecraft.FICHIERS);
+				for (PaquetMinecraft.FichierMetadata fichier : modVersion.fichiers) {
+					FileObject src = data.resolveFile(fichier.path);
+					FileObject dest = filesystem.resolveFile(
+							new URL(this.depotInstallation.dossier.toAbsolutePath().toUri().toURL(), fichier.path));
 					dest.copyFrom(src, new FileDepthSelector());
 				}
 				return true;
-			} catch (FileSystemException e) {
+			} catch (FileSystemException | MalformedURLException e) {
 				e.printStackTrace();
 			}
 			return false;
