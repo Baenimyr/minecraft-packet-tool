@@ -143,15 +143,7 @@ public class DepotLocal extends Depot {
 	 * Si des versions de mods sont sauvegardées localement, une minimum d'information est conservé.
 	 */
 	public void clear() {
-		for (String modid : this.getModids()) {
-			for (ModVersion modVersion : this.getModVersions(modid)) {
-				modVersion.urls.removeIf(url -> !url.getProtocol().equals("file"));
-				modVersion.requiredMods.clear();
-				modVersion.alias.clear();
-			}
-			
-			this.mod_version.get(modid).removeIf(mv -> mv.urls.isEmpty());
-		}
+		this.mod_version.clear();
 	}
 	
 	private static class ArchivePaquet {

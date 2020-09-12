@@ -73,31 +73,6 @@ public class Depot {
 	}
 	
 	/**
-	 * Recherche parmi les informations de ce dépot, une version compatible avec cet alias. En général, l'alias est un
-	 * nom de fichier. Si cet alias contient le symbole '-', alors l'hypothèse est que le nom est de la forme
-	 * <i>modid-version</i> et la recherche à lien en priorité sur les versions correspondants au <i>modid</i>.
-	 *
-	 * @return la première version trouvée, {@link Optional#empty()} sinon.
-	 */
-	public Optional<ModVersion> rechercheAlias(String nom) {
-		int i = nom.indexOf('-');
-		if (i > 0) {
-			String test = nom.substring(0, i).toLowerCase();
-			if (this.contains(test)) {
-				for (ModVersion version : this.getModVersions(test)) {
-					if (version.alias.contains(nom)) return Optional.of(version);
-				}
-			}
-		}
-		
-		for (String modid : this.getModids()) {
-			for (ModVersion version : this.getModVersions(modid))
-				if (version.alias.contains(nom)) return Optional.of(version);
-		}
-		return Optional.empty();
-	}
-	
-	/**
 	 * Fait la liste des versions absentes.
 	 * <p>
 	 * Parmis les dépendances fournies en entrée, cherche dans le dépot, si une version compatible existe. !!! Ne

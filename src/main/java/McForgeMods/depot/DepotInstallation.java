@@ -9,7 +9,6 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 
 import java.io.*;
-import java.net.MalformedURLException;
 import java.nio.file.Path;
 import java.util.*;
 
@@ -115,27 +114,20 @@ public class DepotInstallation implements Closeable {
 	public void analyseDossier() {
 		this.statusImportation();
 		for (ArchiveMod resultat : ArchiveMod.analyseDossier(dossier.resolve("mods"), this.depot)) {
-			try {
-				final Mod mod = resultat.mod;
-				ModVersion modVersion = resultat.modVersion;
-				modVersion.ajoutURL(resultat.fichier.getAbsoluteFile().toURI().toURL());
-				modVersion.ajoutAlias(resultat.fichier.getName());
-				modVersion = this.depot.ajoutModVersion(modVersion);
-				
-				Installation installation;
-				if (this.installations.containsKey(modVersion.modid) && this.installations.get(modVersion.modid).version
-						.equals(modVersion.version)) installation = this.installations.get(modVersion.modid);
-				else {
-					installation = new Installation(modVersion.modid, modVersion.version);
-					installation.manuel = true;
-					this.installations.put(modVersion.modid, installation);
-				}
-				installation.fichier = dossier.resolve("mods").relativize(Path.of(resultat.fichier.getAbsolutePath()))
-						.toString();
-			} catch (MalformedURLException mue) {
-				System.err.println(String.format("[DepotInstallation] [ERROR] in '%s': %s", resultat.fichier.getName(),
-						mue.getMessage()));
+			final Mod mod = resultat.mod;
+			ModVersion modVersion = resultat.modVersion;
+			modVersion = this.depot.ajoutModVersion(modVersion);
+			
+			Installation installation;
+			if (this.installations.containsKey(modVersion.modid) && this.installations.get(modVersion.modid).version
+					.equals(modVersion.version)) installation = this.installations.get(modVersion.modid);
+			else {
+				installation = new Installation(modVersion.modid, modVersion.version);
+				installation.manuel = true;
+				this.installations.put(modVersion.modid, installation);
 			}
+			installation.fichier = dossier.resolve("mods").relativize(Path.of(resultat.fichier.getAbsolutePath()))
+					.toString();
 		}
 	}
 	
@@ -261,6 +253,13 @@ public class DepotInstallation implements Closeable {
 		this.statusSauvegarde();
 	}
 	
+	/**
+	 * Toutes les informations pour la gestion des installations.
+	 * <p>
+	 * Un {@link #modid} ne peut être installé que sous une unique {@link #version}. Toute version en conflit doit être
+	 * supprimée avant. L'installation peut être manuelle ou automatique. Une installation verrouillée ne peut pas être
+	 * modifiée.
+	 */
 	public static class Installation {
 		public final String  modid;
 		public final Version version;

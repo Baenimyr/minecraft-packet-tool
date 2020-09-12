@@ -3,38 +3,29 @@ package McForgeMods;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.net.URL;
 import java.nio.file.Path;
 import java.util.*;
 
 /**
  * Cette classe incarne une version particulière d'un mod.
  * <p>
- * Elle rassemble toutes les informations relatives à une version, n'apparaissant pas dans {@link Mod}. L'association à
- * un fichier réel {@link #urls} est optionnelle.
+ * Elle rassemble toutes les informations relatives à une version: le nom, la version, les dépendances et la liste des
+ * fichiers qui seront installés.
  *
  * @see Mod
  */
 public class ModVersion {
-	public final String                    modid;
-	public final Version                   version;
-	public final VersionIntervalle         mcversion;
+	public final String                         modid;
+	public final Version                        version;
+	public final VersionIntervalle              mcversion;
 	/** Liste des fichiers associés à l'installation. */
-	public final List<FichierInstallation> fichiers = new ArrayList<>();
-	
-	/**
-	 * Liste des liens menant au fichier (localement ou un url)
-	 */
-	public final List<URL>                      urls         = new ArrayList<>(1);
+	public final List<FichierInstallation>      fichiers     = new ArrayList<>();
 	/**
 	 * Mods obligatoires pour le bon fonctionnement de celui-ci. Une intervalle de version doit être spécifiée ou nulle
 	 * pour n'importe quelle version.
 	 */
 	public final Map<String, VersionIntervalle> requiredMods = new HashMap<>();
-	/**
-	 * Mods, si présents, à charger avant celui-ci. Aucune intervalle de version n'est nécessaire.
-	 */
-	public final List<String>                   alias        = new ArrayList<>(0);
+	/** Une description simple pouvant être affichée */
 	public       String                         description  = null;
 	
 	public ModVersion(String modid, Version version, VersionIntervalle mcversion) {
@@ -44,21 +35,11 @@ public class ModVersion {
 	}
 	
 	/**
-	 * Ajoute un url sans doublons.
-	 */
-	public void ajoutURL(URL url) {
-		for (URL u : this.urls)
-			if (u.toString().equals(url.toString()))
-				return;
-		this.urls.add(url);
-	}
-	
-	/**
 	 * Ajoute une nouvelle dépendance.
 	 * <p>
 	 * Si un mod identique est déjà enregistrée, enregistre l'intersection entre les deux intervalles de version.
 	 *
-	 * @param modid      requis
+	 * @param modid requis
 	 * @param intervalle pour laquelle le modid est requis.
 	 */
 	public void ajoutModRequis(String modid, VersionIntervalle intervalle) {
@@ -68,19 +49,13 @@ public class ModVersion {
 		else this.requiredMods.put(modid, intervalle);
 	}
 	
-	public void ajoutAlias(String alias) {
-		if (!this.alias.contains(alias)) this.alias.add(alias);
-	}
-	
 	/**
 	 * Importe les nouvelles données à partir d'une instance similaire.
 	 */
 	public void fusion(ModVersion autre) {
+		if (this.description == null) this.description = autre.description;
 		autre.requiredMods.forEach(this::ajoutModRequis);
-		for (URL url : autre.urls)
-			this.ajoutURL(url);
-		for (String alias : autre.alias)
-			this.ajoutAlias(alias);
+		autre.fichiers.stream().filter(f -> this.fichiers.stream().noneMatch(f2 -> f.nom == f2.nom)).forEach(this.fichiers::add);
 	}
 	
 	@Override
@@ -98,7 +73,7 @@ public class ModVersion {
 	
 	@Override
 	public String toString() {
-		return String.format("'%s' %s %s", modid, version, mcversion);
+		return String.format("'%s' %s", modid, version);
 	}
 	
 	public String toStringStandard() {
@@ -128,18 +103,6 @@ public class ModVersion {
 		return modVersion;
 	}
 	
-	/**
-	 * Dossier dans lequel placer les fichiers lorsque le mod est installé. Ne donne pas le nom du fichier parce que
-	 * celui-ci n'est pas standardisé.
-	 *
-	 * @param minecraft: dossier minecraft racine
-	 * @return le dossier d'installation
-	 */
-	@Deprecated
-	public Path dossierInstallation(Path minecraft) {
-		return minecraft.resolve("mods");
-	}
-	
 	/** Enregistre toutes les informations du mod dans l'objet json. */
 	public void ecriturePaquet(JSONObject json) {
 		json.put("name", this.modid);
@@ -163,6 +126,13 @@ public class ModVersion {
 		json.put("files", files);
 	}
 	
+	/**
+	 * Un fichier qui sera installé.
+	 * <p>
+	 * Cette classe indique où sera installé le fichier grâce à son nom relatif à la racine du dossier minecraft (ex:
+	 * mods/Mod.jar). Des informations de contrôle, comme des somme de hashage permettent de vérifier l'intégrité du
+	 * fichier.
+	 */
 	public static class FichierInstallation {
 		public final Path nom;
 		
