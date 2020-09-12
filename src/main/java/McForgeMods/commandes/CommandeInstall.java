@@ -9,12 +9,13 @@ import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
 import org.apache.commons.vfs2.*;
 import org.json.JSONObject;
+import org.json.JSONTokener;
 import picocli.CommandLine;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.MalformedURLException;
-import java.net.URL;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Function;
@@ -180,8 +181,7 @@ public class CommandeInstall implements Callable<Integer> {
 									}
 								}
 								return url;
-							}).thenApplyAsync(new OuvertureArchive(depotInstallation))
-							.thenAcceptAsync(succes -> {
+							}).thenApplyAsync(new OuvertureArchive(depotInstallation)).thenAcceptAsync(succes -> {
 								if (succes) {
 									synchronized (depotInstallation) {
 										depotInstallation.installation(mversion, demandes.containsKey(mversion.modid));
@@ -196,6 +196,7 @@ public class CommandeInstall implements Callable<Integer> {
 					} catch (InterruptedException ignored) {
 					} catch (ExecutionException erreur) {
 						System.err.printf("Erreur téléchargement de '%s': %s%n", mversion, erreur.getMessage());
+						erreur.printStackTrace();
 					}
 				});
 			}
@@ -213,7 +214,7 @@ public class CommandeInstall implements Callable<Integer> {
 		return 0;
 	}
 	
-	private static class TelechargementArchive implements Supplier<URL> {
+	private static class TelechargementArchive implements Supplier<URI> {
 		final DepotLocal      depotLocal;
 		final PaquetMinecraft version;
 		
@@ -223,28 +224,28 @@ public class CommandeInstall implements Callable<Integer> {
 		}
 		
 		@Override
-		public URL get() {
+		public URI get() {
 			try {
 				final FileSystemManager filesystem = VFS.getManager();
-				final URL dest_url = new URL("tar", "",
-						this.depotLocal.dossier.resolve(version.modid + "-" + version.version.toString() + ".tar")
-								.toString());
+				final URI dest_url = new URI("file://" + this.depotLocal.dossier.resolve("cache")
+						.resolve(version.modid + "-" + version.version.toString() + ".tar").toString());
 				FileObject dest = filesystem.resolveFile(dest_url);
 				if (!dest.exists()) {
-					FileObject fichier = filesystem.resolveFile(depotLocal.archives.get(version).path);
+					FileObject fichier = filesystem
+							.resolveFile(depotLocal.dossier.toUri().resolve(depotLocal.archives.get(version).path));
 					dest.copyFrom(fichier, new FileDepthSelector());
 				}
 				// verifier sha256
 				return dest_url;
-			} catch (FileSystemException | MalformedURLException io) {
+			} catch (FileSystemException | URISyntaxException io) {
 				System.err.printf("[Install] impossible de télécharger l'archive pour %s%n", this.version);
-				System.err.println("\t" + io.getMessage());
+				System.err.println("\t" + io.getClass() + ":" + io.getMessage());
 				return null;
 			}
 		}
 	}
 	
-	private static class OuvertureArchive implements Function<URL, Boolean> {
+	private static class OuvertureArchive implements Function<URI, Boolean> {
 		final DepotInstallation depotInstallation;
 		
 		public OuvertureArchive(DepotInstallation depot) {
@@ -252,27 +253,29 @@ public class CommandeInstall implements Callable<Integer> {
 		}
 		
 		@Override
-		public Boolean apply(URL archive) {
+		public Boolean apply(URI archive) {
 			if (archive == null) return false;
 			
 			try {
+				archive = new URI("tar:" + archive);
 				FileSystemManager filesystem = VFS.getManager();
 				FileObject farchive = filesystem.resolveFile(archive);
 				FileObject mods = farchive.resolveFile(PaquetMinecraft.INFOS);
 				
 				InputStream is = mods.getContent().getInputStream();
-				JSONObject json = new JSONObject(is);
+				JSONObject json = new JSONObject(new JSONTokener(is));
 				PaquetMinecraft modVersion = PaquetMinecraft.lecturePaquet(json);
+				is.close();
 				
 				FileObject data = farchive.resolveFile(PaquetMinecraft.FICHIERS);
 				for (PaquetMinecraft.FichierMetadata fichier : modVersion.fichiers) {
-					FileObject src = data.resolveFile(fichier.path);
-					FileObject dest = filesystem.resolveFile(
-							new URL(this.depotInstallation.dossier.toAbsolutePath().toUri().toURL(), fichier.path));
+					FileObject src = data.resolveFile("/" + fichier.path);
+					FileObject dest = filesystem
+							.resolveFile(this.depotInstallation.dossier.toAbsolutePath().toUri().resolve(fichier.path));
 					dest.copyFrom(src, new FileDepthSelector());
 				}
 				return true;
-			} catch (FileSystemException | MalformedURLException e) {
+			} catch (IOException | URISyntaxException e) {
 				e.printStackTrace();
 			}
 			return false;
