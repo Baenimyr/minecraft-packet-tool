@@ -9,8 +9,7 @@ import org.json.JSONTokener;
 
 import java.io.*;
 import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -68,12 +67,12 @@ public class DepotLocal extends Depot {
 				JSONObject data = mods.getJSONObject(i);
 				ModVersion modVersion = ModVersion.lecturePaquet(data);
 				ArchivePaquet paquet = new ArchivePaquet();
-				paquet.fichier = new URI(data.getString("filename"));
+				paquet.fichier = new URL(data.getString("filename"));
 				if (data.has("sha256")) paquet.SHA256 = data.getString("sha256");
 				
 				this.ajoutModVersion(modVersion);
 				this.archives.put(modVersion, paquet);
-			} catch (URISyntaxException ignored) {
+			} catch (MalformedURLException ignored) {
 			}
 		}
 	}
@@ -146,9 +145,9 @@ public class DepotLocal extends Depot {
 		this.mod_version.clear();
 	}
 	
-	private static class ArchivePaquet {
-		URI    fichier;
-		String SHA256 = null;
+	public static class ArchivePaquet {
+		public URL    fichier;
+		public String SHA256 = null;
 	}
 	
 	/**

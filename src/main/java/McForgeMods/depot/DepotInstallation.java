@@ -9,6 +9,7 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 
 import java.io.*;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
@@ -103,6 +104,23 @@ public class DepotInstallation implements Closeable {
 	}
 	
 	/**
+	 * Vérifie l'integrité d'une installation.
+	 * <p>
+	 * Les fichiers déclarés dans {@link ModVersion#fichiers} doivent être présents, il s'il dispose d'une somme de
+	 * contrôle elle doit être toujours valide.
+	 *
+	 * @param paquet: installation à vérifier
+	 * @return {@code false} à la moindre erreur.
+	 */
+	public boolean verificationIntegrite(ModVersion paquet) {
+		for (ModVersion.FichierInstallation fichier : paquet.fichiers) {
+			final Path chemin_absolu = this.dossier.resolve(fichier.nom);
+			if (!Files.exists(chemin_absolu)) return false;
+		}
+		return true;
+	}
+	
+	/**
 	 * Parcours le sous-dossier `mods` pour trouver les fichiers de mods présents.
 	 * <p>
 	 * Les informations relatives au mod sont fusionnées avec celles déjà connues. Les informations relatives à la
@@ -131,7 +149,9 @@ public class DepotInstallation implements Closeable {
 		}
 	}
 	
-	public Installation installation(String id) {
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+- Accès aux informations de l'installation +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+	
+	public Installation informations(String id) {
 		return this.installations.get(id);
 	}
 	
@@ -183,7 +203,7 @@ public class DepotInstallation implements Closeable {
 		final Map<String, VersionIntervalle> absents = new HashMap<>();
 		for (Map.Entry<String, VersionIntervalle> dep : demande.entrySet()) {
 			if (!this.contains(dep.getKey())) {
-				Installation i = this.installation(dep.getKey());
+				Installation i = this.informations(dep.getKey());
 				if (!dep.getValue().correspond(i.version)) absents.put(dep.getKey(), dep.getValue());
 			}
 		}
@@ -295,10 +315,6 @@ public class DepotInstallation implements Closeable {
 			Objects.requireNonNull(version);
 			this.modid = modid.intern();
 			this.version = version;
-		}
-		
-		public Installation(ModVersion modVersion) {
-			this(modVersion.modid, modVersion.version);
 		}
 		
 		@Override

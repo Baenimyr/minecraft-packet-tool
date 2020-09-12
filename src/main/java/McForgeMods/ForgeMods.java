@@ -138,7 +138,7 @@ public class ForgeMods implements Runnable {
 		List<ModVersion> listeRecherche;
 		
 		if (all) {
-			listeRecherche = depotInstallation.getModids().stream().map(depotInstallation::installation)
+			listeRecherche = depotInstallation.getModids().stream().map(depotInstallation::informations)
 					.map(ins -> depotLocal.getModVersion(ins.modid, ins.version)).filter(Optional::isPresent)
 					.map(Optional::get).collect(Collectors.toList());
 		} else if (mods != null && mods.size() > 0) {
@@ -206,7 +206,7 @@ public class ForgeMods implements Runnable {
 		if (action == MarkAction.manual) {
 			for (String modid : versions.keySet()) {
 				if (depotInstallation.contains(modid)) {
-					DepotInstallation.Installation mv = depotInstallation.installation(modid);
+					DepotInstallation.Installation mv = depotInstallation.informations(modid);
 					if (versions.get(modid).correspond(mv.version)) {
 						if (mv.verrou) {
 							System.err.printf("%s est verrouillé%n", mv);
@@ -217,7 +217,7 @@ public class ForgeMods implements Runnable {
 		} else if (action == MarkAction.auto) {
 			for (String modid : versions.keySet()) {
 				if (depotInstallation.contains(modid)) {
-					DepotInstallation.Installation mv = depotInstallation.installation(modid);
+					DepotInstallation.Installation mv = depotInstallation.informations(modid);
 					if (versions.get(modid).correspond(mv.version)) {
 						if (mv.verrou) {
 							System.err.printf("%s est verrouillé%n", mv);
@@ -228,7 +228,7 @@ public class ForgeMods implements Runnable {
 		} else if (action == MarkAction.lock) {
 			for (String modid : versions.keySet()) {
 				if (depotInstallation.contains(modid)) {
-					DepotInstallation.Installation mv = depotInstallation.installation(modid);
+					DepotInstallation.Installation mv = depotInstallation.informations(modid);
 					if (versions.get(modid).correspond(mv.version)) {
 						mv.verrou = true;
 					}
@@ -237,7 +237,7 @@ public class ForgeMods implements Runnable {
 		} else if (action == MarkAction.unlock) {
 			for (String modid : versions.keySet()) {
 				if (depotInstallation.contains(modid)) {
-					DepotInstallation.Installation mv = depotInstallation.installation(modid);
+					DepotInstallation.Installation mv = depotInstallation.informations(modid);
 					if (versions.get(modid).correspond(mv.version)) {
 						mv.verrou = false;
 					}

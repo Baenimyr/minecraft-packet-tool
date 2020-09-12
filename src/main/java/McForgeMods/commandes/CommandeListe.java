@@ -57,7 +57,7 @@ public class CommandeListe implements Callable<Integer> {
 			List<String> modids = new ArrayList<>(depotInstallation.getModids());
 			modids.sort(String::compareTo);
 			for (String modid : modids) {
-				DepotInstallation.Installation ins = depotInstallation.installation(modid);
+				DepotInstallation.Installation ins = depotInstallation.informations(modid);
 				
 				if (mode == null || (mode.manuels && ins.manuel) || (mode.auto && !ins.manuel) || (mode.verrouille
 						&& ins.verrou)) {

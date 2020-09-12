@@ -7,22 +7,18 @@ import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.ArbreDependance;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
-import McForgeMods.outils.TelechargementHttp;
+import org.apache.commons.vfs2.*;
+import org.json.JSONObject;
 import picocli.CommandLine;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.MalformedURLException;
-import java.net.URISyntaxException;
 import java.net.URL;
-import java.net.http.HttpResponse;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * La commande <i>install</i> permet de récupérer les fichiers de mod présents sur le réseau. Pour l'installation d'un
@@ -126,7 +122,7 @@ public class CommandeInstall implements Callable<Integer> {
 		
 		// Ajout de toutes les installations manuelles dans l'installation
 		for (String modid : depotInstallation.getModids()) {
-			DepotInstallation.Installation ins = depotInstallation.installation(modid);
+			DepotInstallation.Installation ins = depotInstallation.informations(modid);
 			if (ins.manuel && !arbre_dependances.listeModids().contains(ins.modid)) {
 				arbre_dependances.ajoutContrainte(ins.modid, new VersionIntervalle(ins.version));
 			}
@@ -147,7 +143,7 @@ public class CommandeInstall implements Callable<Integer> {
 			if (modid.equalsIgnoreCase("forge")) continue;
 			
 			if (depotInstallation.contains(modid) && intervalle_requis
-					.correspond(depotInstallation.installation(modid).version)) continue;
+					.correspond(depotInstallation.informations(modid).version)) continue;
 			if (!depotLocal.contains(modid)) {
 				System.err.printf("Modid requis inconnu: '%s'%n", modid);
 				if (!this.force) return ERREUR_MODID;
@@ -176,12 +172,19 @@ public class CommandeInstall implements Callable<Integer> {
 				Map<ModVersion, CompletableFuture<Void>> telechargements = new HashMap<>();
 				for (ModVersion mversion : installations) {
 					CompletableFuture<Void> t = CompletableFuture
-							.supplyAsync(new InstallationMod(mversion, depotInstallation, depotLocal), executor)
+							.supplyAsync(new TelechargementArchive(depotLocal, mversion), executor)
+							.thenApplyAsync(url -> {
+								if (url != null) {
+									synchronized (depotInstallation) {
+										depotInstallation.suppressionConflits(mversion);
+									}
+								}
+								return url;
+							}).thenApplyAsync(new OuvertureArchive(depotInstallation))
 							.thenAcceptAsync(succes -> {
 								if (succes) {
 									synchronized (depotInstallation) {
 										depotInstallation.installation(mversion, demandes.containsKey(mversion.modid));
-										depotInstallation.suppressionConflits(mversion);
 									}
 								}
 							});
@@ -210,117 +213,69 @@ public class CommandeInstall implements Callable<Integer> {
 		return 0;
 	}
 	
-	private static class InstallationMod implements Supplier<Boolean> {
-		final   DepotLocal        local;
-		final   ModVersion        modVersion;
-		final   DepotInstallation minecraft;
-		private Path              cible = null;
+	private static class TelechargementArchive implements Supplier<URL> {
+		final DepotLocal depotLocal;
+		final ModVersion version;
 		
-		InstallationMod(ModVersion modVersion, DepotInstallation minecraft, DepotLocal local) {
-			this.modVersion = modVersion;
-			this.minecraft = minecraft;
-			this.local = local;
-		}
-		
-		/**
-		 * Change le nom du fichier de destination. Le fichier jar peut avoir n'importe quel nom et le recupère
-		 * généralement le meme que le fichier source.
-		 *
-		 * @param nom: nom du fichier, ne doit pas contenir de caractères comme '/'.
-		 */
-		private void renommerFichier(String nom) {
-			this.cible = modVersion.dossierInstallation(minecraft.dossier).resolve(nom);
+		public TelechargementArchive(DepotLocal depot, ModVersion version) {
+			this.depotLocal = depot;
+			this.version = version;
 		}
 		
 		@Override
-		public Boolean get() {
-			List<URL> fichiers = modVersion.urls.stream().filter(url -> url.getProtocol().equals("file"))
-					.collect(Collectors.toList());
-			// Ajoute les fichiers éventuellement dans le cache
-			for (String alias : modVersion.alias)
-				try {
-					fichiers.add(local.dossierCache(modVersion).resolve(alias).toUri().toURL());
-				} catch (MalformedURLException ignored) {
+		public URL get() {
+			try {
+				final FileSystemManager filesystem = VFS.getManager();
+				final URL dest_url = new URL("tar", "",
+						this.depotLocal.dossier.resolve(version.modid + "-" + version.version.toString() + ".tar")
+								.toString());
+				FileObject dest = filesystem.resolveFile(dest_url);
+				if (!dest.exists()) {
+					FileObject fichier = filesystem.resolveFile(depotLocal.archives.get(version).fichier);
+					dest.copyFrom(fichier, new FileDepthSelector());
 				}
-			List<URL> http = modVersion.urls.stream()
-					.filter(url -> url.getProtocol().equals("http") || url.getProtocol().equals("https"))
-					.collect(Collectors.toList());
-			if (fichiers.size() == 0 && http.size() == 0) {
-				System.err.printf("[Install] aucun lien de téléchargement pour %s.%n", modVersion);
-				return false;
+				// verifier sha256
+				return dest_url;
+			} catch (FileSystemException | MalformedURLException io) {
+				System.err.printf("[Install] impossible de télécharger l'archive pour %s%n", this.version);
+				System.err.println("\t" + io.getMessage());
+				return null;
 			}
+		}
+	}
+	
+	private static class OuvertureArchive implements Function<URL, Boolean> {
+		final DepotInstallation depotInstallation;
+		
+		public OuvertureArchive(DepotInstallation depot) {
+			this.depotInstallation = depot;
+		}
+		
+		@Override
+		public Boolean apply(URL archive) {
+			if (archive == null) return false;
 			
-			Path dossier = modVersion.dossierInstallation(minecraft.dossier);
-			if (Files.notExists(dossier)) {
-				try {
-					Files.createDirectories(dossier);
-				} catch (IOException e) {
-					throw new RuntimeException("Impossible de créer le dossier de destination.");
-				}
-			}
-			
-			// Tentative de copie de fichier
-			for (URL url : fichiers) {
-				try {
-					Path source = Path.of(url.toURI().getPath());
-					if (!source.toFile().exists()) continue;
-					this.renommerFichier(source.getFileName().toString());
-					Files.copy(source, cible);
-					synchronized (System.out) {
-						System.out.printf("%-20s %-20s OK%n", modVersion.modid, modVersion.version);
-					}
-					return true;
-				} catch (URISyntaxException e) {
-					System.err.printf("Format d'url incorrect: '%s'%n", url.toString());
-				} catch (IOException e) {
-					System.err.printf("[Install] impossible de copier le fichier '%s'.%n", url.toString());
-					System.err.println("\t" + e.getMessage());
-				}
-			}
-			
-			// Tentative de téléchargement HTTP
-			for (URL url : http) {
-				String nom = url.getPath();
-				nom = nom.substring(nom.lastIndexOf('/') + 1);
-				if (!nom.endsWith(".jar")) nom = modVersion.toStringStandard() + ".jar";
+			try {
+				FileSystemManager filesystem = VFS.getManager();
+				FileObject farchive = filesystem.resolveFile(archive);
+				FileObject mods = farchive.resolveFile("mods.json");
 				
-				try {
-					TelechargementHttp telechargement = new TelechargementHttp(url.toURI(),
-							modVersion.dossierInstallation(minecraft.dossier).resolve(nom).toFile());
-					HttpResponse<String> connexion = telechargement.recupereInformations();
-					
-					if (connexion.statusCode() >= 400) {
-						throw new IOException(
-								String.format("Server sent code %d for '%s'", connexion.statusCode(), connexion.uri()));
-					}
-					
-					List<String> content = connexion.headers().allValues("Content-Disposition");
-					final Pattern filename = Pattern.compile("filename=\"(.+)\"");
-					for (String info : content) {
-						Matcher m = filename.matcher(info);
-						if (m.find()) {
-							this.renommerFichier(m.group(1));
-							telechargement.fichier = this.cible.toFile();
-							System.out.println(
-									"[Telechargement] [DEBUG] nouveau nom : " + telechargement.fichier.getName());
-							break;
-						}
-					}
-					
-					long taille = telechargement.telechargement();
-					if (taille == 0) continue;
-					synchronized (System.out) {
-						System.out.printf("%-20s %-20s %.1f Ko%n", modVersion.modid, modVersion.version,
-								(float) telechargement.telecharge / 1024);
-					}
-					return true;
-				} catch (IOException | InterruptedException | URISyntaxException io) {
-					System.err.printf("[Install] impossible de télécharger le fichier: %s%n", url);
-					System.err.println("\t" + io.getMessage());
+				InputStream is = mods.getContent().getInputStream();
+				JSONObject json = new JSONObject(is);
+				ModVersion modVersion = ModVersion.lecturePaquet(json);
+				
+				FileObject data = farchive.resolveFile("data");
+				
+				for (ModVersion.FichierInstallation fichier : modVersion.fichiers) {
+					FileObject src = farchive.resolveFile(fichier.nom.toString());
+					FileObject dest = filesystem
+							.resolveFile(this.depotInstallation.dossier.toAbsolutePath().resolve(fichier.nom).toUri());
+					dest.copyFrom(src, new FileDepthSelector());
 				}
+				return true;
+			} catch (FileSystemException e) {
+				e.printStackTrace();
 			}
-			
-			System.err.printf("Téléchargement échoué de %s%n", modVersion);
 			return false;
 		}
 	}
