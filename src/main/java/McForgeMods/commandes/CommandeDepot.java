@@ -61,14 +61,6 @@ public class CommandeDepot implements Runnable {
 		if (verbose) {
 			ArrayList<String> modids = new ArrayList<>(depot.getModids());
 			modids.sort(String::compareTo);
-			for (String modid : modids) {
-				for (ModVersion version : depot.getModVersions(modid)) {
-					if (version.urls.isEmpty()) {
-						System.out
-								.println(String.format("%s: aucun urls de téléchargement", version.toStringStandard()));
-					}
-				}
-			}
 			
 			for (final String modid : modids) {
 				for (final ModVersion version : depot.getModVersions(modid)) {

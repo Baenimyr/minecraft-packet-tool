@@ -2,7 +2,6 @@ package McForgeMods.depot;
 
 import McForgeMods.ModVersion;
 import McForgeMods.Version;
-import McForgeMods.VersionIntervalle;
 
 import java.util.*;
 
@@ -70,24 +69,6 @@ public class Depot {
 			liste.add(modVersion);
 			return modVersion;
 		}
-	}
-	
-	/**
-	 * Fait la liste des versions absentes.
-	 * <p>
-	 * Parmis les dépendances fournies en entrée, cherche dans le dépot, si une version compatible existe. !!! Ne
-	 * compare pas les versions minecraft, un intervalle ouverte sur la droite est une mauvaise idée.
-	 *
-	 * @return une map {modid -> version} des demandes qui n'ont pas trouvée de correspondance.
-	 */
-	public Map<String, VersionIntervalle> dependancesAbsentes(final Map<String, VersionIntervalle> demande) {
-		final Map<String, VersionIntervalle> absents = new HashMap<>();
-		for (Map.Entry<String, VersionIntervalle> dep : demande.entrySet()) {
-			if (!this.contains(dep.getKey()) || this.getModVersions(dep.getKey()).stream().noneMatch(
-					m -> dep.getValue().equals(VersionIntervalle.ouvert()) || dep.getValue().correspond(m.version)))
-				absents.put(dep.getKey(), dep.getValue());
-		}
-		return absents;
 	}
 	
 	/**

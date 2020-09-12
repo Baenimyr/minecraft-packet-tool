@@ -11,8 +11,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @CommandLine.Command(name = "list", resourceBundle = "mcforgemods/lang/List")
 public class CommandeListe implements Callable<Integer> {
@@ -24,7 +22,7 @@ public class CommandeListe implements Callable<Integer> {
 	@CommandLine.Option(names = {"-i", "--no-installed"}, negatable = true, defaultValue = "true")
 	private boolean installes;
 	@CommandLine.ArgGroup(headingKey = "mode")
-	private Mode    mode;
+	private Mode    mode = null;
 	@CommandLine.Option(names = {"-a", "--all-versions"})
 	private boolean all;
 	
@@ -53,27 +51,17 @@ public class CommandeListe implements Callable<Integer> {
 			}
 			return 0;
 		} else {
-			final DepotInstallation depotInstallation = new DepotInstallation(dossiers.minecraft);
-			depotInstallation.analyseDossier(depotLocal);
+			final DepotInstallation depotInstallation = new DepotInstallation(depotLocal, dossiers.minecraft);
+			depotInstallation.analyseDossier();
 			
 			List<String> modids = new ArrayList<>(depotInstallation.getModids());
 			modids.sort(String::compareTo);
 			for (String modid : modids) {
-				Stream<ModVersion> versions = depotInstallation.getModVersions(modid).stream();
+				DepotInstallation.Installation ins = depotInstallation.installation(modid);
 				
-				if (mode != null) {
-					if (mode.manuels) versions = versions.filter(depotInstallation::estManuel);
-					else if (mode.auto) versions = versions.filter(mv -> !depotInstallation.estManuel(mv));
-					else if (mode.verrouille) versions = versions.filter(depotInstallation::estVerrouille);
-				}
-				
-				List<ModVersion> liste = versions.sorted(Comparator.comparing(mv -> mv.version))
-						.collect(Collectors.toList());
-				
-				if (all || liste.size() > 0) {
-					System.out.print(modid + ":");
-					for (ModVersion mv : liste) System.out.print(" " + mv.version);
-					System.out.println();
+				if (mode == null || (mode.manuels && ins.manuel) || (mode.auto && !ins.manuel) || (mode.verrouille
+						&& ins.verrou)) {
+					System.out.println(modid + ":" + ins.version);
 				}
 			}
 			

@@ -73,21 +73,22 @@ public class CommandeInstall implements Callable<Integer> {
 	@Override
 	public Integer call() {
 		final DepotLocal depotLocal = new DepotLocal(dossiers.depot);
-		final DepotInstallation depotInstallation = new DepotInstallation(dossiers.minecraft);
+		final DepotInstallation depotInstallation = new DepotInstallation(depotLocal, dossiers.minecraft);
 		/* Liste des mods à installer. */
 		final ArbreDependance arbre_dependances = new ArbreDependance(depotLocal);
 		
 		try {
 			depotLocal.importation();
-			depotInstallation.analyseDossier(depotLocal);
+			depotInstallation.analyseDossier();
 		} catch (IOException i) {
 			System.err.println("[ERROR] Erreur de lecture du dépot !");
 			return 1;
 		}
 		
 		if (this.mcversion != null) {
-			if (depotInstallation.mcversion == null) depotInstallation.mcversion = VersionIntervalle.read(this.mcversion);
-			else if (!depotInstallation.mcversion.equals(Version.read(this.mcversion))) {
+			if (depotInstallation.mcversion == null)
+				depotInstallation.mcversion = VersionIntervalle.read(this.mcversion);
+			else if (!depotInstallation.mcversion.correspond(Version.read(this.mcversion))) {
 				System.err.println("[ERROR] Il est impossible de changer la version de minecraft ici.");
 				return 1;
 			}
@@ -95,7 +96,8 @@ public class CommandeInstall implements Callable<Integer> {
 			System.err.println(
 					"Aucune version de minecraft spécifiée. Veuillez compléter l'option -mc une première fois.");
 			return 1;
-		};
+		}
+		;
 		arbre_dependances.mcversion.intersection(depotInstallation.mcversion);
 		
 		/* Liste des installations explicitement demandées par l'utilisateur. */
@@ -124,12 +126,9 @@ public class CommandeInstall implements Callable<Integer> {
 		
 		// Ajout de toutes les installations manuelles dans l'installation
 		for (String modid : depotInstallation.getModids()) {
-			for (ModVersion mversion : depotInstallation.getModVersions(modid)) {
-				if (depotInstallation.estManuel(mversion) && !arbre_dependances.listeModids()
-						.contains(mversion.modid) && mversion.mcversion.englobe(depotInstallation.mcversion)) {
-					// seulement les choix utilisateur les plus récents
-					arbre_dependances.ajoutContrainte(mversion);
-				}
+			DepotInstallation.Installation ins = depotInstallation.installation(modid);
+			if (ins.manuel && !arbre_dependances.listeModids().contains(ins.modid)) {
+				arbre_dependances.ajoutContrainte(ins.modid, new VersionIntervalle(ins.version));
 			}
 		}
 		
@@ -147,8 +146,8 @@ public class CommandeInstall implements Callable<Integer> {
 			final VersionIntervalle intervalle_requis = arbre_dependances.intervalle(modid);
 			if (modid.equalsIgnoreCase("forge")) continue;
 			
-			if (depotInstallation.contains(modid) && depotInstallation.getModVersions(modid).stream()
-					.anyMatch(mv -> intervalle_requis.correspond(mv.version))) continue;
+			if (depotInstallation.contains(modid) && intervalle_requis
+					.correspond(depotInstallation.installation(modid).version)) continue;
 			if (!depotLocal.contains(modid)) {
 				System.err.printf("Modid requis inconnu: '%s'%n", modid);
 				if (!this.force) return ERREUR_MODID;
@@ -177,7 +176,8 @@ public class CommandeInstall implements Callable<Integer> {
 				Map<ModVersion, CompletableFuture<Void>> telechargements = new HashMap<>();
 				for (ModVersion mversion : installations) {
 					CompletableFuture<Void> t = CompletableFuture
-							.supplyAsync(new InstallationMod(mversion, depotInstallation, depotLocal), executor).thenAcceptAsync(succes -> {
+							.supplyAsync(new InstallationMod(mversion, depotInstallation, depotLocal), executor)
+							.thenAcceptAsync(succes -> {
 								if (succes) {
 									synchronized (depotInstallation) {
 										depotInstallation.installation(mversion, demandes.containsKey(mversion.modid));
@@ -211,10 +211,10 @@ public class CommandeInstall implements Callable<Integer> {
 	}
 	
 	private static class InstallationMod implements Supplier<Boolean> {
-		final DepotLocal        local;
-		final ModVersion        modVersion;
-		final DepotInstallation minecraft;
-		private Path cible = null;
+		final   DepotLocal        local;
+		final   ModVersion        modVersion;
+		final   DepotInstallation minecraft;
+		private Path              cible = null;
 		
 		InstallationMod(ModVersion modVersion, DepotInstallation minecraft, DepotLocal local) {
 			this.modVersion = modVersion;

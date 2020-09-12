@@ -138,8 +138,9 @@ public class ForgeMods implements Runnable {
 		List<ModVersion> listeRecherche;
 		
 		if (all) {
-			listeRecherche = depotInstallation.getModids().stream()
-					.flatMap(modid -> depotInstallation.getModVersions(modid).stream()).collect(Collectors.toList());
+			listeRecherche = depotInstallation.getModids().stream().map(depotInstallation::installation)
+					.map(ins -> depotLocal.getModVersion(ins.modid, ins.version)).filter(Optional::isPresent)
+					.map(Optional::get).collect(Collectors.toList());
 		} else if (mods != null && mods.size() > 0) {
 			final List<ModVersion> resultat = new ArrayList<>();
 			final Map<String, VersionIntervalle> recherche;
@@ -204,33 +205,43 @@ public class ForgeMods implements Runnable {
 		Map<String, VersionIntervalle> versions = VersionIntervalle.lectureDependances(mods);
 		if (action == MarkAction.manual) {
 			for (String modid : versions.keySet()) {
-				if (depotInstallation.contains(modid)) for (ModVersion mv : depotInstallation.getModVersions(modid))
+				if (depotInstallation.contains(modid)) {
+					DepotInstallation.Installation mv = depotInstallation.installation(modid);
 					if (versions.get(modid).correspond(mv.version)) {
-						if (depotInstallation.estVerrouille(mv)) {
+						if (mv.verrou) {
 							System.err.printf("%s est verrouillé%n", mv);
-						} else depotInstallation.statusChange(mv, true);
+						} else mv.manuel = true;
 					}
+				}
 			}
 		} else if (action == MarkAction.auto) {
 			for (String modid : versions.keySet()) {
-				if (depotInstallation.contains(modid)) for (ModVersion mv : depotInstallation.getModVersions(modid))
-					if (depotInstallation.estVerrouille(mv)) {
-						System.err.printf("%s est verrouillé%n", mv);
-					} else depotInstallation.statusChange(mv, false);
+				if (depotInstallation.contains(modid)) {
+					DepotInstallation.Installation mv = depotInstallation.installation(modid);
+					if (versions.get(modid).correspond(mv.version)) {
+						if (mv.verrou) {
+							System.err.printf("%s est verrouillé%n", mv);
+						} else mv.manuel = false;
+					}
+				}
 			}
 		} else if (action == MarkAction.lock) {
 			for (String modid : versions.keySet()) {
-				if (depotInstallation.contains(modid)) for (ModVersion mv : depotInstallation.getModVersions(modid))
+				if (depotInstallation.contains(modid)) {
+					DepotInstallation.Installation mv = depotInstallation.installation(modid);
 					if (versions.get(modid).correspond(mv.version)) {
-						depotInstallation.verrouillerMod(mv, true);
+						mv.verrou = true;
 					}
+				}
 			}
 		} else if (action == MarkAction.unlock) {
 			for (String modid : versions.keySet()) {
-				if (depotInstallation.contains(modid)) for (ModVersion mv : depotInstallation.getModVersions(modid))
+				if (depotInstallation.contains(modid)) {
+					DepotInstallation.Installation mv = depotInstallation.installation(modid);
 					if (versions.get(modid).correspond(mv.version)) {
-						depotInstallation.verrouillerMod(mv, false);
+						mv.verrou = false;
 					}
+				}
 			}
 		} else {
 			System.err.println("Action inconnue: " + action);

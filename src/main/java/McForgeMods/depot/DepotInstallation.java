@@ -23,13 +23,13 @@ import java.util.*;
  * détecter cette erreur.
  */
 public class DepotInstallation implements Closeable {
-	public final Path                      dossier;
-	public final DepotLocal                depot;
-	public final Map<String, Installation> installations = new HashMap<>();
+	public final  Path                      dossier;
+	public final  DepotLocal                depot;
+	private final Map<String, Installation> installations = new HashMap<>();
 	/**
 	 * Version de minecraft pour l'installation.
 	 */
-	public       VersionIntervalle         mcversion     = null;
+	public        VersionIntervalle         mcversion     = null;
 	
 	
 	/**
@@ -131,6 +131,10 @@ public class DepotInstallation implements Closeable {
 		}
 	}
 	
+	public Installation installation(String id) {
+		return this.installations.get(id);
+	}
+	
 	public boolean estManuel(ModVersion version) {
 		return this.installations.containsKey(version.modid) && this.installations.get(version.modid).manuel;
 	}
@@ -165,6 +169,25 @@ public class DepotInstallation implements Closeable {
 	/** Efface le status associé à une version de mod. */
 	public void statusSuppression(String modid) {
 		this.installations.remove(modid);
+	}
+	
+	/**
+	 * Fait la liste des versions absentes.
+	 * <p>
+	 * Parmis les dépendances fournies en entrée, cherche dans le dépot, si une version compatible existe. !!! Ne
+	 * compare pas les versions minecraft, un intervalle ouverte sur la droite est une mauvaise idée.
+	 *
+	 * @return une map {modid -> version} des demandes qui n'ont pas trouvée de correspondance.
+	 */
+	public Map<String, VersionIntervalle> dependancesAbsentes(final Map<String, VersionIntervalle> demande) {
+		final Map<String, VersionIntervalle> absents = new HashMap<>();
+		for (Map.Entry<String, VersionIntervalle> dep : demande.entrySet()) {
+			if (!this.contains(dep.getKey())) {
+				Installation i = this.installation(dep.getKey());
+				if (!dep.getValue().correspond(i.version)) absents.put(dep.getKey(), dep.getValue());
+			}
+		}
+		return absents;
 	}
 	
 	/**
