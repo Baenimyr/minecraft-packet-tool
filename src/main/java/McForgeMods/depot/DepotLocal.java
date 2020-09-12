@@ -18,6 +18,8 @@ import java.util.Map;
  * @see PaquetMinecraft
  */
 public class DepotLocal extends Depot {
+	private final static String MODS = "Mods.json";
+	
 	public final Path                                                  dossier;
 	public final Map<PaquetMinecraft, PaquetMinecraft.FichierMetadata> archives = new HashMap<>();
 	
@@ -48,7 +50,7 @@ public class DepotLocal extends Depot {
 	}
 	
 	private File fichierIndexDepot() {
-		return dossier.resolve("Mods.json").toFile();
+		return dossier.resolve(MODS).toFile();
 	}
 	
 	/**
@@ -78,14 +80,14 @@ public class DepotLocal extends Depot {
 	public void importation() throws IOException, JSONException {
 		final File MODS = fichierIndexDepot();
 		if (!MODS.exists()) {
-			System.err.println("Absence du fichier principal: 'Mods.json'");
+			System.err.println("Absence du fichier principal: '" + MODS + "'");
 			return;
 		}
 		
 		try (FileInputStream fichier = new FileInputStream(MODS)) {
 			lectureFichierIndex(fichier);
 		} catch (JSONException je) {
-			throw new JSONException("Erreur lecture fichier 'Mods.json'", je);
+			throw new JSONException("Erreur lecture fichier '" + MODS + "'", je);
 		}
 	}
 	
@@ -117,7 +119,7 @@ public class DepotLocal extends Depot {
 				final JSONObject data = new JSONObject();
 				modVersion.ecriturePaquet(data);
 				PaquetMinecraft.FichierMetadata archive = this.archives.get(modVersion);
-				data.put("filename", archive.path.toString());
+				data.put("filename", archive.path);
 				if (archive.SHA256 != null) {
 					data.put("sha256", archive.SHA256);
 				}

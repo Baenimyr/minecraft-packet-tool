@@ -174,10 +174,9 @@ public class ArchiveMod {
 	 * Pour chaque fichier jar trouvé, tente d'importer les informations. Le moindre échec invalide l'importation.
 	 *
 	 * @param dossier: dossier système à parcourir
-	 * @param infos: un dépôt complet qui contient des informations supplémentaires
 	 * @return la liste des archives détectées.
 	 */
-	public static List<ArchiveMod> analyseDossier(Path dossier, Depot infos) {
+	public static List<ArchiveMod> analyseDossier(Path dossier) {
 		final List<ArchiveMod> resultats = new LinkedList<>();
 		Queue<File> dossiers = new LinkedList<>();
 		dossiers.add(dossier.toFile());

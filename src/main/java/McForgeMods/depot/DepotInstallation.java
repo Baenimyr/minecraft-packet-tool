@@ -132,7 +132,7 @@ public class DepotInstallation implements Closeable {
 	 */
 	public void analyseDossier() {
 		this.statusImportation();
-		for (ArchiveMod resultat : ArchiveMod.analyseDossier(dossier.resolve("mods"), this.depot)) {
+		for (ArchiveMod resultat : ArchiveMod.analyseDossier(dossier.resolve("mods"))) {
 			final Mod mod = resultat.mod;
 			PaquetMinecraft modVersion = resultat.modVersion;
 			modVersion = this.depot.ajoutModVersion(modVersion);
@@ -145,8 +145,7 @@ public class DepotInstallation implements Closeable {
 				installation.manuel = true;
 				this.installations.put(modVersion.modid, installation);
 			}
-			installation.fichier = dossier.resolve("mods").relativize(Path.of(resultat.fichier.getAbsolutePath()))
-					.toString();
+			installation.fichier = dossier.relativize(Path.of(resultat.fichier.getAbsolutePath())).toString();
 		}
 	}
 	
@@ -241,7 +240,6 @@ public class DepotInstallation implements Closeable {
 								Installation i = new Installation(modid, version);
 								i.manuel = manual;
 								i.verrou = verrou;
-								i.fichier = mod_data.getString("fichier");
 								this.installations.put(modid, i);
 							} catch (NullPointerException ignored) {
 							} catch (JSONException jsonException) {
@@ -273,7 +271,6 @@ public class DepotInstallation implements Closeable {
 				JSONObject mod_data = new JSONObject();
 				Installation i = entry.getValue();
 				mod_data.put("version", i.version.toString());
-				mod_data.put("fichier", i.fichier);
 				mod_data.put("manual", i.manuel);
 				mod_data.put("locked", i.verrou);
 				

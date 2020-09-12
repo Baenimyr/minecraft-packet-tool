@@ -1,20 +1,19 @@
 package McForgeMods.commandes;
 
 import McForgeMods.ForgeMods;
-import McForgeMods.ModVersion;
+import McForgeMods.PaquetMinecraft;
 import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.ArbreDependance;
 import McForgeMods.depot.ArchiveMod;
 import McForgeMods.depot.DepotLocal;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.json.JSONException;
+import org.json.JSONObject;
 import picocli.CommandLine;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.URL;
-import java.nio.file.Files;
+import java.io.*;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.Callable;
 
@@ -63,7 +62,7 @@ public class CommandeDepot implements Runnable {
 			modids.sort(String::compareTo);
 			
 			for (final String modid : modids) {
-				for (final ModVersion version : depot.getModVersions(modid)) {
+				for (final PaquetMinecraft version : depot.getModVersions(modid)) {
 					ArbreDependance dependances = new ArbreDependance(depot, Collections.singleton(version));
 					dependances.resolution();
 					for (Map.Entry<String, VersionIntervalle> dep : dependances.requis().entrySet()) {
@@ -98,8 +97,6 @@ public class CommandeDepot implements Runnable {
 		List<String> modids;
 		@CommandLine.Option(names = {"-a", "--all"}, defaultValue = "false")
 		boolean      all;
-		@CommandLine.Option(names = {"-i", "--include-files"}, defaultValue = "false", descriptionKey = "include")
-		boolean  include_file;
 		
 		@CommandLine.Mixin
 		ForgeMods.DossiersOptions dossiers;
@@ -115,7 +112,7 @@ public class CommandeDepot implements Runnable {
 						i.getClass().getSimpleName(), i.getMessage()));
 				return 1;
 			}
-			List<ArchiveMod> archives = ArchiveMod.analyseDossier(dossiers.minecraft, depot);
+			List<ArchiveMod> archives = ArchiveMod.analyseDossier(dossiers.minecraft);
 			
 			System.out.println(String.format("%d mods chargés depuis '%s'.", archives.size(), dossiers.minecraft));
 			
@@ -130,8 +127,6 @@ public class CommandeDepot implements Runnable {
 						try {
 							ArchiveMod mod = ArchiveMod.importationJar(fichier);
 							if (mod.isPresent()) {
-								URL url = fichier.toURI().toURL();
-								mod.modVersion.urls.add(url);
 								importation.add(mod);
 							}
 						} catch (IOException i) {
@@ -147,13 +142,45 @@ public class CommandeDepot implements Runnable {
 			}
 			
 			for (ArchiveMod version_client : importation) {
-				depot.getMod(version_client.mod.modid).fusion(version_client.mod);
-				final ModVersion reelle = depot.ajoutModVersion(version_client.modVersion);
-				reelle.urls.removeIf(url -> url.getProtocol().equals("file"));
+				final PaquetMinecraft.FichierMetadata fichierjar = new PaquetMinecraft.FichierMetadata(
+						Path.of("mods").resolve(version_client.fichier.getName()));
+				version_client.modVersion.fichiers.add(fichierjar);
+				final Path archive_destination = depot.dossier.toAbsolutePath()
+						.resolve(version_client.modVersion.toStringStandard() + ".tar");
 				
-				if (include_file) {
-					copieFichier(depot, version_client.modVersion, version_client.fichier);
+				JSONObject json = new JSONObject();
+				version_client.modVersion.ecriturePaquet(json);
+				ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+				try (OutputStreamWriter writer = new OutputStreamWriter(bytes)) {
+					json.write(writer, 4, 4);
+				} catch (IOException e) {
+					e.printStackTrace();
+					break;
 				}
+				
+				try (FileOutputStream fos = new FileOutputStream(archive_destination.toFile());
+					 TarArchiveOutputStream tar = new TarArchiveOutputStream(fos)) {
+					TarArchiveEntry infos = new TarArchiveEntry(PaquetMinecraft.INFOS);
+					infos.setSize(bytes.size());
+					TarArchiveEntry mod = new TarArchiveEntry(version_client.fichier,
+							PaquetMinecraft.FICHIERS + "mods/" + version_client.fichier.getName());
+					
+					tar.putArchiveEntry(infos);
+					bytes.writeTo(tar);
+					tar.closeArchiveEntry();
+					tar.putArchiveEntry(mod);
+					try (FileInputStream fichier_mod = new FileInputStream(version_client.fichier)) {
+						fichier_mod.transferTo(tar);
+					}
+					tar.closeArchiveEntry();
+				} catch (IOException e) {
+					e.printStackTrace();
+					break;
+				}
+				
+				depot.ajoutModVersion(version_client.modVersion);
+				depot.archives.put(version_client.modVersion,
+						new PaquetMinecraft.FichierMetadata(depot.dossier.relativize(archive_destination)));
 			}
 			System.out.println(String.format("%d versions importées.", importation.size()));
 			
@@ -166,30 +193,6 @@ public class CommandeDepot implements Runnable {
 				return 1;
 			}
 			return 0;
-		}
-		
-		/**
-		 * Copie un fichier jar dans le cache du dépot local.
-		 *
-		 * @param depot: depot local dont on remplit le cache
-		 * @param version: informations sur le mode, utiliser par le cache
-		 * @param source: fichier d'origine
-		 * @see DepotLocal#dossierCache(ModVersion)
-		 */
-		private void copieFichier(final DepotLocal depot, final ModVersion version, File source) {
-			try {
-				final Path destination = depot.dossierCache(version).resolve(source.getName());
-				if (destination.getParent().toFile().exists() || destination.getParent().toFile().mkdirs())
-					Files.copy(source.toPath(), destination, StandardCopyOption.REPLACE_EXISTING);
-				else System.err.println(
-						String.format("Impossible de créer le dossier '%s'", destination.getParent().toString()));
-				
-				//Optional<ModVersion> version_depot = depot
-				//		.getModVersion(depot.getMod(version.modid), version.version);
-				//if (version_depot.isPresent()) version_depot.get().ajoutURL(destination.toUri().toURL());
-			} catch (IOException e) {
-				System.err.println(String.format("Impossible de copier le fichier '%s'!", source));
-			}
 		}
 	}
 }

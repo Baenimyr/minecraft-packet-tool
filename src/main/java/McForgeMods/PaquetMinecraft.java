@@ -29,7 +29,7 @@ public class PaquetMinecraft {
 	/** Fichier d'information du paquet. */
 	public static final String INFOS    = "mods.json";
 	/** Dossier de l'archive contenant les fichiers à installer. */
-	public static final String FICHIERS = "files";
+	public static final String FICHIERS = "/";
 	
 	public final String                         modid;
 	public final Version                        version;
@@ -108,7 +108,7 @@ public class PaquetMinecraft {
 	}
 	
 	public String toStringStandard() {
-		return String.format("%s-%s-%s", modid, mcversion.toStringMinimal(), version);
+		return String.format("%s-%s", modid, version);
 	}
 	
 	@Override
@@ -158,7 +158,7 @@ public class PaquetMinecraft {
 		}
 		
 		public FichierMetadata(Path path) {
-			this(path.toAbsolutePath().toString());
+			this(path.toString());
 		}
 	}
 }
