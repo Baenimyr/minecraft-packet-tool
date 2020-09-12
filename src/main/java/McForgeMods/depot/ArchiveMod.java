@@ -195,16 +195,6 @@ public class ArchiveMod {
 						System.err.println(String.format("[DepotInstallation] [ERROR] in '%s': %s", f, i.getMessage()));
 					}
 					
-					if (resultat == null && infos != null) {
-						// Recherche par nom de fichier
-						Optional<ModVersion> modVersion = infos.rechercheAlias(f.getName());
-						if (modVersion.isPresent()) {
-							resultat = new ArchiveMod();
-							resultat.mod = infos.getMod(modVersion.get().modid);
-							resultat.modVersion = modVersion.get();
-						}
-					}
-					
 					if (resultat != null && resultat.isPresent()) {
 						resultat.fichier = f;
 						resultats.add(resultat);

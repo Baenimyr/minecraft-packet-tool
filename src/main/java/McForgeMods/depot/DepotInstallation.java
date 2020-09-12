@@ -10,12 +10,8 @@ import org.json.JSONTokener;
 
 import java.io.*;
 import java.net.MalformedURLException;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Ce dépot lit les informations directement dans les fichiers qu'il rencontre. Il permet d'analyser une instance
@@ -27,13 +23,14 @@ import java.util.stream.Collectors;
  * chargement du jeu. Seulement si les versions de mod sont différentes, le dépot d'installation sera capable de
  * détecter cette erreur.
  */
-public class DepotInstallation extends Depot implements Closeable {
-	public final Path               dossier;
+public class DepotInstallation implements Closeable {
+	public final Path                      dossier;
+	public final DepotLocal                depot;
 	public final Map<String, Installation> installations = new HashMap<>();
 	/**
 	 * Version de minecraft pour l'installation.
 	 */
-	public       VersionIntervalle            mcversion     = null;
+	public       VersionIntervalle         mcversion     = null;
 	
 	
 	/**
@@ -41,7 +38,8 @@ public class DepotInstallation extends Depot implements Closeable {
 	 *
 	 * @param dossier d'installation ou {@code null}
 	 */
-	public DepotInstallation(Path dossier) {
+	public DepotInstallation(DepotLocal depot, Path dossier) {
+		this.depot = depot;
 		Path dos = Path.of(System.getProperty("user.home")).resolve(".minecraft");
 		if (dossier == null) {
 			Path d = Path.of("").toAbsolutePath();
@@ -78,20 +76,15 @@ public class DepotInstallation extends Depot implements Closeable {
 	 * Si la cible est toujours nécessaire en temps que dépendance, elle passe en installation automatique. Cette
 	 * fonction désinstalle même si cette version est la dépendance d'un autre mod.
 	 */
-	public void desinstallation(ModVersion mversion) {
-		if (this.contains(mversion.modid)) {
-			this.mod_version.get(mversion.modid).remove(mversion);
-			
-			// Suppression des fichiers
-			for (URL url : mversion.urls) {
-				try {
-					if (url.getProtocol().equals("file") && Path.of(url.toURI()).startsWith(this.dossier))
-						Files.deleteIfExists(Path.of(url.toURI()));
-				} catch (IOException | URISyntaxException ignored) {
-				}
+	public void desinstallation(String id) {
+		if (this.installations.containsKey(id)) {
+			Installation installation = this.installations.get(id);
+			Optional<ModVersion> modVersion = this.depot.getModVersion(installation.modid, installation.version);
+			if (modVersion.isPresent()) {
+				// TODO: suppression fichiers
 			}
 			
-			this.statusSuppression(mversion);
+			this.statusSuppression(id);
 		}
 	}
 	
@@ -104,11 +97,9 @@ public class DepotInstallation extends Depot implements Closeable {
 	 * @param statique version à conserver
 	 */
 	public void suppressionConflits(ModVersion statique) {
-		if (this.contains(statique.modid)) {
-			List<ModVersion> perimes = this.getModVersions(statique.modid).stream()
-					.filter(mv -> mv.mcversion.equals(statique.mcversion) && !mv.version.equals(statique.version))
-					.collect(Collectors.toList());
-			perimes.forEach(this::desinstallation);
+		if (this.installations.containsKey(statique.modid)
+				&& this.installations.get(statique.modid).version != statique.version) {
+			this.desinstallation(statique.modid);
 		}
 	}
 	
@@ -121,20 +112,19 @@ public class DepotInstallation extends Depot implements Closeable {
 	 * <p>
 	 * Si un fichier d'un mod non installé est trouvé, il est marqué comme installé manuellement.
 	 */
-	public void analyseDossier(Depot infos) {
+	public void analyseDossier() {
 		this.statusImportation();
-		for (ArchiveMod resultat : ArchiveMod.analyseDossier(dossier.resolve("mods"), infos)) {
+		for (ArchiveMod resultat : ArchiveMod.analyseDossier(dossier.resolve("mods"), this.depot)) {
 			try {
 				final Mod mod = resultat.mod;
-				final ModVersion modVersion = resultat.modVersion;
+				ModVersion modVersion = resultat.modVersion;
 				modVersion.ajoutURL(resultat.fichier.getAbsoluteFile().toURI().toURL());
 				modVersion.ajoutAlias(resultat.fichier.getName());
-				this.getMod(mod.modid).fusion(mod);
-				this.ajoutModVersion(modVersion);
+				modVersion = this.depot.ajoutModVersion(modVersion);
 				
 				Installation installation;
-				if (this.installations.containsKey(modVersion.modid) && this.installations.get(modVersion.modid).version.equals(modVersion.version))
-					installation = this.installations.get(modVersion.modid);
+				if (this.installations.containsKey(modVersion.modid) && this.installations.get(modVersion.modid).version
+						.equals(modVersion.version)) installation = this.installations.get(modVersion.modid);
 				else {
 					installation = new Installation(modVersion.modid, modVersion.version);
 					installation.manuel = true;
@@ -181,8 +171,8 @@ public class DepotInstallation extends Depot implements Closeable {
 	}
 	
 	/** Efface le status associé à une version de mod. */
-	public void statusSuppression(ModVersion version) {
-		this.installations.remove(version.modid);
+	public void statusSuppression(String modid) {
+		this.installations.remove(modid);
 	}
 	
 	/**
@@ -206,7 +196,7 @@ public class DepotInstallation extends Depot implements Closeable {
 					JSONObject mods = racine.getJSONObject("mods");
 					for (String modid : mods.keySet()) {
 						JSONObject mod_data = mods.getJSONObject(modid);
-						if (mod_data != null && this.contains(modid)) {
+						if (mod_data != null) {
 							try {
 								final Version version = Version.read(mod_data.getString("version"));
 								final boolean manual = mod_data.getBoolean("manual");
@@ -221,8 +211,6 @@ public class DepotInstallation extends Depot implements Closeable {
 							} catch (JSONException jsonException) {
 								jsonException.printStackTrace();
 							}
-						} else {
-							System.err.printf("%s n'existe pas%n", modid);
 						}
 					}
 				}
@@ -255,9 +243,17 @@ public class DepotInstallation extends Depot implements Closeable {
 				
 				MODS.put(i.modid, mod_data);
 			}
-			data.put("mods", mods);
+			data.put("mods", MODS);
 			data.write(bw, 4, 4);
 		}
+	}
+	
+	public Collection<String> getModids() {
+		return this.installations.keySet();
+	}
+	
+	public boolean contains(String modid) {
+		return this.installations.containsKey(modid);
 	}
 	
 	@Override
@@ -266,11 +262,11 @@ public class DepotInstallation extends Depot implements Closeable {
 	}
 	
 	public static class Installation {
-		public final String             modid;
-		public final Version            version;
-		public       String             fichier;
-		public boolean manuel = true;
-		public boolean verrou = false;
+		public final String  modid;
+		public final Version version;
+		public       String  fichier;
+		public       boolean manuel = true;
+		public       boolean verrou = false;
 		
 		public Installation(String modid, Version version) {
 			Objects.requireNonNull(modid);

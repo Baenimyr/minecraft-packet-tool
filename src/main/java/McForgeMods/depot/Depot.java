@@ -1,6 +1,5 @@
 package McForgeMods.depot;
 
-import McForgeMods.Mod;
 import McForgeMods.ModVersion;
 import McForgeMods.Version;
 import McForgeMods.VersionIntervalle;
@@ -16,40 +15,19 @@ import java.util.*;
  * minecraft.
  */
 public class Depot {
-	protected final Map<String, Mod>             mods        = new HashMap<>();
 	protected final Map<String, Set<ModVersion>> mod_version = new HashMap<>();
 	
 	/**
 	 * Renvoit la liste complète, sans doublons, des mods présents dans le dépôt.
 	 */
 	public Collection<String> getModids() {
-		return this.mods.keySet();
-	}
-	
-	/**
-	 * Chaque dépot gère ses propres instances de {@link Mod} utilisées dans les {@link ModVersion} disponibles dans le
-	 * dépot. Si il n'y a aucune instance disponible pour le modid, une nouvelle est crée et enregistrée.
-	 *
-	 * @return l'unique instance de ce dépot associée au `modid`.
-	 */
-	public Mod getMod(String modid) {
-		if (!this.mods.containsKey(modid)) {
-			this.mods.put(modid.intern(), new Mod(modid));
-		}
-		return this.mods.get(modid);
+		return this.mod_version.keySet();
 	}
 	
 	/**
 	 * Fournit la liste complète des version connues du mod. Si le mod n'est pas connu, renvoit {@code null}.
 	 *
 	 * @return un ensemble, ou {@code null}
-	 */
-	public Set<ModVersion> getModVersions(Mod mod) {
-		return this.mod_version.get(mod.modid);
-	}
-	
-	/**
-	 * Similaire à {@link #getModVersions(Mod)}.
 	 */
 	public Set<ModVersion> getModVersions(String modid) {
 		return this.mod_version.get(modid);
@@ -61,21 +39,13 @@ public class Depot {
 	 *
 	 * @return {@link Optional<ModVersion>} si la version est disponible ou non.
 	 */
-	public Optional<ModVersion> getModVersion(Mod mod, Version version) {
+	public Optional<ModVersion> getModVersion(String mod, Version version) {
 		return this.contains(mod) ? this.getModVersions(mod).stream().filter(mv -> mv.version.equals(version)).findAny()
 				: Optional.empty();
 	}
 	
 	public boolean contains(String modid) {
-		modid = modid.toLowerCase();
-		return this.mods.containsKey(modid);
-	}
-	
-	/**
-	 * @return {@code true} si le mod demandé est connu de ce dépôt.
-	 */
-	public boolean contains(Mod mod) {
-		return this.mods.containsValue(mod);
+		return this.mod_version.containsKey(modid.toLowerCase());
 	}
 	
 	/**
@@ -87,10 +57,6 @@ public class Depot {
 	
 	/**
 	 * Enregistre une nouvelle version d'un mod dans le dépot.
-	 * <p>
-	 * De préférence, l'instance de mod utilisée à {@link ModVersion#mod} doit correspondre à celle renvoyée par {@link
-	 * #getMod(String)}. Il faut également que l'instance enregistrée ici ne correspondent pas à une instance
-	 * enregistrée dans un autre dépôt afin d'éviter les modifications partagées entre dépôt.
 	 */
 	public ModVersion ajoutModVersion(final ModVersion modVersion) {
 		if (!mod_version.containsKey(modVersion.modid)) mod_version.put(modVersion.modid, new HashSet<>());
@@ -158,6 +124,5 @@ public class Depot {
 	
 	public void clear() {
 		this.mod_version.clear();
-		this.mods.clear();
 	}
 }

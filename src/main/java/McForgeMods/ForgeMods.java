@@ -96,10 +96,6 @@ public class ForgeMods implements Runnable {
 					modids.add(modid);
 					continue;
 				}
-				Matcher m_nom = schema.matcher(depotLocal.getMod(modid).name);
-				if (m_nom.find()) {
-					modids.add(modid);
-				}
 			}
 		} else {
 			String recherche_l = recherche.toLowerCase();
@@ -108,16 +104,14 @@ public class ForgeMods implements Runnable {
 					modids.add(modid);
 					continue;
 				}
-				if (depotLocal.getMod(modid).name.toLowerCase().contains(recherche_l)) {
-					modids.add(modid);
-				}
 			}
 			depotLocal.getModids().stream().filter(modid -> modid.contains(recherche)).forEach(modids::add);
 		}
 		
 		modids.stream().sorted(String::compareTo).forEach(modid -> {
-			Mod mod = depotLocal.getMod(modid);
-			System.out.printf("\u001B[32m%s\u001B[0m \"%s\"%n", mod.modid, mod.name);
+			Optional<ModVersion> modVersion = depotLocal.getModVersions(modid).stream()
+					.max(Comparator.comparing(mv -> mv.version));
+			modVersion.ifPresent(mod -> System.out.printf("\u001B[32m%s\u001B[0m \"%s\"%n", mod.modid, mod.version));
 		});
 		
 		return 0;
@@ -130,7 +124,7 @@ public class ForgeMods implements Runnable {
 			@CommandLine.Option(names = {"--missing"}, defaultValue = "false") boolean missing,
 			@CommandLine.Option(names = {"-a", "--all"}) boolean all, @CommandLine.Mixin ForgeMods.Help help) {
 		final DepotLocal depotLocal = new DepotLocal(dossiers.depot);
-		final DepotInstallation depotInstallation = new DepotInstallation(dossiers.minecraft);
+		final DepotInstallation depotInstallation = new DepotInstallation(depotLocal, dossiers.minecraft);
 		
 		try {
 			depotLocal.importation();
@@ -138,7 +132,7 @@ public class ForgeMods implements Runnable {
 			System.err.println("Erreur de lecture du dépôt.");
 			return 1;
 		}
-		depotInstallation.analyseDossier(depotLocal);
+		depotInstallation.analyseDossier();
 		
 		// Liste des versions pour lesquels chercher les dépendances.
 		List<ModVersion> listeRecherche;
@@ -205,8 +199,8 @@ public class ForgeMods implements Runnable {
 			@CommandLine.Parameters(arity = "1", paramLabel = "action") MarkAction action,
 			@CommandLine.Parameters(arity = "1..n", paramLabel = "mods") ArrayList<String> mods) {
 		final DepotLocal depotLocal = new DepotLocal(depot);
-		final DepotInstallation depotInstallation = new DepotInstallation(minecraft);
-		depotInstallation.analyseDossier(depotLocal);
+		final DepotInstallation depotInstallation = new DepotInstallation(depotLocal, minecraft);
+		depotInstallation.analyseDossier();
 		Map<String, VersionIntervalle> versions = VersionIntervalle.lectureDependances(mods);
 		if (action == MarkAction.manual) {
 			for (String modid : versions.keySet()) {
