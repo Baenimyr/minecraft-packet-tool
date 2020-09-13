@@ -177,7 +177,13 @@ public class CommandeInstall implements Callable<Integer> {
 							.thenApplyAsync(url -> {
 								if (url != null) {
 									synchronized (depotInstallation) {
-										depotInstallation.suppressionConflits(mversion);
+										try {
+											depotInstallation.suppressionConflits(mversion);
+										} catch (FileSystemException fse) {
+											System.err
+													.println("[ERROR] suppression ancienne version: " + fse.getCode());
+											return null;
+										}
 									}
 								}
 								return url;
@@ -229,13 +235,22 @@ public class CommandeInstall implements Callable<Integer> {
 				final FileSystemManager filesystem = VFS.getManager();
 				final URI dest_url = new URI("file://" + this.depotLocal.dossier.resolve("cache")
 						.resolve(version.modid + "-" + version.version.toString() + ".tar").toString());
+				final PaquetMinecraft.FichierMetadata archive_metadata = depotLocal.archives.get(version);
+				
 				FileObject dest = filesystem.resolveFile(dest_url);
 				if (!dest.exists()) {
 					FileObject fichier = filesystem
-							.resolveFile(depotLocal.dossier.toUri().resolve(depotLocal.archives.get(version).path));
+							.resolveFile(depotLocal.dossier.toUri().resolve(archive_metadata.path));
 					dest.copyFrom(fichier, new FileDepthSelector());
 				}
-				// verifier sha256
+				try (InputStream dest_is = dest.getContent().getInputStream()) {
+					archive_metadata.checkSHA(dest_is);
+				} catch (IOException e) {
+					System.err.printf("[Install] [ERROR] impossible de vérifier l'intégrité de l'archive: %s%n",
+							dest.getPublicURIString());
+					return null;
+				}
+				
 				return dest_url;
 			} catch (FileSystemException | URISyntaxException io) {
 				System.err.printf("[Install] impossible de télécharger l'archive pour %s%n", this.version);
@@ -268,11 +283,21 @@ public class CommandeInstall implements Callable<Integer> {
 				is.close();
 				
 				FileObject data = archive_tar.resolveFile(PaquetMinecraft.FICHIERS);
-				for (PaquetMinecraft.FichierMetadata fichier : modVersion.fichiers) {
-					FileObject src = data.resolveFile("/" + fichier.path);
-					FileObject dest = filesystem
-							.resolveFile(this.depotInstallation.dossier.toAbsolutePath().toUri().resolve(fichier.path));
+				for (PaquetMinecraft.FichierMetadata metadata : modVersion.fichiers) {
+					FileObject src = data.resolveFile("/" + metadata.path);
+					FileObject dest = filesystem.resolveFile(
+							this.depotInstallation.dossier.toAbsolutePath().toUri().resolve(metadata.path));
 					dest.copyFrom(src, new FileDepthSelector());
+					
+					try (InputStream fichier_contenu = dest.getContent().getInputStream()) {
+						if (!metadata.checkSHA(fichier_contenu)) {
+							System.err.printf("[ERROR] fichier %s non conforme.%n", dest.getName());
+							return false;
+						}
+					}
+					
+					src.close();
+					dest.close();
 				}
 				return true;
 			} catch (IOException | URISyntaxException e) {

@@ -4,6 +4,10 @@ import McForgeMods.Mod;
 import McForgeMods.PaquetMinecraft;
 import McForgeMods.Version;
 import McForgeMods.VersionIntervalle;
+import org.apache.commons.vfs2.FileObject;
+import org.apache.commons.vfs2.FileSystemException;
+import org.apache.commons.vfs2.FileSystemManager;
+import org.apache.commons.vfs2.VFS;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
@@ -76,12 +80,17 @@ public class DepotInstallation implements Closeable {
 	 * Si la cible est toujours nécessaire en temps que dépendance, elle passe en installation automatique. Cette
 	 * fonction désinstalle même si cette version est la dépendance d'un autre mod.
 	 */
-	public void desinstallation(String id) {
+	public void desinstallation(String id) throws FileSystemException {
 		if (this.installations.containsKey(id)) {
 			Installation installation = this.installations.get(id);
 			Optional<PaquetMinecraft> modVersion = this.depot.getModVersion(installation.modid, installation.version);
 			if (modVersion.isPresent()) {
-				// TODO: suppression fichiers
+				try (final FileSystemManager filesystem = VFS.getManager()) {
+					for (PaquetMinecraft.FichierMetadata fichier : modVersion.get().fichiers) {
+						FileObject f = filesystem.resolveFile(fichier.path);
+						if (f.exists()) f.delete();
+					}
+				}
 			}
 			
 			this.statusSuppression(id);
@@ -96,7 +105,7 @@ public class DepotInstallation implements Closeable {
 	 *
 	 * @param statique version à conserver
 	 */
-	public void suppressionConflits(PaquetMinecraft statique) {
+	public void suppressionConflits(PaquetMinecraft statique) throws FileSystemException {
 		if (this.installations.containsKey(statique.modid)
 				&& this.installations.get(statique.modid).version != statique.version) {
 			this.desinstallation(statique.modid);
@@ -217,7 +226,7 @@ public class DepotInstallation implements Closeable {
 	 * résultat d'une mauvaise manipulation, la restauration de l'installation doit rester possible.
 	 */
 	public void statusImportation() {
-		File infos = dossier.resolve("mods").resolve(".mods.json").toFile();
+		File infos = dossier.resolve(".mods.json").toFile();
 		if (infos.exists()) {
 			try (FileInputStream fis = new FileInputStream(infos)) {
 				JSONObject racine = new JSONObject(new JSONTokener(fis));
@@ -255,7 +264,7 @@ public class DepotInstallation implements Closeable {
 	}
 	
 	public void statusSauvegarde() throws IOException {
-		File infos = dossier.resolve("mods").resolve(".mods.json").toFile();
+		File infos = dossier.resolve(".mods.json").toFile();
 		try (FileOutputStream fos = new FileOutputStream(infos);
 			 BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos))) {
 			JSONObject data = new JSONObject();

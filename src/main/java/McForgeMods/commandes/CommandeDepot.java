@@ -6,6 +6,7 @@ import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.ArbreDependance;
 import McForgeMods.depot.ArchiveMod;
 import McForgeMods.depot.DepotLocal;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.vfs2.FileObject;
@@ -18,6 +19,7 @@ import org.json.JSONTokener;
 import picocli.CommandLine;
 
 import java.io.*;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.*;
@@ -126,13 +128,16 @@ public class CommandeDepot implements Runnable {
 		@CommandLine.Option(names = {"-a", "--all"}, defaultValue = "false")
 		boolean      all;
 		
+		@CommandLine.Option(names = {"-d", "--depot"}, description = "Dépot local à utiliser")
+		Path depot_path = null;
+		
+		@CommandLine.Option(names = {"-f", "--from"}, description = "Dossier à parcourir", required = true)
+		Path           dossier_import = null;
 		@CommandLine.Mixin
-		ForgeMods.DossiersOptions dossiers;
-		@CommandLine.Mixin
-		ForgeMods.Help            help;
+		ForgeMods.Help help;
 		
 		public Integer call() {
-			DepotLocal depot = new DepotLocal(dossiers.depot);
+			DepotLocal depot = new DepotLocal(depot_path);
 			try {
 				depot.importation();
 			} catch (IOException | JSONException | IllegalArgumentException i) {
@@ -140,9 +145,9 @@ public class CommandeDepot implements Runnable {
 						i.getMessage());
 				return 1;
 			}
-			List<ArchiveMod> archives = ArchiveMod.analyseDossier(dossiers.minecraft);
+			List<ArchiveMod> archives = ArchiveMod.analyseDossier(dossier_import);
 			
-			System.out.printf("%d mods chargés depuis '%s'.%n", archives.size(), dossiers.minecraft);
+			System.out.printf("%d mods chargés depuis '%s'.%n", archives.size(), dossier_import);
 			
 			final Collection<ArchiveMod> importation = new ArrayList<>();
 			if (all) {
@@ -170,18 +175,22 @@ public class CommandeDepot implements Runnable {
 			}
 			
 			for (ArchiveMod version_client : importation) {
-				final PaquetMinecraft.FichierMetadata fichierjar = new PaquetMinecraft.FichierMetadata(
-						Path.of("mods").resolve(version_client.fichier.getName()));
-				version_client.modVersion.fichiers.add(fichierjar);
+				final JSONObject json = new JSONObject();
+				final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
 				final Path archive_destination = depot.dossier.toAbsolutePath()
 						.resolve(version_client.modVersion.toStringStandard() + ".tar");
 				
-				JSONObject json = new JSONObject();
-				version_client.modVersion.ecriturePaquet(json);
-				ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-				try (OutputStreamWriter writer = new OutputStreamWriter(bytes)) {
+				try (FileInputStream fis = new FileInputStream(version_client.fichier);
+					 OutputStreamWriter writer = new OutputStreamWriter(bytes)) {
+					final String sha256 = DigestUtils.sha256Hex(fis);
+					
+					final PaquetMinecraft.FichierMetadata fichierjar = new PaquetMinecraft.FichierMetadata(
+							new URI("mods/").resolve(version_client.fichier.getName()));
+					fichierjar.SHA256 = sha256;
+					version_client.modVersion.fichiers.add(fichierjar);
+					version_client.modVersion.ecriturePaquet(json);
 					json.write(writer, 4, 4);
-				} catch (IOException e) {
+				} catch (IOException | URISyntaxException e) {
 					e.printStackTrace();
 					break;
 				}
@@ -206,9 +215,10 @@ public class CommandeDepot implements Runnable {
 					break;
 				}
 				
+				final PaquetMinecraft.FichierMetadata archive_metadata = new PaquetMinecraft.FichierMetadata(
+						depot.dossier.toUri().relativize(archive_destination.toUri()));
 				depot.ajoutModVersion(version_client.modVersion);
-				depot.archives.put(version_client.modVersion,
-						new PaquetMinecraft.FichierMetadata(depot.dossier.relativize(archive_destination)));
+				depot.archives.put(version_client.modVersion, archive_metadata);
 			}
 			System.out.printf("%d versions importées.%n", importation.size());
 			

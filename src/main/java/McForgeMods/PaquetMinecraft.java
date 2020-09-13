@@ -1,11 +1,13 @@
 package McForgeMods;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.file.Path;
 import java.util.*;
 
 /**
@@ -67,7 +69,10 @@ public class PaquetMinecraft {
 		if (json.has("files")) {
 			JSONObject files = json.getJSONObject("files");
 			for (String nom : files.keySet()) {
+				final JSONObject metadata = files.getJSONObject(nom);
 				FichierMetadata fichier = new FichierMetadata(nom);
+				if (metadata.has("sha256")) fichier.SHA256 = metadata.getString("sha256");
+				
 				modVersion.fichiers.add(fichier);
 			}
 		}
@@ -137,6 +142,7 @@ public class PaquetMinecraft {
 		JSONObject files = new JSONObject();
 		for (FichierMetadata fichier : this.fichiers) {
 			JSONObject fichier_metadata = new JSONObject();
+			if (fichier.SHA256 != null) fichier_metadata.put("sha256", fichier.SHA256);
 			
 			files.put(fichier.path.toString(), fichier_metadata);
 		}
@@ -160,12 +166,16 @@ public class PaquetMinecraft {
 			this.path = path;
 		}
 		
-		public FichierMetadata(Path path) {
-			this(path.toUri());
-		}
-		
 		public FichierMetadata(String path) throws URISyntaxException {
 			this(new URI(path));
+		}
+		
+		public boolean checkSHA(InputStream stream) throws IOException {
+			if (SHA256 != null) {
+				String sha = DigestUtils.sha256Hex(stream);
+				return sha.equals(SHA256);
+			}
+			return true;
 		}
 	}
 }

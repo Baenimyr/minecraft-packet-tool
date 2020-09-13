@@ -108,7 +108,7 @@ public class JSONWriter {
 		writer.write('{');
 		if (cles.size() == 0) {
 			writer.write('}');
-		} else if (cles.size() == 1) {
+		} else if (cles.size() == 1 && !(jo.get(cles.get(0)) instanceof JSONObject)) {
 			String cle = cles.get(0);
 			quote(cle, writer);
 			writer.write(": ");
