@@ -73,8 +73,18 @@ public class CommandeUpdate implements Callable<Integer> {
 			System.out.printf("%d/%d\t%s%n", ++i, sources.size(), uri);
 			try {
 				FileObject mods = filesystem.resolveFile(uri.resolve(DepotLocal.MODS));
+				FileObject mods_gz = filesystem.resolveFile(uri.resolve(DepotLocal.MODS + ".gz"));
+				FileObject mods_zip = filesystem.resolveFile(uri.resolve(DepotLocal.MODS + ".zip"));
 				
-				if (mods.exists()) {
+				if (mods_gz.exists()) {
+					try (InputStream is = filesystem.createFileSystem("gz", mods_gz).getContent().getInputStream()) {
+						depotLocal.synchronisationDepot(is);
+					}
+				} else if (mods_zip.exists()) {
+					try (InputStream is = filesystem.createFileSystem("zip", mods_zip).getContent().getInputStream()) {
+						depotLocal.synchronisationDepot(is);
+					}
+				} else if (mods.exists()) {
 					try (InputStream is = mods.getContent().getInputStream()) {
 						depotLocal.synchronisationDepot(is);
 					}

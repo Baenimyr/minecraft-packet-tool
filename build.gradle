@@ -26,11 +26,15 @@ archivesBaseName = "ForgeMods"
 
 
 dependencies {
+    compile 'info.picocli:picocli:4.2.0'
     compile 'org.json:json:20200518'
+    compile 'org.tomlj:tomlj:1.0.0'
     compile 'org.apache.commons:commons-compress:1.20'
     compile 'org.apache.commons:commons-vfs2:2.6.0'
-    compile 'info.picocli:picocli:4.2.0'
-    compile 'org.tomlj:tomlj:1.0.0'
+
+    // implementation 'commons-httpclient:commons-httpclient:20020423'
+    // implementation 'commons-net:commons-net:20030805.205232'
+    // implementation 'org.apache.httpcomponents:httpclient:4.5.12'
     // annotationProcessor 'info.picocli:picocli-codegen:4.2.0'
 
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.5.1'
