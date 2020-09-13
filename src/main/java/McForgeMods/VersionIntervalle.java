@@ -57,7 +57,7 @@ public class VersionIntervalle {
 	public VersionIntervalle(Version version, int precision) {
 		this.minimum = version;
 		this.maximum = new Version(version);
-		this.maximum.set(precision, this.maximum.get(precision) + 1);
+		if (precision < this.maximum.size()) this.maximum.set(precision, this.maximum.get(precision) + 1);
 		this.inclut_min = true;
 		this.inclut_max = false;
 	}
@@ -111,7 +111,7 @@ public class VersionIntervalle {
 				intervalle = new VersionIntervalle(v_minimale, v_maximale);
 			} else {
 				if (inclut_max) intervalle = new VersionIntervalle(v_minimale);
-				else intervalle = new VersionIntervalle(v_minimale, v_minimale.precision() + 1);
+				else intervalle = new VersionIntervalle(v_minimale, v_minimale.precision());
 			}
 			
 			intervalle.inclut_min = inclut_min;

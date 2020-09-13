@@ -101,7 +101,7 @@ public class PaquetMinecraft {
 	public void fusion(PaquetMinecraft autre) {
 		if (this.description == null) this.description = autre.description;
 		autre.requiredMods.forEach(this::ajoutModRequis);
-		autre.fichiers.stream().filter(f -> this.fichiers.stream().noneMatch(f2 -> f.path == f2.path))
+		autre.fichiers.stream().filter(f -> this.fichiers.stream().noneMatch(f2 -> f.path.equals(f2.path)))
 				.forEach(this.fichiers::add);
 	}
 	

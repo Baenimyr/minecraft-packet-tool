@@ -8,11 +8,14 @@ import org.apache.commons.vfs2.FileObject;
 import org.apache.commons.vfs2.FileSystemException;
 import org.apache.commons.vfs2.FileSystemManager;
 import org.apache.commons.vfs2.VFS;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
 import java.io.*;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -74,26 +77,47 @@ public class DepotInstallation implements Closeable {
 		this.statusChange(mversion, manuel);
 	}
 	
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- Désinstallation +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+	
 	/**
 	 * Désinstalle une version de mod.
 	 * <p>
 	 * Si la cible est toujours nécessaire en temps que dépendance, elle passe en installation automatique. Cette
 	 * fonction désinstalle même si cette version est la dépendance d'un autre mod.
+	 *
+	 * @return {@code true} si le paquet à bien été supprimé
 	 */
-	public void desinstallation(String id) throws FileSystemException {
+	public boolean desinstallation(String id) throws FileSystemException {
 		if (this.installations.containsKey(id)) {
 			Installation installation = this.installations.get(id);
 			Optional<PaquetMinecraft> modVersion = this.depot.getModVersion(installation.modid, installation.version);
 			if (modVersion.isPresent()) {
-				try (final FileSystemManager filesystem = VFS.getManager()) {
-					for (PaquetMinecraft.FichierMetadata fichier : modVersion.get().fichiers) {
-						FileObject f = filesystem.resolveFile(fichier.path);
-						if (f.exists()) f.delete();
-					}
-				}
-			}
+				this.suppressionFichiers(modVersion.get());
+				this.statusSuppression(id);
+				return true;
+			} else return false;
+		}
+		return true;
+	}
+	
+	/**
+	 * Supprime les fichiers associées à un paquet.
+	 * <p>
+	 * Tous les fichiers déclarés dans le paquet seront supprimés du dossier minecraft, s'ils existent toujours.
+	 *
+	 * @param paquet: paquet à effacer
+	 * @throws FileSystemException si les fichiers ne peuvent pas être modifiés. Cette erreur peut laisser
+	 * l'installation dans un état incohérent.
+	 */
+	void suppressionFichiers(final PaquetMinecraft paquet) throws FileSystemException {
+		FileSystemManager filesystem = VFS.getManager();
+		final URI dossier = this.dossier.toUri();
+		for (PaquetMinecraft.FichierMetadata fichier : paquet.fichiers) {
+			FileObject f = filesystem.resolveFile(dossier.resolve(fichier.path));
 			
-			this.statusSuppression(id);
+			if (f.exists() /* && hors config */) {
+				f.delete();
+			}
 		}
 	}
 	
@@ -104,12 +128,14 @@ public class DepotInstallation implements Closeable {
 	 * différente. Considère seulement les versions pouvant être en conflit avec {@code statique}.
 	 *
 	 * @param statique version à conserver
+	 * @return {@code true} s'il ne reste aucun conflit.
 	 */
-	public void suppressionConflits(PaquetMinecraft statique) throws FileSystemException {
+	public boolean suppressionConflits(PaquetMinecraft statique) throws FileSystemException {
 		if (this.installations.containsKey(statique.modid)
 				&& this.installations.get(statique.modid).version != statique.version) {
-			this.desinstallation(statique.modid);
+			return this.desinstallation(statique.modid);
 		}
+		return true;
 	}
 	
 	/**
@@ -237,23 +263,22 @@ public class DepotInstallation implements Closeable {
 				}
 				
 				if (racine.has("mods")) {
-					JSONObject mods = racine.getJSONObject("mods");
-					for (String modid : mods.keySet()) {
-						JSONObject mod_data = mods.getJSONObject(modid);
-						if (mod_data != null) {
-							try {
-								final Version version = Version.read(mod_data.getString("version"));
-								final boolean manual = mod_data.getBoolean("manual");
-								final boolean verrou = mod_data.getBoolean("locked");
-								
-								Installation i = new Installation(modid, version);
-								i.manuel = manual;
-								i.verrou = verrou;
-								this.installations.put(modid, i);
-							} catch (NullPointerException ignored) {
-							} catch (JSONException jsonException) {
-								jsonException.printStackTrace();
-							}
+					JSONArray mods = racine.getJSONArray("mods");
+					for (int i = 0; i < mods.length(); i++) {
+						JSONObject mod_data = mods.getJSONObject(i);
+						try {
+							PaquetMinecraft paquet = PaquetMinecraft.lecturePaquet(mod_data);
+							final boolean manual = mod_data.getBoolean("manual");
+							final boolean verrou = mod_data.getBoolean("locked");
+							
+							Installation inst = new Installation(paquet.modid, paquet.version);
+							inst.manuel = manual;
+							inst.verrou = verrou;
+							this.installations.put(paquet.modid, inst);
+							
+							if (!depot.contains(paquet)) depot.ajoutModVersion(paquet);
+						} catch (JSONException | URISyntaxException jsonException) {
+							jsonException.printStackTrace();
 						}
 					}
 				}
@@ -275,15 +300,18 @@ public class DepotInstallation implements Closeable {
 				data.put("minecraft", minecraft);
 			}
 			
-			JSONObject MODS = new JSONObject();
+			JSONArray MODS = new JSONArray();
 			for (Map.Entry<String, Installation> entry : this.installations.entrySet()) {
-				JSONObject mod_data = new JSONObject();
 				Installation i = entry.getValue();
-				mod_data.put("version", i.version.toString());
-				mod_data.put("manual", i.manuel);
-				mod_data.put("locked", i.verrou);
-				
-				MODS.put(i.modid, mod_data);
+				Optional<PaquetMinecraft> paquet = depot.getModVersion(i.modid, i.version);
+				if (paquet.isPresent()) {
+					JSONObject i_data = new JSONObject();
+					paquet.get().ecriturePaquet(i_data);
+					i_data.put("manual", i.manuel);
+					i_data.put("locked", i.verrou);
+					
+					MODS.put(i_data);
+				}
 			}
 			data.put("mods", MODS);
 			data.write(bw, 4, 4);
