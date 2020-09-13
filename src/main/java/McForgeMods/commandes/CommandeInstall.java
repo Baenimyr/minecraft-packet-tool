@@ -178,7 +178,11 @@ public class CommandeInstall implements Callable<Integer> {
 								if (url != null) {
 									synchronized (depotInstallation) {
 										try {
-											depotInstallation.suppressionConflits(mversion);
+											if (!depotInstallation.suppressionConflits(mversion)) {
+												System.err.println("[Install] [ERROR] " + mversion + " impossible de "
+														+ "supprimer les versions en conflit.");
+												return null;
+											}
 										} catch (FileSystemException fse) {
 											System.err
 													.println("[ERROR] suppression ancienne version: " + fse.getCode());

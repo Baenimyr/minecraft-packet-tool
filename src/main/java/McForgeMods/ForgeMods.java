@@ -202,50 +202,21 @@ public class ForgeMods implements Runnable {
 		final DepotInstallation depotInstallation = new DepotInstallation(depotLocal, minecraft);
 		depotInstallation.analyseDossier();
 		Map<String, VersionIntervalle> versions = VersionIntervalle.lectureDependances(mods);
-		if (action == MarkAction.manual) {
-			for (String modid : versions.keySet()) {
-				if (depotInstallation.contains(modid)) {
-					DepotInstallation.Installation mv = depotInstallation.informations(modid);
-					if (versions.get(modid).correspond(mv.version)) {
+		for (String modid : versions.keySet()) {
+			if (depotInstallation.contains(modid)) {
+				DepotInstallation.Installation mv = depotInstallation.informations(modid);
+				if (versions.get(modid).correspond(mv.version)) {
+					if (action == MarkAction.manual || action == MarkAction.auto) {
 						if (mv.verrou) {
 							System.err.printf("%s est verrouillé%n", mv);
-						} else mv.manuel = true;
-					}
+						} else mv.manuel = action == MarkAction.manual;
+					} else mv.verrou = action == MarkAction.lock;
+				} else {
+					System.err.printf("Le mod %s@%s n'est pas installé", modid, versions.get(modid));
 				}
 			}
-		} else if (action == MarkAction.auto) {
-			for (String modid : versions.keySet()) {
-				if (depotInstallation.contains(modid)) {
-					DepotInstallation.Installation mv = depotInstallation.informations(modid);
-					if (versions.get(modid).correspond(mv.version)) {
-						if (mv.verrou) {
-							System.err.printf("%s est verrouillé%n", mv);
-						} else mv.manuel = false;
-					}
-				}
-			}
-		} else if (action == MarkAction.lock) {
-			for (String modid : versions.keySet()) {
-				if (depotInstallation.contains(modid)) {
-					DepotInstallation.Installation mv = depotInstallation.informations(modid);
-					if (versions.get(modid).correspond(mv.version)) {
-						mv.verrou = true;
-					}
-				}
-			}
-		} else if (action == MarkAction.unlock) {
-			for (String modid : versions.keySet()) {
-				if (depotInstallation.contains(modid)) {
-					DepotInstallation.Installation mv = depotInstallation.informations(modid);
-					if (versions.get(modid).correspond(mv.version)) {
-						mv.verrou = false;
-					}
-				}
-			}
-		} else {
-			System.err.println("Action inconnue: " + action);
-			return 1;
 		}
+		
 		try {
 			depotInstallation.statusSauvegarde();
 		} catch (IOException e) {
