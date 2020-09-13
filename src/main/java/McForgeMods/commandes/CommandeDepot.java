@@ -178,6 +178,7 @@ public class CommandeDepot implements Runnable {
 				final JSONObject json = new JSONObject();
 				final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
 				final Path archive_destination = depot.dossier.toAbsolutePath()
+						.resolve("" + version_client.modVersion.modid.charAt(0))
 						.resolve(version_client.modVersion.toStringStandard() + ".tar");
 				
 				try (FileInputStream fis = new FileInputStream(version_client.fichier);
