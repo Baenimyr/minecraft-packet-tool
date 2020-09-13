@@ -8,8 +8,13 @@ import McForgeMods.depot.ArchiveMod;
 import McForgeMods.depot.DepotLocal;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.vfs2.FileObject;
+import org.apache.commons.vfs2.FileSystemException;
+import org.apache.commons.vfs2.FileSystemManager;
+import org.apache.commons.vfs2.VFS;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.json.JSONTokener;
 import picocli.CommandLine;
 
 import java.io.*;
@@ -47,15 +52,37 @@ public class CommandeDepot implements Runnable {
 			@CommandLine.Option(names = {"-v", "--verbose"}, defaultValue = "false", descriptionKey = "verbose")
 					boolean verbose) {
 		DepotLocal depot = new DepotLocal(chemin_depot);
-		try {
-			depot.importation();
-		} catch (IOException | JSONException | IllegalArgumentException i) {
-			System.err.println("Erreur de lecture du dépot: " + i.getClass().getSimpleName() + ": " + i.getMessage());
-			if (!force) return 1;
+		
+		try (final FileSystemManager filesystem = VFS.getManager()) {
+			Queue<FileObject> fichiers = new LinkedList<>();
+			fichiers.add(filesystem.resolveFile(depot.dossier.toUri()));
+			
+			while (!fichiers.isEmpty()) {
+				FileObject f = fichiers.poll();
+				if (f.isFolder()) {
+					for (FileObject fc : f.getChildren())
+						if (fc.getName().getBaseName().endsWith(".tar")) fichiers.add(fc);
+				} else if (f.isFile() && !f.isHidden()) {
+					FileObject archive = filesystem.createFileSystem("tar", f);
+					FileObject data = archive.resolveFile(PaquetMinecraft.INFOS);
+					if (data.exists()) {
+						try (InputStream is = data.getContent().getInputStream()) {
+							JSONObject json = new JSONObject(new JSONTokener(is));
+							PaquetMinecraft paquet = PaquetMinecraft.lecturePaquet(json);
+							depot.ajoutModVersion(paquet);
+							depot.archives.put(paquet, new PaquetMinecraft.FichierMetadata(f.getName().getPath()));
+							// System.out.println("[Archive] " + paquet);
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
+				}
+			}
+		} catch (FileSystemException e) {
+			e.printStackTrace();
 		}
 		
-		System.out.println(
-				String.format("Dépot importé de %s: %d versions disponibles", depot.dossier, depot.sizeModVersion()));
+		System.out.printf("Dépot importé de %s: %d versions disponibles%n", depot.dossier, depot.sizeModVersion());
 		
 		if (verbose) {
 			ArrayList<String> modids = new ArrayList<>(depot.getModids());
@@ -70,9 +97,9 @@ public class CommandeDepot implements Runnable {
 							if (!depot.contains(dep.getKey()) || depot.getModVersions(dep.getKey()).stream().noneMatch(
 									v -> dep.getValue().equals(VersionIntervalle.ouvert()) || dep.getValue()
 											.correspond(v.version))) {
-								System.out.println(String.format(
-										"'%s' a besoin de '%s@%s', mais il n'est pas disponible dans le dépôt !",
-										version.toStringStandard(), dep.getKey(), dep.getValue()));
+								System.out
+										.printf("'%s' a besoin de '%s@%s', mais il n'est pas disponible dans le dépôt !%n",
+												version.toStringStandard(), dep.getKey(), dep.getValue());
 							}
 						}
 					}
@@ -108,13 +135,13 @@ public class CommandeDepot implements Runnable {
 			try {
 				depot.importation();
 			} catch (IOException | JSONException | IllegalArgumentException i) {
-				System.err.println(String.format("Erreur de lecture des informations du dépot: %s %s",
-						i.getClass().getSimpleName(), i.getMessage()));
+				System.err.printf("Erreur de lecture des informations du dépot: %s %s%n", i.getClass().getSimpleName(),
+						i.getMessage());
 				return 1;
 			}
 			List<ArchiveMod> archives = ArchiveMod.analyseDossier(dossiers.minecraft);
 			
-			System.out.println(String.format("%d mods chargés depuis '%s'.", archives.size(), dossiers.minecraft));
+			System.out.printf("%d mods chargés depuis '%s'.%n", archives.size(), dossiers.minecraft);
 			
 			final Collection<ArchiveMod> importation = new ArrayList<>();
 			if (all) {
@@ -182,14 +209,13 @@ public class CommandeDepot implements Runnable {
 				depot.archives.put(version_client.modVersion,
 						new PaquetMinecraft.FichierMetadata(depot.dossier.relativize(archive_destination)));
 			}
-			System.out.println(String.format("%d versions importées.", importation.size()));
+			System.out.printf("%d versions importées.%n", importation.size());
 			
 			try {
 				depot.sauvegarde();
 			} catch (IOException i) {
-				System.err.println(
-						String.format("Impossible de sauvegarder le dépot local à '%s': %s %s", depot.dossier,
-								getClass().getSimpleName(), i.getMessage()));
+				System.err.printf("Impossible de sauvegarder le dépot local à '%s': %s %s%n", depot.dossier,
+						getClass().getSimpleName(), i.getMessage());
 				return 1;
 			}
 			return 0;
