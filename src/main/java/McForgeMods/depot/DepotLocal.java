@@ -8,7 +8,6 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 
 import java.io.*;
-import java.net.MalformedURLException;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -18,7 +17,7 @@ import java.util.Map;
  * @see PaquetMinecraft
  */
 public class DepotLocal extends Depot {
-	private final static String MODS = "Mods.json";
+	public final static String MODS = "Mods.json";
 	
 	public final Path                                                  dossier;
 	public final Map<PaquetMinecraft, PaquetMinecraft.FichierMetadata> archives = new HashMap<>();
@@ -149,14 +148,10 @@ public class DepotLocal extends Depot {
 	 * présentes sont erronées. Il peut être conseillé de supprimer les données périmées avant d'activer la
 	 * synchronisation avec {@link Depot#clear()}.
 	 *
-	 * @param depot_distant: interface du dépôt distant
-	 * @throws MalformedURLException si l'url n'est pas conpatible avec l'exploration d'arborescence de fichier
-	 * @throws IOException à la moindre erreur de lecture des flux réseau.
+	 * @param is: contenu du fichier Mods.json selon le protocol de transport
 	 */
-	public void synchronisationDepot(DepotDistant depot_distant) throws MalformedURLException, IOException {
-		try (InputStream is = depot_distant.fichierIndexDepot()) {
-			this.lectureFichierIndex(new BufferedInputStream(is));
-		}
+	public void synchronisationDepot(InputStream is) {
+		this.lectureFichierIndex(new BufferedInputStream(is));
 		System.out.println();
 	}
 }

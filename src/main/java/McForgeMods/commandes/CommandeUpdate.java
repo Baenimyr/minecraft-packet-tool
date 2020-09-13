@@ -1,22 +1,24 @@
 package McForgeMods.commandes;
 
 import McForgeMods.ForgeMods;
-import McForgeMods.depot.DepotDistant;
 import McForgeMods.depot.DepotLocal;
 import McForgeMods.outils.Sources;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.vfs2.FileObject;
+import org.apache.commons.vfs2.FileSystemManager;
+import org.apache.commons.vfs2.VFS;
 import org.json.JSONException;
 import picocli.CommandLine;
 
-import java.io.*;
-import java.net.MalformedURLException;
-import java.net.URL;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.file.FileSystemException;
 import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Callable;
 
 @CommandLine.Command(name = "update", resourceBundle = "mcforgemods/lang/Update")
@@ -41,13 +43,13 @@ public class CommandeUpdate implements Callable<Integer> {
 			return 1;
 		}
 		
-		Sources sources;
+		final Sources sources = new Sources();
 		if (urlDistant == null) {
 			urlDistant = new LinkedList<>();
 			final File fichier = depotLocal.dossier.resolve("sources.txt").toFile();
 			if (fichier.exists()) {
 				try (FileInputStream input = new FileInputStream(fichier)) {
-					sources = new Sources(input);
+					sources.importation(input);
 				} catch (IOException ignored) {
 					return -1;
 				}
@@ -56,61 +58,32 @@ public class CommandeUpdate implements Callable<Integer> {
 				return 2;
 			}
 		} else {
-			sources = new Sources();
 			for (String url : urlDistant) {
 				try {
-					sources.add(new URL(url));
-				} catch (MalformedURLException m) {
-					System.err.println(String.format("MalformedURL: '%s'", url));
+					sources.add(new URI(url));
+				} catch (URISyntaxException m) {
+					System.err.printf("MalformedURL: '%s'%n", url);
 				}
 			}
 		}
 		
 		int i = 0;
-		Map<URL, Sources.SourceType> src = sources.urls();
-		for (URL url : src.keySet()) {
-			System.out.println(String.format("%d/%d\t%s", ++i, sources.size(), url));
+		final FileSystemManager filesystem = VFS.getManager();
+		for (URI uri : sources.urls()) {
+			System.out.printf("%d/%d\t%s%n", ++i, sources.size(), uri);
 			try {
-				if (src.get(url) == Sources.SourceType.TAR) {
-					try (InputStream s = url.openStream(); TarArchiveInputStream tar = new TarArchiveInputStream(s)) {
-						final Map<String, ByteArrayInputStream> fichiers = new HashMap<>();
-						TarArchiveEntry entry;
-						while ((entry = tar.getNextTarEntry()) != null) {
-							fichiers.put(entry.getName(), new ByteArrayInputStream(tar.readAllBytes()));
-						}
-						
-						depotLocal.synchronisationDepot(new DepotDistant() {
-							@Override
-							public InputStream fichierIndexDepot() throws IOException {
-								return fichiers.get("Mods.json");
-							}
-							
-							@Override
-							public InputStream fichierModDepot(String modid) throws IOException {
-								return fichiers.get(modid.charAt(0) + "/" + modid + "/" + modid + ".json");
-							}
-						});
-					} catch (FileNotFoundException fnfe) {
-						System.err.println("Fichier absent dans l'archive : '" + fnfe.getMessage() + "'");
+				FileObject mods = filesystem.resolveFile(uri.resolve(DepotLocal.MODS));
+				
+				if (mods.exists()) {
+					try (InputStream is = mods.getContent().getInputStream()) {
+						depotLocal.synchronisationDepot(is);
 					}
 				} else {
-					depotLocal.synchronisationDepot(new DepotDistant() {
-						@Override
-						public InputStream fichierIndexDepot() throws IOException {
-							return new URL(url, "Mods.json").openStream();
-						}
-						
-						@Override
-						public InputStream fichierModDepot(String modid) throws IOException {
-							return new URL(url, modid.substring(0, 1) + "/" + modid + "/" + modid + ".json")
-									.openStream();
-						}
-					});
+					System.err.printf("Impossible de lire %s à %s !%n", DepotLocal.MODS, uri);
 				}
-			} catch (MalformedURLException u) {
-				System.err.println("URL invalide: " + u.getMessage());
-			} catch (IOException io) {
+			} catch (FileSystemException io) {
 				System.err.println("Erreur lecture du dépot distant: " + io.getClass() + " " + io.getMessage());
+				io.printStackTrace();
 			}
 		}
 		

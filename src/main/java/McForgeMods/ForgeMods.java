@@ -8,8 +8,8 @@ import McForgeMods.outils.Sources;
 import picocli.CommandLine;
 
 import java.io.*;
-import java.net.MalformedURLException;
-import java.net.URL;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -39,32 +39,31 @@ public class ForgeMods implements Runnable {
 	public int ajout_repo(@CommandLine.Parameters(index = "0", arity = "1..n", paramLabel = "url") List<String> urls,
 			@CommandLine.Option(names = {"-d", "--depot"}) Path depot) {
 		final DepotLocal depotLocal = new DepotLocal(depot);
-		Sources sources;
+		final Sources sources = new Sources();
 		
+		depotLocal.dossier.toFile().mkdirs();
 		final File fichier = depotLocal.dossier.resolve("sources.txt").toFile();
 		if (fichier.exists()) {
 			try (FileInputStream input = new FileInputStream(fichier)) {
-				sources = new Sources(input);
+				sources.importation(input);
 			} catch (IOException ignored) {
 				return -1;
 			}
-		} else {
-			sources = new Sources();
 		}
 		
 		try (FileOutputStream output = new FileOutputStream(fichier, true);
 			 OutputStreamWriter bos = new OutputStreamWriter(output); BufferedWriter bw = new BufferedWriter(bos)) {
 			for (String url : urls) {
 				try {
-					URL u = new URL(url);
-					if (!sources.urls().containsKey(u)) {
+					URI u = new URI(url);
+					if (url.endsWith(".gz")) u = new URI("gz:" + u);
+					
+					if (!sources.urls().contains(u)) {
 						bw.newLine();
-						if (u.getPath().endsWith(".tar")) bw.write("tar\t");
-						else bw.write("dir\t");
 						bw.write(u.toString());
 					}
-				} catch (MalformedURLException m) {
-					System.err.printf("MalformedURL: '%s'%n", url);
+				} catch (URISyntaxException m) {
+					System.err.printf("URISyntax Error: '%s'%n", url);
 				}
 			}
 		} catch (IOException i) {
