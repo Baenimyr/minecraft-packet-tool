@@ -18,6 +18,7 @@ import org.json.JSONTokener;
 import picocli.CommandLine;
 
 import java.io.*;
+import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.Callable;
@@ -70,9 +71,9 @@ public class CommandeDepot implements Runnable {
 							JSONObject json = new JSONObject(new JSONTokener(is));
 							PaquetMinecraft paquet = PaquetMinecraft.lecturePaquet(json);
 							depot.ajoutModVersion(paquet);
-							depot.archives.put(paquet, new PaquetMinecraft.FichierMetadata(f.getName().getPath()));
+							depot.archives.put(paquet, new PaquetMinecraft.FichierMetadata(f.getPublicURIString()));
 							// System.out.println("[Archive] " + paquet);
-						} catch (IOException e) {
+						} catch (IOException | URISyntaxException e) {
 							e.printStackTrace();
 						}
 					}

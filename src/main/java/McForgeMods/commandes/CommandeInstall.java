@@ -94,7 +94,7 @@ public class CommandeInstall implements Callable<Integer> {
 					"Aucune version de minecraft spécifiée. Veuillez compléter l'option -mc une première fois.");
 			return 1;
 		}
-		;
+		
 		arbre_dependances.mcversion.intersection(depotInstallation.mcversion);
 		
 		/* Liste des installations explicitement demandées par l'utilisateur. */
@@ -253,21 +253,21 @@ public class CommandeInstall implements Callable<Integer> {
 		}
 		
 		@Override
-		public Boolean apply(URI archive) {
-			if (archive == null) return false;
+		public Boolean apply(URI archive_url) {
+			if (archive_url == null) return false;
 			
 			try {
-				archive = new URI("tar:" + archive);
 				FileSystemManager filesystem = VFS.getManager();
-				FileObject farchive = filesystem.resolveFile(archive);
-				FileObject mods = farchive.resolveFile(PaquetMinecraft.INFOS);
+				FileObject archive_f = filesystem.resolveFile(archive_url);
+				FileObject archive_tar = filesystem.createFileSystem("tar", archive_f);
+				FileObject mods = archive_tar.resolveFile(PaquetMinecraft.INFOS);
 				
 				InputStream is = mods.getContent().getInputStream();
 				JSONObject json = new JSONObject(new JSONTokener(is));
 				PaquetMinecraft modVersion = PaquetMinecraft.lecturePaquet(json);
 				is.close();
 				
-				FileObject data = farchive.resolveFile(PaquetMinecraft.FICHIERS);
+				FileObject data = archive_tar.resolveFile(PaquetMinecraft.FICHIERS);
 				for (PaquetMinecraft.FichierMetadata fichier : modVersion.fichiers) {
 					FileObject src = data.resolveFile("/" + fichier.path);
 					FileObject dest = filesystem

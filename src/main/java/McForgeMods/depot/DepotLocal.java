@@ -8,6 +8,8 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 
 import java.io.*;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -58,18 +60,23 @@ public class DepotLocal extends Depot {
 	 *
 	 * @param input contenu du fichier d'index.
 	 */
-	private void lectureFichierIndex(final InputStream input) throws JSONException {
+	private void lectureFichierIndex(final InputStream input, final URI baseURI) throws JSONException {
 		JSONTokener tokener = new JSONTokener(new BufferedInputStream(input));
 		JSONArray mods = new JSONArray(tokener);
 		
 		for (int i = 0; i < mods.length(); i++) {
 			JSONObject data = mods.getJSONObject(i);
-			PaquetMinecraft modVersion = PaquetMinecraft.lecturePaquet(data);
-			PaquetMinecraft.FichierMetadata paquet = new PaquetMinecraft.FichierMetadata(data.getString("filename"));
-			if (data.has("sha256")) paquet.SHA256 = data.getString("sha256");
-			
-			this.ajoutModVersion(modVersion);
-			this.archives.put(modVersion, paquet);
+			try {
+				PaquetMinecraft modVersion = PaquetMinecraft.lecturePaquet(data);
+				PaquetMinecraft.FichierMetadata paquet = new PaquetMinecraft.FichierMetadata(
+						baseURI.resolve(data.getString("filename")));
+				if (data.has("sha256")) paquet.SHA256 = data.getString("sha256");
+				
+				this.ajoutModVersion(modVersion);
+				this.archives.put(modVersion, paquet);
+			} catch (URISyntaxException e) {
+				System.err.printf("[ERROR] lecture infos pour %s: %s%n", data.getString("name"), e.getMessage());
+			}
 		}
 	}
 	
@@ -84,7 +91,7 @@ public class DepotLocal extends Depot {
 		}
 		
 		try (FileInputStream fichier = new FileInputStream(MODS)) {
-			lectureFichierIndex(fichier);
+			lectureFichierIndex(fichier, this.dossier.toUri());
 		} catch (JSONException je) {
 			throw new JSONException("Erreur lecture fichier '" + MODS + "'", je);
 		}
@@ -99,7 +106,7 @@ public class DepotLocal extends Depot {
 		
 		try (FileOutputStream fichier = new FileOutputStream(fichierIndexDepot());
 			 BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(fichier)) {
-			ecritureFichierIndex(bufferedOutputStream);
+			ecritureFichierIndex(bufferedOutputStream, this.dossier.toUri());
 		}
 	}
 	
@@ -110,7 +117,7 @@ public class DepotLocal extends Depot {
 	 *
 	 * @param outputStream: flux d'écriture.
 	 */
-	private void ecritureFichierIndex(final OutputStream outputStream) throws IOException {
+	private void ecritureFichierIndex(final OutputStream outputStream, final URI relURI) throws IOException {
 		JSONArray mods = new JSONArray();
 		
 		for (String modid : this.getModids())
@@ -118,7 +125,7 @@ public class DepotLocal extends Depot {
 				final JSONObject data = new JSONObject();
 				modVersion.ecriturePaquet(data);
 				PaquetMinecraft.FichierMetadata archive = this.archives.get(modVersion);
-				data.put("filename", archive.path);
+				data.put("filename", relURI.relativize(archive.path));
 				if (archive.SHA256 != null) {
 					data.put("sha256", archive.SHA256);
 				}
@@ -150,8 +157,8 @@ public class DepotLocal extends Depot {
 	 *
 	 * @param is: contenu du fichier Mods.json selon le protocol de transport
 	 */
-	public void synchronisationDepot(InputStream is) {
-		this.lectureFichierIndex(new BufferedInputStream(is));
+	public void synchronisationDepot(InputStream is, final URI baseURI) {
+		this.lectureFichierIndex(new BufferedInputStream(is), baseURI);
 		System.out.println();
 	}
 }

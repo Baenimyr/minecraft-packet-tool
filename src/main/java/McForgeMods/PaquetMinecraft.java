@@ -3,6 +3,8 @@ package McForgeMods;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.*;
 
@@ -50,22 +52,8 @@ public class PaquetMinecraft {
 		this.mcversion = mcversion;
 	}
 	
-	/**
-	 * Ajoute une nouvelle dépendance.
-	 * <p>
-	 * Si un mod identique est déjà enregistrée, enregistre l'intersection entre les deux intervalles de version.
-	 *
-	 * @param modid requis
-	 * @param intervalle pour laquelle le modid est requis.
-	 */
-	public void ajoutModRequis(String modid, VersionIntervalle intervalle) {
-		modid = modid.toLowerCase().intern();
-		if (this.requiredMods.containsKey(modid) && this.requiredMods.get(modid) != null) this.requiredMods.get(modid).intersection(intervalle);
-		else this.requiredMods.put(modid, intervalle);
-	}
-	
 	/** Lit les informations relatives à un paquet. */
-	public static PaquetMinecraft lecturePaquet(JSONObject json) {
+	public static PaquetMinecraft lecturePaquet(JSONObject json) throws URISyntaxException {
 		PaquetMinecraft modVersion = new PaquetMinecraft(json.getString("name"),
 				Version.read(json.getString("version")), VersionIntervalle.read(json.getString("mcversion")));
 		modVersion.description = json.optString("description", null);
@@ -79,12 +67,27 @@ public class PaquetMinecraft {
 		if (json.has("files")) {
 			JSONObject files = json.getJSONObject("files");
 			for (String nom : files.keySet()) {
-				FichierMetadata fichier = new FichierMetadata(Path.of(nom));
+				FichierMetadata fichier = new FichierMetadata(nom);
 				modVersion.fichiers.add(fichier);
 			}
 		}
 		
 		return modVersion;
+	}
+	
+	/**
+	 * Ajoute une nouvelle dépendance.
+	 * <p>
+	 * Si un mod identique est déjà enregistrée, enregistre l'intersection entre les deux intervalles de version.
+	 *
+	 * @param modid requis
+	 * @param intervalle pour laquelle le modid est requis.
+	 */
+	public void ajoutModRequis(String modid, VersionIntervalle intervalle) {
+		modid = modid.toLowerCase().intern();
+		if (this.requiredMods.containsKey(modid) && this.requiredMods.get(modid) != null)
+			this.requiredMods.get(modid).intersection(intervalle);
+		else this.requiredMods.put(modid, intervalle);
 	}
 	
 	/**
@@ -150,15 +153,19 @@ public class PaquetMinecraft {
 	 * fichier.
 	 */
 	public static class FichierMetadata {
-		public final String path;
+		public final URI    path;
 		public       String SHA256 = null;
 		
-		public FichierMetadata(String path) {
+		public FichierMetadata(URI path) {
 			this.path = path;
 		}
 		
 		public FichierMetadata(Path path) {
-			this(path.toString());
+			this(path.toUri());
+		}
+		
+		public FichierMetadata(String path) throws URISyntaxException {
+			this(new URI(path));
 		}
 	}
 }

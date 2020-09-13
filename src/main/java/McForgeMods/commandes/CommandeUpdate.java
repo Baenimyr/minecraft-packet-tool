@@ -69,7 +69,7 @@ public class CommandeUpdate implements Callable<Integer> {
 		
 		int i = 0;
 		final FileSystemManager filesystem = VFS.getManager();
-		for (URI uri : sources.urls()) {
+		for (final URI uri : sources.urls()) {
 			System.out.printf("%d/%d\t%s%n", ++i, sources.size(), uri);
 			try {
 				FileObject mods = filesystem.resolveFile(uri.resolve(DepotLocal.MODS));
@@ -78,15 +78,15 @@ public class CommandeUpdate implements Callable<Integer> {
 				
 				if (mods_gz.exists()) {
 					try (InputStream is = filesystem.createFileSystem("gz", mods_gz).getContent().getInputStream()) {
-						depotLocal.synchronisationDepot(is);
+						depotLocal.synchronisationDepot(is, uri);
 					}
 				} else if (mods_zip.exists()) {
 					try (InputStream is = filesystem.createFileSystem("zip", mods_zip).getContent().getInputStream()) {
-						depotLocal.synchronisationDepot(is);
+						depotLocal.synchronisationDepot(is, uri);
 					}
 				} else if (mods.exists()) {
 					try (InputStream is = mods.getContent().getInputStream()) {
-						depotLocal.synchronisationDepot(is);
+						depotLocal.synchronisationDepot(is, uri);
 					}
 				} else {
 					System.err.printf("Impossible de lire %s à %s !%n", DepotLocal.MODS, uri);
