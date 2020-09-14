@@ -56,6 +56,7 @@ compileJava {
 application {
     // Define the main class for the application.
     mainClassName = 'McForgeMods.ForgeMods'
+    applicationName 'forgemods'
 }
 
 jar {
@@ -99,6 +100,7 @@ task deb(type: Deb, group: 'build') {
         into 'bin'
         fileMode 0550
         exclude packageName + "_completion"
+        exclude '*.bat'
     }
 }
 
