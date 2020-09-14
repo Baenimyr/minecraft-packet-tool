@@ -5,11 +5,20 @@
  * For more details take a look at the Java Quickstart chapter in the Gradle
  * User Manual available at https://docs.gradle.org/6.0.1/userguide/tutorial_java_projects.html
  */
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.netflix.nebula:gradle-ospackage-plugin:8.4.1'
+    }
+}
 
 plugins {
     id 'java'
     id 'application'
 }
+apply plugin: 'nebula.deb'
 
 repositories {
     // Use jcenter for resolving dependencies.
@@ -17,11 +26,9 @@ repositories {
     jcenter()
 }
 
-java {
-    sourceCompatibility = JavaVersion.VERSION_11
-}
+java.sourceCompatibility = JavaVersion.VERSION_11
 
-version = "0.3.0"
+version = "0.4.0"
 archivesBaseName = "ForgeMods"
 
 
@@ -33,17 +40,17 @@ dependencies {
     compile 'commons-codec:commons-codec:1.13'
     compile 'org.apache.commons:commons-vfs2:2.6.0'
 
-    // implementation 'commons-httpclient:commons-httpclient:20020423'
+    implementation 'commons-httpclient:commons-httpclient:20020423'
     // implementation 'commons-net:commons-net:20030805.205232'
     // implementation 'org.apache.httpcomponents:httpclient:4.5.12'
-    // annotationProcessor 'info.picocli:picocli-codegen:4.2.0'
+    annotationProcessor 'info.picocli:picocli-codegen:4.2.0'
 
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.5.1'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.5.1'
 }
 
 compileJava {
-    // options.compilerArgs += ["-Aproject=${project.name}"]
+    options.compilerArgs += ["-Aproject=${project.name}"]
 }
 
 application {
@@ -62,6 +69,37 @@ jar {
 test {
     // Use junit platform for unit tests
     useJUnitPlatform()
+}
+
+task autocompletion(type: JavaExec) {
+    dependsOn('assemble')
+
+    workingDir('build/scripts')
+    classpath(configurations.runtime, jar.outputs.files)
+    main 'picocli.AutoComplete'
+    args application.mainClassName, '-n', 'forgemods'
+}
+
+task deb(type: Deb, group: 'build') {
+    dependsOn(assemble)
+    // dependsOn(autocompletion)
+
+    packageName 'forgemods'
+    packageDescription 'Gestionnaire de paquet pour Minecraft.'
+    requires('openjdk-14-jre-headless').or('openjdk-13-jre-headless').or('openjdk-11-jre-headless')
+
+    into '/opt/' + packageName
+    from (jar.outputs.files) {
+        into 'lib'
+    }
+    from (configurations.runtime) {
+        into 'lib'
+    }
+    from ('build/scripts') {
+        into 'bin'
+        fileMode 0550
+        exclude packageName + "_completion"
+    }
 }
 
 
