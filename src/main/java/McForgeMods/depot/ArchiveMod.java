@@ -48,19 +48,20 @@ public class ArchiveMod {
 		if (!json.has("modid") || !json.has("name")) return;
 		final String modid = json.getString("modid");
 		final String name = json.getString("name");
-		Version version, mcversion;
+		Version version;
+		VersionIntervalle mcversion;
 		
 		String texte_version = json.getString("version");
 		Matcher m = minecraft_version.matcher(texte_version);
 		if (m.find()) {
 			// System.out.println(String.format("[Version] '%s' => %s\t%s", texte_version, texte_version.substring(0, m.end() - 1), texte_version.substring(m.end())));
-			mcversion = Version.read(texte_version.substring(0, m.end() - 1));
+			mcversion = VersionIntervalle.read(texte_version.substring(0, m.end() - 1));
 			version = Version.read(texte_version.substring(m.end()));
 			
-			if (json.has("mcversion")) mcversion = Version.read(json.getString("mcversion"));
+			if (json.has("mcversion")) mcversion = VersionIntervalle.read(json.getString("mcversion"));
 		} else {
 			version = Version.read(texte_version);
-			mcversion = Version.read(json.getString("mcversion")); // obligatoire car non déduit de la version
+			mcversion = VersionIntervalle.read(json.getString("mcversion")); // obligatoire car non déduit de la version
 		}
 		
 		archive.mod = new Mod(modid);
@@ -73,8 +74,7 @@ public class ArchiveMod {
 		if (archive.mod.url != null && archive.mod.url.length() == 0) archive.mod.url = null;
 		if (archive.mod.updateJSON != null && archive.mod.updateJSON.length() == 0) archive.mod.updateJSON = null;
 		
-		archive.modVersion = new PaquetMinecraft(modid, version,
-				new VersionIntervalle(mcversion, mcversion.precision()));
+		archive.modVersion = new PaquetMinecraft(modid, version, mcversion);
 		
 		if (json.has("requiredMods")) {
 			VersionIntervalle.lectureDependances(json.getJSONArray("requiredMods"))
@@ -193,7 +193,7 @@ public class ArchiveMod {
 					try {
 						resultat = ArchiveMod.importationJar(f);
 					} catch (IOException i) {
-						System.err.println(String.format("[DepotInstallation] [ERROR] in '%s': %s", f, i.getMessage()));
+						System.err.printf("[ERROR] in '%s': %s%n", f, i.getMessage());
 					}
 					
 					if (resultat != null && resultat.isPresent()) {

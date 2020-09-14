@@ -52,7 +52,10 @@ class VersionIntervalleTest {
 		assertTrue(dep4.inclut_min);
 		assertEquals(new Version(1, 0, 0), dep4.minimum);
 		assertEquals(dep4.minimum, dep4.maximum);
-		
+	}
+	
+	@Test
+	public void intervalleAuto() {
 		VersionIntervalle dep5 = VersionIntervalle.read("1.0");
 		assertFalse(dep5.inclut_max);
 		assertTrue(dep5.inclut_min);
@@ -60,6 +63,14 @@ class VersionIntervalleTest {
 		assertNotNull(dep5.maximum);
 		assertEquals(new Version(1, 0, 0), dep5.minimum);
 		assertEquals(new Version(1, 1, 0), dep5.maximum);
+		
+		VersionIntervalle dep6 = VersionIntervalle.read("1.0.0");
+		assertFalse(dep6.inclut_max);
+		assertTrue(dep6.inclut_min);
+		assertNotNull(dep6.minimum);
+		assertNotNull(dep6.maximum);
+		assertEquals(new Version(1, 0, 0), dep6.minimum);
+		assertEquals(new Version(1, 0, 1), dep6.maximum);
 	}
 	
 	@Test

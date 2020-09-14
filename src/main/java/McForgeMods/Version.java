@@ -13,14 +13,14 @@ import java.util.regex.Pattern;
  * @since 2020-01-10
  */
 public class Version implements Comparable<Version> {
-	public static final Pattern VERSION = Pattern.compile(
-			"(\\d+)\\.(\\d+)(\\.(\\d+)(\\.(\\d+))?)?(-(?<release>\\p{Alnum}+))?(\\+" + "(?<build>\\p{Alnum}+))?");
+	public static final Pattern VERSION  = Pattern
+			.compile("(\\d+)\\.(\\d+)(\\.(\\d+)(\\.(\\d+))?)?(-(?<release>\\p{Alnum}+))?(\\+(?<build>\\p{Alnum}+))?");
 	/**
 	 * major, medium, minor, patch
 	 */
-	private final int[]  versions = new int[4];
-	public        String release  = null;
-	public        String build    = null;
+	private final       int[]   versions = new int[4];
+	public              String  release  = null;
+	public              String  build    = null;
 	
 	public Version(int major, int medium, int minor, int patch) {
 		this.versions[0] = major;
@@ -35,6 +35,8 @@ public class Version implements Comparable<Version> {
 	
 	public Version(Version v) {
 		System.arraycopy(v.versions, 0, this.versions, 0, 4);
+		this.release = v.release;
+		this.build = v.build;
 	}
 	
 	public int size() {
