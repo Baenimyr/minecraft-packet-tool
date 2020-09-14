@@ -22,7 +22,7 @@ public class Sources {
 		try (BufferedReader reader = new BufferedReader(new InputStreamReader(fichier))) {
 			String ligne;
 			while ((ligne = reader.readLine()) != null) {
-				if (ligne.startsWith("#")) continue;
+				if (ligne.startsWith("#") || ligne.length() == 0) continue;
 				
 				try {
 					this.add(new URI(ligne));

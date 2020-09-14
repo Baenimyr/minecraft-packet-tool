@@ -56,8 +56,6 @@ public class ForgeMods implements Runnable {
 			for (String url : urls) {
 				try {
 					URI u = new URI(url);
-					if (url.endsWith(".gz")) u = new URI("gz:" + u);
-					
 					if (!sources.urls().contains(u)) {
 						bw.newLine();
 						bw.write(u.toString());
@@ -93,7 +91,6 @@ public class ForgeMods implements Runnable {
 				Matcher m_modid = schema.matcher(modid);
 				if (m_modid.find()) {
 					modids.add(modid);
-					continue;
 				}
 			}
 		} else {
@@ -101,7 +98,6 @@ public class ForgeMods implements Runnable {
 			for (String modid : depotLocal.getModids()) {
 				if (modid.contains(recherche_l)) {
 					modids.add(modid);
-					continue;
 				}
 			}
 			depotLocal.getModids().stream().filter(modid -> modid.contains(recherche)).forEach(modids::add);
