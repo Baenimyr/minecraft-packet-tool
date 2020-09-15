@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 @CommandLine.Command(name = "forgemods", showDefaultValues = true, resourceBundle = "mcforgemods/lang/ForgeMods",
 		mixinStandardHelpOptions = true, version = "0.4.0",
 		subcommands = {CommandeShow.class, CommandeListe.class, CommandeDepot.class, CommandeInstall.class,
-				CommandeUpdate.class})
+				CommandeRemove.class, CommandeUpdate.class})
 public class ForgeMods implements Runnable {
 	
 	@CommandLine.Spec
