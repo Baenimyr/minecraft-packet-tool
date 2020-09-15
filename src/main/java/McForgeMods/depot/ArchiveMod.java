@@ -90,16 +90,17 @@ public class ArchiveMod {
 		TomlParseResult toml = Toml.parse(lecture);
 		TomlArray mods = toml.getArray("mods");
 		if (mods == null || mods.isEmpty()) {
-			System.err.println("[mods.toml] pas de liste 'mods'");
+			System.err.println("[JAR/mods.toml] pas de liste 'mods'");
 			return;
 		}
 		
 		TomlTable mod_info = mods.getTable(0);
 		if (mod_info == null || !mod_info.contains("modId")) {
-			System.err.println("[mods.toml] aucun 'modId'");
+			System.err.println("[JAR/mods.toml] aucun 'modId'");
 			return;
 		}
 		archive.mod = new Mod(mod_info.getString("modId"));
+		final Version version = Version.read(mod_info.getString("version"));
 		archive.mod.name = mod_info.getString("displayName");
 		archive.mod.url = mod_info.contains("displayURL") ? mod_info.getString("displayURL") : null;
 		archive.mod.updateJSON = mod_info.contains("updateJSONURL") ? mod_info.getString("updateJSONURL") : null;
@@ -108,7 +109,7 @@ public class ArchiveMod {
 		
 		TomlArray dependencies_info = toml.getArray("dependencies." + archive.mod.modid);
 		if (dependencies_info == null) {
-			System.err.println("[mods.toml] pas de liste 'dependencies." + archive.mod.modid + "'");
+			System.err.println("[JAR/mods.toml] pas de liste 'dependencies." + archive.mod.modid + "'");
 			return;
 		}
 		final Map<String, VersionIntervalle> dependencies = new HashMap<>();
@@ -126,11 +127,10 @@ public class ArchiveMod {
 		}
 		
 		if (mcversion == null) {
-			System.err.println("[mods.toml] Aucune version minecraft spécifiée pour " + archive.mod.modid);
+			System.err.println("[JAR/mods.toml] Aucune version minecraft spécifiée pour " + archive.mod.modid);
 			return;
 		}
-		archive.modVersion = new PaquetMinecraft(archive.mod.modid, Version.read(mod_info.getString("version")),
-				mcversion);
+		archive.modVersion = new PaquetMinecraft(archive.mod.modid, version, mcversion);
 		archive.modVersion.requiredMods.putAll(dependencies);
 	}
 	
@@ -162,8 +162,8 @@ public class ArchiveMod {
 						lectureMcMod(archive, lecture);
 					}
 			}
-		} catch (JSONException | IllegalArgumentException ignored) {
-			// System.err.println("[DEBUG] [importation] '" + fichier.getName() + "':\t" + ignored.getMessage());
+		} catch (JSONException | IllegalArgumentException error) {
+			System.err.printf("[JAR] '%s':\t%s:%s%n", fichier.getName(), error.getClass(), error.getMessage());
 		}
 		return archive;
 	}

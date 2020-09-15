@@ -63,20 +63,22 @@ public class CommandeDepot implements Runnable {
 			while (!fichiers.isEmpty()) {
 				FileObject f = fichiers.poll();
 				if (f.isFolder()) {
-					for (FileObject fc : f.getChildren())
-						if (fc.getName().getBaseName().endsWith(".tar")) fichiers.add(fc);
-				} else if (f.isFile() && !f.isHidden()) {
+					fichiers.addAll(Arrays.asList(f.getChildren()));
+				} else if (f.isFile() && !f.isHidden() && f.getName().getBaseName().endsWith(".tar")) {
 					FileObject archive = filesystem.createFileSystem("tar", f);
 					FileObject data = archive.resolveFile(PaquetMinecraft.INFOS);
 					if (data.exists()) {
 						try (InputStream is = data.getContent().getInputStream()) {
 							JSONObject json = new JSONObject(new JSONTokener(is));
 							PaquetMinecraft paquet = PaquetMinecraft.lecturePaquet(json);
+							PaquetMinecraft.FichierMetadata metadata = new PaquetMinecraft.FichierMetadata(
+									new URI("file", null, f.getName().getPathDecoded(), null));
 							depot.ajoutModVersion(paquet);
-							depot.archives.put(paquet, new PaquetMinecraft.FichierMetadata(f.getPublicURIString()));
+							depot.archives.put(paquet, metadata);
 							// System.out.println("[Archive] " + paquet);
 						} catch (IOException | URISyntaxException e) {
 							e.printStackTrace();
+							return 1;
 						}
 					}
 				}
@@ -196,6 +198,10 @@ public class CommandeDepot implements Runnable {
 					break;
 				}
 				
+				if (!archive_destination.toFile().exists() && !archive_destination.toFile().mkdirs()) {
+					System.err.println("[ERROR] impossible de créer un dossier pour " + archive_destination);
+					break;
+				}
 				try (FileOutputStream fos = new FileOutputStream(archive_destination.toFile());
 					 TarArchiveOutputStream tar = new TarArchiveOutputStream(fos)) {
 					TarArchiveEntry infos = new TarArchiveEntry(PaquetMinecraft.INFOS);

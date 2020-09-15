@@ -13,8 +13,8 @@ import java.util.regex.Pattern;
  * @since 2020-01-10
  */
 public class Version implements Comparable<Version> {
-	public static final Pattern VERSION  = Pattern
-			.compile("(\\d+)\\.(\\d+)(\\.(\\d+)(\\.(\\d+))?)?(-(?<release>\\p{Alnum}+))?(\\+(?<build>\\p{Alnum}+))?");
+	public static final Pattern VERSION  = Pattern.compile(
+			"(\\d+)(\\.(\\d+)(\\.(\\d+)(\\.(\\d+))?)?)?(-(?<release>\\p{Alnum}+))?(\\+(?<build>\\p{Alnum}+))" + "?");
 	/**
 	 * major, medium, minor, patch
 	 */
@@ -77,16 +77,18 @@ public class Version implements Comparable<Version> {
 	
 	public static Version read(Matcher m) {
 		Version version;
-		String minor = m.group(4);
-		String patch = m.group(6);
-		String release = m.group(8);
-		String build = m.group(10);
+		String medium = m.group(3);
+		String minor = m.group(5);
+		String patch = m.group(7);
+		String release = m.group("release");
+		String build = m.group("build");
 		
+		int v_medium = medium == null ? 0 : Integer.parseInt(medium);
 		int v_minor = minor == null ? 0 : Integer.parseInt(minor);
 		
-		if (patch != null) version = new Version(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)), v_minor,
-				Integer.parseInt(patch));
-		else version = new Version(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)), v_minor);
+		if (patch != null)
+			version = new Version(Integer.parseInt(m.group(1)), v_medium, v_minor, Integer.parseInt(patch));
+		else version = new Version(Integer.parseInt(m.group(1)), v_medium, v_minor);
 		
 		if (release != null) version.release = release;
 		if (build != null) version.build = build;
