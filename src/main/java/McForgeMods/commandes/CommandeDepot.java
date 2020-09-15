@@ -155,7 +155,7 @@ public class CommandeDepot implements Runnable {
 			if (all) {
 				importation.addAll(archives);
 			} else if (modids != null && modids.size() > 0) {
-				archives.stream().filter(a -> modids.contains(a.mod.modid)).forEach(importation::add);
+				archives.stream().filter(a -> modids.contains(a.modVersion.modid)).forEach(importation::add);
 				for (String modid : modids) {
 					final File fichier = new File(modid);
 					if (fichier.exists()) {
@@ -167,7 +167,7 @@ public class CommandeDepot implements Runnable {
 						} catch (IOException i) {
 							i.printStackTrace();
 						}
-					} else if (archives.stream().noneMatch(a -> a.mod.modid.equals(modid))) {
+					} else if (archives.stream().noneMatch(a -> a.modVersion.modid.equals(modid))) {
 						System.err.println("Mod non reconnu: '" + modid + "'");
 					}
 				}

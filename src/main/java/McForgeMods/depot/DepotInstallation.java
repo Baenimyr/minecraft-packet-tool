@@ -1,6 +1,5 @@
 package McForgeMods.depot;
 
-import McForgeMods.Mod;
 import McForgeMods.PaquetMinecraft;
 import McForgeMods.Version;
 import McForgeMods.VersionIntervalle;
@@ -168,7 +167,6 @@ public class DepotInstallation implements Closeable {
 	public void analyseDossier() {
 		this.statusImportation();
 		for (ArchiveMod resultat : ArchiveMod.analyseDossier(dossier.resolve("mods"))) {
-			final Mod mod = resultat.mod;
 			PaquetMinecraft modVersion = resultat.modVersion;
 			modVersion = this.depot.ajoutModVersion(modVersion);
 			

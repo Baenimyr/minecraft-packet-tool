@@ -29,7 +29,7 @@ import java.util.*;
  * <h3>Exemple de paquet</h3>
  * - mods.json - files - mods/BiomesOPlenty-1.12.2-9.0.jar - config/biomesoplenty.cfg
  */
-public class PaquetMinecraft {
+public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 	/** Fichier d'information du paquet. */
 	public static final String INFOS    = "mods.json";
 	/** Dossier de l'archive contenant les fichiers à installer. */
@@ -46,6 +46,7 @@ public class PaquetMinecraft {
 	 */
 	public final Map<String, VersionIntervalle> requiredMods = new HashMap<>();
 	/** Une description simple pouvant être affichée */
+	public       String                         nomCommun    = null;
 	public       String                         description  = null;
 	
 	public PaquetMinecraft(String modid, Version version, VersionIntervalle mcversion) {
@@ -59,6 +60,7 @@ public class PaquetMinecraft {
 		PaquetMinecraft modVersion = new PaquetMinecraft(json.getString("name"),
 				Version.read(json.getString("version")), VersionIntervalle.read(json.getString("mcversion")));
 		modVersion.description = json.optString("description", null);
+		modVersion.nomCommun = json.optString("displayName", null);
 		
 		if (json.has("dependencies")) {
 			JSONArray depen = json.getJSONArray("dependencies");
@@ -127,12 +129,19 @@ public class PaquetMinecraft {
 		return modid.equals(that.modid) && version.equals(that.version);
 	}
 	
+	@Override
+	public int compareTo(PaquetMinecraft o) {
+		if (this.modid.equals(o.modid)) return this.version.compareTo(o.version);
+		else return this.modid.compareTo(o.modid);
+	}
+	
 	/** Enregistre toutes les informations du mod dans l'objet json. */
 	public void ecriturePaquet(JSONObject json) {
 		json.put("name", this.modid);
 		json.put("version", this.version);
 		json.put("mcversion", this.mcversion);
 		if (this.description != null) json.put("description", this.description);
+		if (this.nomCommun != null) json.put("displayName", this.nomCommun);
 		
 		JSONArray dependencies = new JSONArray();
 		for (String modid : this.requiredMods.keySet()) {

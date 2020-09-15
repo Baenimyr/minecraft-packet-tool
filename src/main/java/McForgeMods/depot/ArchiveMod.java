@@ -36,10 +36,43 @@ public class ArchiveMod {
 			"^(1\\.14(\\.[1-4])?|1\\.13(\\.[1-2])?|1\\.12(\\.[1-2])?|1\\.11(\\.[1-2])?|1\\.10(\\.[1-2])?|1\\.9(\\"
 					+ ".[1-4])?|1\\.8(\\.1)?|1\\.7(\\.[1-9]|(10))?|1\\.6\\.[1-4]|1\\.5(\\.[1-2])?)-");
 	public              File            fichier;
-	public              Mod             mod               = null;
 	public              PaquetMinecraft modVersion        = null;
 	
-	private static void lectureMcMod(ArchiveMod archive, InputStream lecture) {
+	/**
+	 * Cette fonction lit un fichier et tente d'extraire les informations relatives au mod.
+	 * <p>
+	 * Un mod est un fichier jar contenant un fichier <b>mcmod.info</b> avant 1.14.4 et un fichier META-INF/mcmod .toml
+	 * à partir de minecraft 1.14.4. Ce fichier contient une <b>liste</b> des mods que le fichier contient. Chaque mod
+	 * définit un <i>modid</i>, un <i>name</i>, une
+	 * <i>version</i> et une <i>mcversion</i>. Le format de la version doit être compatible avec le format définit par
+	 * {@link Version}. La version minecraft peut être extraite de la <i>version</i> à la condition d'être sous le
+	 * format "<i>mcversion</i>-<i>version</i>".
+	 *
+	 * @return un {@link ArchiveMod} non vide si réussi: il s'agit bien d'un mod Minecraft Forge
+	 * @see <a href="https://mcforge.readthedocs.io/en/latest/gettingstarted/structuring/">Fichier mcmod.info</a>
+	 */
+	public static ArchiveMod importationJar(File fichier) throws IOException {
+		ArchiveMod archive = new ArchiveMod();
+		try (ZipFile zip = new ZipFile(fichier)) {
+			ZipEntry modToml = zip.getEntry("META-INF/mods.toml");
+			if (modToml != null) {
+				archive.lectureModTOML(zip.getInputStream(modToml));
+			}
+			
+			if (!archive.isPresent()) {
+				ZipEntry mcmod = zip.getEntry("mcmod.info");
+				if (mcmod != null)
+					try (BufferedInputStream lecture = new BufferedInputStream(zip.getInputStream(mcmod))) {
+						archive.lectureMcMod(lecture);
+					}
+			}
+		} catch (JSONException | IllegalArgumentException error) {
+			System.err.printf("[JAR] '%s':\t%s:%s%n", fichier.getName(), error.getClass(), error.getMessage());
+		}
+		return archive;
+	}
+	
+	private void lectureMcMod(InputStream lecture) {
 		JSONTokener token = new JSONTokener(new NoNewlineReader(lecture));
 		JSONObject json;
 		JSONArray liste = new JSONArray(token);
@@ -64,29 +97,31 @@ public class ArchiveMod {
 			mcversion = VersionIntervalle.read(json.getString("mcversion")); // obligatoire car non déduit de la version
 		}
 		
-		archive.mod = new Mod(modid);
-		archive.mod.name = name;
-		archive.mod.description = json.has("description") ? json.getString("description") : null;
-		archive.mod.url = json.has("url") ? json.getString("url") : null;
-		archive.mod.updateJSON = json.has("updateJSON") ? json.getString("updateJSON") : null;
+		// archive.mod = new Mod(modid);
+		// archive.mod.name = name;
+		String description = json.has("description") ? json.getString("description") : null;
+		// archive.mod.url = json.has("url") ? json.getString("url") : null;
+		// archive.mod.updateJSON = json.has("updateJSON") ? json.getString("updateJSON") : null;
 		
-		if (archive.mod.description != null && archive.mod.description.length() == 0) archive.mod.description = null;
-		if (archive.mod.url != null && archive.mod.url.length() == 0) archive.mod.url = null;
-		if (archive.mod.updateJSON != null && archive.mod.updateJSON.length() == 0) archive.mod.updateJSON = null;
+		if (description != null && description.length() == 0) description = null;
+		// if (archive.mod.url != null && archive.mod.url.length() == 0) archive.mod.url = null;
+		// if (archive.mod.updateJSON != null && archive.mod.updateJSON.length() == 0) archive.mod.updateJSON = null;
 		
-		archive.modVersion = new PaquetMinecraft(modid, version, mcversion);
+		this.modVersion = new PaquetMinecraft(modid, version, mcversion);
+		this.modVersion.nomCommun = name;
+		this.modVersion.description = description;
 		
 		if (json.has("requiredMods")) {
 			VersionIntervalle.lectureDependances(json.getJSONArray("requiredMods"))
-					.forEach(archive.modVersion::ajoutModRequis);
+					.forEach(this.modVersion::ajoutModRequis);
 		}
 		if (json.has("dependencies")) {
 			VersionIntervalle.lectureDependances(json.getJSONArray("dependencies"))
-					.forEach(archive.modVersion::ajoutModRequis);
+					.forEach(this.modVersion::ajoutModRequis);
 		}
 	}
 	
-	private static void lectureModTOML(ArchiveMod archive, InputStream lecture) throws IOException {
+	private void lectureModTOML(InputStream lecture) throws IOException {
 		TomlParseResult toml = Toml.parse(lecture);
 		TomlArray mods = toml.getArray("mods");
 		if (mods == null || mods.isEmpty()) {
@@ -99,17 +134,17 @@ public class ArchiveMod {
 			System.err.println("[JAR/mods.toml] aucun 'modId'");
 			return;
 		}
-		archive.mod = new Mod(mod_info.getString("modId"));
+		final String modid = mod_info.getString("modId");
 		final Version version = Version.read(mod_info.getString("version"));
-		archive.mod.name = mod_info.getString("displayName");
-		archive.mod.url = mod_info.contains("displayURL") ? mod_info.getString("displayURL") : null;
-		archive.mod.updateJSON = mod_info.contains("updateJSONURL") ? mod_info.getString("updateJSONURL") : null;
-		archive.mod.description = mod_info.contains("description") ? mod_info.getString("description") : null;
+		String name = mod_info.getString("displayName");
+		// archive.mod.url = mod_info.contains("displayURL") ? mod_info.getString("displayURL") : null;
+		// archive.mod.updateJSON = mod_info.contains("updateJSONURL") ? mod_info.getString("updateJSONURL") : null;
+		String description = mod_info.contains("description") ? mod_info.getString("description") : null;
 		
 		
-		TomlArray dependencies_info = toml.getArray("dependencies." + archive.mod.modid);
+		TomlArray dependencies_info = toml.getArray("dependencies." + modid);
 		if (dependencies_info == null) {
-			System.err.println("[JAR/mods.toml] pas de liste 'dependencies." + archive.mod.modid + "'");
+			System.err.println("[JAR/mods.toml] pas de liste 'dependencies." + modid + "'");
 			return;
 		}
 		final Map<String, VersionIntervalle> dependencies = new HashMap<>();
@@ -127,45 +162,13 @@ public class ArchiveMod {
 		}
 		
 		if (mcversion == null) {
-			System.err.println("[JAR/mods.toml] Aucune version minecraft spécifiée pour " + archive.mod.modid);
+			System.err.println("[JAR/mods.toml] Aucune version minecraft spécifiée pour " + modid);
 			return;
 		}
-		archive.modVersion = new PaquetMinecraft(archive.mod.modid, version, mcversion);
-		archive.modVersion.requiredMods.putAll(dependencies);
-	}
-	
-	/**
-	 * Cette fonction lit un fichier et tente d'extraire les informations relatives au mod.
-	 * <p>
-	 * Un mod est un fichier jar contenant un fichier <b>mcmod.info</b> avant 1.14.4 et un fichier META-INF/mcmod .toml
-	 * à partir de minecraft 1.14.4. Ce fichier contient une <b>liste</b> des mods que le fichier contient. Chaque mod
-	 * définit un <i>modid</i>, un <i>name</i>, une
-	 * <i>version</i> et une <i>mcversion</i>. Le format de la version doit être compatible avec le format définit par
-	 * {@link Version}. La version minecraft peut être extraite de la <i>version</i> à la condition d'être sous le
-	 * format "<i>mcversion</i>-<i>version</i>".
-	 *
-	 * @return un {@link ArchiveMod} non vide si réussi: il s'agit bien d'un mod Minecraft Forge
-	 * @see <a href="https://mcforge.readthedocs.io/en/latest/gettingstarted/structuring/">Fichier mcmod.info</a>
-	 */
-	public static ArchiveMod importationJar(File fichier) throws IOException {
-		ArchiveMod archive = new ArchiveMod();
-		try (ZipFile zip = new ZipFile(fichier)) {
-			ZipEntry modToml = zip.getEntry("META-INF/mods.toml");
-			if (modToml != null) {
-				lectureModTOML(archive, zip.getInputStream(modToml));
-			}
-			
-			if (!archive.isPresent()) {
-				ZipEntry mcmod = zip.getEntry("mcmod.info");
-				if (mcmod != null)
-					try (BufferedInputStream lecture = new BufferedInputStream(zip.getInputStream(mcmod))) {
-						lectureMcMod(archive, lecture);
-					}
-			}
-		} catch (JSONException | IllegalArgumentException error) {
-			System.err.printf("[JAR] '%s':\t%s:%s%n", fichier.getName(), error.getClass(), error.getMessage());
-		}
-		return archive;
+		this.modVersion = new PaquetMinecraft(modid, version, mcversion);
+		this.modVersion.requiredMods.putAll(dependencies);
+		this.modVersion.nomCommun = name;
+		this.modVersion.description = description;
 	}
 	
 	/**

@@ -15,6 +15,7 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @CommandLine.Command(name = "forgemods", showDefaultValues = true, resourceBundle = "mcforgemods/lang/ForgeMods",
 		mixinStandardHelpOptions = true,
@@ -88,20 +89,18 @@ public class ForgeMods implements Runnable {
 		
 		final HashSet<String> modids = new HashSet<>();
 		if (regex) {
-			Pattern schema = Pattern.compile(recherche);
+			Pattern schema = Pattern.compile(recherche, Pattern.CASE_INSENSITIVE);
 			for (String modid : depotLocal.getModids()) {
-				Matcher m_modid = schema.matcher(modid);
-				if (m_modid.find()) {
-					modids.add(modid);
-					continue;
-				}
+				Stream<Matcher> s_match = Stream.concat(Stream.of(modid),
+						depotLocal.getModVersions(modid).stream().map(v -> v.nomCommun).filter(Objects::nonNull))
+						.map(schema::matcher);
+				if (s_match.anyMatch(Matcher::find)) modids.add(modid);
 			}
 		} else {
 			String recherche_l = recherche.toLowerCase();
 			for (String modid : depotLocal.getModids()) {
 				if (modid.contains(recherche_l)) {
 					modids.add(modid);
-					continue;
 				}
 			}
 			depotLocal.getModids().stream().filter(modid -> modid.contains(recherche)).forEach(modids::add);
