@@ -1,9 +1,9 @@
 package McForgeMods;
 
 import McForgeMods.commandes.*;
-import McForgeMods.depot.ArbreDependance;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
+import McForgeMods.outils.SolveurDependances;
 import McForgeMods.outils.Sources;
 import picocli.CommandLine;
 
@@ -170,20 +170,18 @@ public class ForgeMods implements Runnable {
 		}
 		
 		// Liste complète des dépendances nécessaire pour la liste des mods présent.
-		ArbreDependance arbre_dependances = new ArbreDependance(depotLocal, listeRecherche);
-		arbre_dependances.resolution();
+		SolveurDependances solveur = new SolveurDependances(depotLocal);
+		listeRecherche.forEach(solveur::ajoutSelection);
 		Map<String, VersionIntervalle> liste;
 		if (missing) {
-			liste = depotInstallation.dependancesAbsentes(arbre_dependances.requis());
+			liste = depotInstallation.dependancesAbsentes(solveur.contraintes);
 			System.out.printf("%d absents%n", liste.size());
 		} else {
-			liste = arbre_dependances.requis();
+			liste = solveur.contraintes;
 			System.out.printf("%d dépendances%n", liste.size());
 		}
 		
-		ArrayList<String> modids = new ArrayList<>(liste.keySet());
-		modids.sort(String::compareTo);
-		for (String dep : modids) {
+		for (String dep : liste.keySet().stream().sorted().collect(Collectors.toList())) {
 			System.out.println(dep + " " + liste.get(dep));
 		}
 		return 0;

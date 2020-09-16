@@ -3,9 +3,9 @@ package McForgeMods.commandes;
 import McForgeMods.ForgeMods;
 import McForgeMods.PaquetMinecraft;
 import McForgeMods.VersionIntervalle;
-import McForgeMods.depot.ArbreDependance;
 import McForgeMods.depot.ArchiveMod;
 import McForgeMods.depot.DepotLocal;
+import McForgeMods.outils.SolveurDependances;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
@@ -92,16 +92,16 @@ public class CommandeDepot implements Runnable {
 			
 			for (final String modid : modids) {
 				for (final PaquetMinecraft version : depot.getModVersions(modid)) {
-					ArbreDependance dependances = new ArbreDependance(depot, Collections.singleton(version));
-					dependances.resolution();
-					for (Map.Entry<String, VersionIntervalle> dep : dependances.requis().entrySet()) {
-						if (!dep.getKey().equals("forge")) {
-							if (!depot.contains(dep.getKey()) || depot.getModVersions(dep.getKey()).stream().noneMatch(
-									v -> dep.getValue().equals(VersionIntervalle.ouvert()) || dep.getValue()
-											.correspond(v.version))) {
-								System.out
+					SolveurDependances dependances = new SolveurDependances(depot);
+					dependances.ajoutSelection(version);
+					for (final String dep : dependances.listeContraintes()) {
+						if (!dep.equals("forge") && !dep.equals("minecraft")) {
+							final VersionIntervalle demande = dependances.contrainte(dep);
+							if (!depot.contains(dep) || depot.getModVersions(dep).stream()
+									.noneMatch(v -> demande.correspond(v.version))) {
+								System.err
 										.printf("'%s' a besoin de '%s@%s', mais il n'est pas disponible dans le dépôt !%n",
-												version.toStringStandard(), dep.getKey(), dep.getValue());
+												version.toStringStandard(), dep, demande);
 							}
 						}
 					}

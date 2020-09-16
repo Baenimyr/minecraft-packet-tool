@@ -8,9 +8,9 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class SolveurDependances {
-	public final  List<PaquetMinecraft>              selection   = new LinkedList<>();
 	private final Depot                              depot;
-	private final HashMap<String, VersionIntervalle> contraintes = new HashMap<>();
+	public final  List<PaquetMinecraft>              selection   = new LinkedList<>();
+	public final  HashMap<String, VersionIntervalle> contraintes = new HashMap<>();
 	
 	public SolveurDependances(Depot depot) {
 		this.depot = depot;
@@ -63,7 +63,7 @@ public class SolveurDependances {
 	private boolean propagation(PaquetMinecraft p) {
 		this.ajoutContrainte("minecraft", p.mcversion);
 		final VersionIntervalle intervalle_minecraft = contrainte("minecraft");
-		if (intervalle_minecraft.minimum().compareTo(intervalle_minecraft.maximum()) > 0) return false;
+		if (intervalle_minecraft.isEmpty()) return false;
 		
 		for (String id : p.requiredMods.keySet()) {
 			this.ajoutContrainte(id, p.requiredMods.get(id));

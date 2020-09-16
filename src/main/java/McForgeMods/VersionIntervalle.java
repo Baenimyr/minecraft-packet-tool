@@ -245,6 +245,10 @@ public class VersionIntervalle {
 				&& Objects.equals(maximum, that.maximum);
 	}
 	
+	public boolean isEmpty() {
+		return !this.inclut_min && !this.inclut_max && this.minimum.compareTo(this.maximum) > 0;
+	}
+	
 	@Override
 	public int hashCode() {
 		return Objects.hash(minimum, maximum, inclut_min, inclut_max);
