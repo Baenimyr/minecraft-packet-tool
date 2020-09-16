@@ -5,6 +5,7 @@ import McForgeMods.depot.DepotLocal;
 import McForgeMods.outils.Sources;
 import org.apache.commons.vfs2.FileObject;
 import org.apache.commons.vfs2.FileSystemManager;
+import org.apache.commons.vfs2.FileSystemOptions;
 import org.apache.commons.vfs2.VFS;
 import org.json.JSONException;
 import picocli.CommandLine;
@@ -23,6 +24,10 @@ import java.util.concurrent.Callable;
 
 @CommandLine.Command(name = "update", resourceBundle = "mcforgemods/lang/Update")
 public class CommandeUpdate implements Callable<Integer> {
+	static {
+		System.setProperty("log4j.logger.org.apache.component", "ERROR");
+	}
+	
 	@CommandLine.Mixin
 	ForgeMods.Help help;
 	@CommandLine.Option(names = {"-d", "--depot"})
@@ -69,12 +74,15 @@ public class CommandeUpdate implements Callable<Integer> {
 		
 		int i = 0;
 		final FileSystemManager filesystem = VFS.getManager();
+		FileSystemOptions opts = new FileSystemOptions();
+		
 		for (final URI uri : sources.urls()) {
 			System.out.printf("%d/%d\t%s%n", ++i, sources.size(), uri);
 			try {
-				FileObject mods = filesystem.resolveFile(uri.resolve(DepotLocal.MODS));
-				FileObject mods_gz = filesystem.resolveFile(uri.resolve(DepotLocal.MODS + ".gz"));
-				FileObject mods_zip = filesystem.resolveFile(uri.resolve(DepotLocal.MODS + ".zip"));
+				final FileObject dossier = filesystem.resolveFile(uri.toString(), opts);
+				FileObject mods = dossier.resolveFile(DepotLocal.MODS);
+				FileObject mods_gz = dossier.resolveFile(DepotLocal.MODS + ".gz");
+				FileObject mods_zip = dossier.resolveFile(DepotLocal.MODS + ".zip");
 				
 				if (mods_gz.exists()) {
 					try (InputStream is = filesystem.createFileSystem("gz", mods_gz).getContent().getInputStream()) {

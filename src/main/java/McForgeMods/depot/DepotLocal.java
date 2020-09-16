@@ -134,8 +134,7 @@ public class DepotLocal extends Depot {
 			}
 		
 		try (OutputStreamWriter writer = new OutputStreamWriter(outputStream)) {
-			simpleJson.JSONWriter jwriter = new simpleJson.JSONWriter();
-			jwriter.write(mods, writer);
+			mods.write(writer, 4, 4);
 		}
 	}
 	
