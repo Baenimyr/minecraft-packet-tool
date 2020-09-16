@@ -66,17 +66,13 @@ public class DepotLocal extends Depot {
 		
 		for (int i = 0; i < mods.length(); i++) {
 			JSONObject data = mods.getJSONObject(i);
-			try {
-				PaquetMinecraft modVersion = PaquetMinecraft.lecturePaquet(data);
-				PaquetMinecraft.FichierMetadata paquet = new PaquetMinecraft.FichierMetadata(
-						baseURI.resolve(data.getString("filename")));
-				if (data.has("sha256")) paquet.SHA256 = data.getString("sha256");
-				
-				this.ajoutModVersion(modVersion);
-				this.archives.put(modVersion, paquet);
-			} catch (URISyntaxException e) {
-				System.err.printf("[ERROR] lecture infos pour %s: %s%n", data.getString("name"), e.getMessage());
-			}
+			PaquetMinecraft modVersion = PaquetMinecraft.lecturePaquet(data);
+			PaquetMinecraft.FichierMetadata paquet = new PaquetMinecraft.FichierMetadata(
+					baseURI.resolve(data.getString("filename")).toString());
+			if (data.has("sha256")) paquet.SHA256 = data.getString("sha256");
+			
+			this.ajoutModVersion(modVersion);
+			this.archives.put(modVersion, paquet);
 		}
 	}
 	
@@ -122,15 +118,19 @@ public class DepotLocal extends Depot {
 		
 		for (String modid : this.getModids())
 			for (PaquetMinecraft modVersion : this.getModVersions(modid)) {
-				final JSONObject data = new JSONObject();
-				modVersion.ecriturePaquet(data);
-				PaquetMinecraft.FichierMetadata archive = this.archives.get(modVersion);
-				data.put("filename", relURI.relativize(archive.path));
-				if (archive.SHA256 != null) {
-					data.put("sha256", archive.SHA256);
+				try {
+					final JSONObject data = new JSONObject();
+					modVersion.ecriturePaquet(data);
+					PaquetMinecraft.FichierMetadata archive = this.archives.get(modVersion);
+					data.put("filename", relURI.relativize(new URI(archive.path)));
+					if (archive.SHA256 != null) {
+						data.put("sha256", archive.SHA256);
+					}
+					
+					mods.put(data);
+				} catch (URISyntaxException e) {
+					e.printStackTrace();
 				}
-				
-				mods.put(data);
 			}
 		
 		try (OutputStreamWriter writer = new OutputStreamWriter(outputStream)) {

@@ -13,8 +13,6 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 
 import java.io.*;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -110,9 +108,9 @@ public class DepotInstallation implements Closeable {
 	 */
 	void suppressionFichiers(final PaquetMinecraft paquet) throws FileSystemException {
 		FileSystemManager filesystem = VFS.getManager();
-		final URI dossier = this.dossier.toUri();
+		final FileObject minecraft = filesystem.resolveFile(dossier.toUri());
 		for (PaquetMinecraft.FichierMetadata fichier : paquet.fichiers) {
-			FileObject f = filesystem.resolveFile(dossier.resolve(fichier.path));
+			FileObject f = minecraft.resolveFile(fichier.path);
 			
 			if (f.exists() /* && hors config */) {
 				f.delete();
@@ -148,8 +146,7 @@ public class DepotInstallation implements Closeable {
 	 */
 	public boolean verificationIntegrite(PaquetMinecraft paquet) {
 		for (PaquetMinecraft.FichierMetadata fichier : paquet.fichiers) {
-			final Path chemin_absolu;
-			chemin_absolu = Path.of(fichier.path);
+			final Path chemin_absolu = this.dossier.resolve(fichier.path);
 			if (!Files.exists(chemin_absolu)) return false;
 		}
 		return true;
@@ -275,7 +272,7 @@ public class DepotInstallation implements Closeable {
 							this.installations.put(paquet.modid, inst);
 							
 							if (!depot.contains(paquet)) depot.ajoutModVersion(paquet);
-						} catch (JSONException | URISyntaxException jsonException) {
+						} catch (JSONException jsonException) {
 							jsonException.printStackTrace();
 						}
 					}

@@ -6,8 +6,6 @@ import org.json.JSONObject;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.*;
 
 /**
@@ -56,7 +54,7 @@ public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 	}
 	
 	/** Lit les informations relatives à un paquet. */
-	public static PaquetMinecraft lecturePaquet(JSONObject json) throws URISyntaxException {
+	public static PaquetMinecraft lecturePaquet(JSONObject json) {
 		PaquetMinecraft modVersion = new PaquetMinecraft(json.getString("name"),
 				Version.read(json.getString("version")), VersionIntervalle.read(json.getString("mcversion")));
 		modVersion.description = json.optString("description", null);
@@ -153,7 +151,7 @@ public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 			JSONObject fichier_metadata = new JSONObject();
 			if (fichier.SHA256 != null) fichier_metadata.put("sha256", fichier.SHA256);
 			
-			files.put(fichier.path.toString(), fichier_metadata);
+			files.put(fichier.path, fichier_metadata);
 		}
 		
 		json.put("dependencies", dependencies);
@@ -168,15 +166,11 @@ public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 	 * fichier.
 	 */
 	public static class FichierMetadata {
-		public final URI    path;
+		public final String path;
 		public       String SHA256 = null;
 		
-		public FichierMetadata(URI path) {
+		public FichierMetadata(String path) {
 			this.path = path;
-		}
-		
-		public FichierMetadata(String path) throws URISyntaxException {
-			this(new URI(path));
 		}
 		
 		public boolean checkSHA(InputStream stream) throws IOException {

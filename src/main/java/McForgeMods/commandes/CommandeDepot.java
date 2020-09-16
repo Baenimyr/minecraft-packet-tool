@@ -19,8 +19,6 @@ import org.json.JSONTokener;
 import picocli.CommandLine;
 
 import java.io.*;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.Callable;
@@ -72,11 +70,11 @@ public class CommandeDepot implements Runnable {
 							JSONObject json = new JSONObject(new JSONTokener(is));
 							PaquetMinecraft paquet = PaquetMinecraft.lecturePaquet(json);
 							PaquetMinecraft.FichierMetadata metadata = new PaquetMinecraft.FichierMetadata(
-									new URI("file", null, f.getName().getPathDecoded(), null));
+									f.getName().getPathDecoded());
 							depot.ajoutModVersion(paquet);
 							depot.archives.put(paquet, metadata);
 							// System.out.println("[Archive] " + paquet);
-						} catch (IOException | URISyntaxException e) {
+						} catch (IOException e) {
 							e.printStackTrace();
 							return 1;
 						}
@@ -188,12 +186,12 @@ public class CommandeDepot implements Runnable {
 					final String sha256 = DigestUtils.sha256Hex(fis);
 					
 					final PaquetMinecraft.FichierMetadata fichierjar = new PaquetMinecraft.FichierMetadata(
-							new URI("mods/").resolve(version_client.fichier.getName()));
+							"mods/" + version_client.fichier.getName());
 					fichierjar.SHA256 = sha256;
 					version_client.modVersion.fichiers.add(fichierjar);
 					version_client.modVersion.ecriturePaquet(json);
 					json.write(writer, 4, 4);
-				} catch (IOException | URISyntaxException e) {
+				} catch (IOException e) {
 					e.printStackTrace();
 					break;
 				}
@@ -223,7 +221,7 @@ public class CommandeDepot implements Runnable {
 				}
 				
 				final PaquetMinecraft.FichierMetadata archive_metadata = new PaquetMinecraft.FichierMetadata(
-						depot.dossier.toUri().relativize(archive_destination.toUri()));
+						depot.dossier.relativize(archive_destination).toString());
 				depot.ajoutModVersion(version_client.modVersion);
 				depot.archives.put(version_client.modVersion, archive_metadata);
 			}
