@@ -29,7 +29,7 @@ import java.util.*;
  * <h3>Exemple de paquet</h3>
  * - mods.json - files - mods/BiomesOPlenty-1.12.2-9.0.jar - config/biomesoplenty.cfg
  */
-public class PaquetMinecraft {
+public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 	/** Fichier d'information du paquet. */
 	public static final String INFOS    = "mods.json";
 	/** Dossier de l'archive contenant les fichiers à installer. */
@@ -125,6 +125,12 @@ public class PaquetMinecraft {
 		if (o == null || getClass() != o.getClass()) return false;
 		PaquetMinecraft that = (PaquetMinecraft) o;
 		return modid.equals(that.modid) && version.equals(that.version);
+	}
+	
+	@Override
+	public int compareTo(PaquetMinecraft o) {
+		if (this.modid.equals(o.modid)) return this.version.compareTo(o.version);
+		else return this.modid.compareTo(o.modid);
 	}
 	
 	/** Enregistre toutes les informations du mod dans l'objet json. */

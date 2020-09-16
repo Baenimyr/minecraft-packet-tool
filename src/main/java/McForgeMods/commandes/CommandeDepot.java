@@ -63,9 +63,8 @@ public class CommandeDepot implements Runnable {
 			while (!fichiers.isEmpty()) {
 				FileObject f = fichiers.poll();
 				if (f.isFolder()) {
-					for (FileObject fc : f.getChildren())
-						if (fc.getName().getBaseName().endsWith(".tar")) fichiers.add(fc);
-				} else if (f.isFile() && !f.isHidden()) {
+					fichiers.addAll(Arrays.asList(f.getChildren()));
+				} else if (f.isFile() && !f.isHidden() && f.getName().getBaseName().endsWith(".tar")) {
 					FileObject archive = filesystem.createFileSystem("tar", f);
 					FileObject data = archive.resolveFile(PaquetMinecraft.INFOS);
 					if (data.exists()) {
