@@ -36,103 +36,7 @@ public class ArchiveMod {
 			"^(1\\.14(\\.[1-4])?|1\\.13(\\.[1-2])?|1\\.12(\\.[1-2])?|1\\.11(\\.[1-2])?|1\\.10(\\.[1-2])?|1\\.9(\\"
 					+ ".[1-4])?|1\\.8(\\.1)?|1\\.7(\\.[1-9]|(10))?|1\\.6\\.[1-4]|1\\.5(\\.[1-2])?)-");
 	public              File            fichier;
-	public              Mod             mod               = null;
 	public              PaquetMinecraft modVersion        = null;
-	
-	private static void lectureMcMod(ArchiveMod archive, InputStream lecture) {
-		JSONTokener token = new JSONTokener(new NoNewlineReader(lecture));
-		JSONObject json;
-		JSONArray liste = new JSONArray(token);
-		json = liste.getJSONObject(0);
-		
-		if (!json.has("modid") || !json.has("name")) return;
-		final String modid = json.getString("modid");
-		final String name = json.getString("name");
-		Version version, mcversion;
-		
-		String texte_version = json.getString("version");
-		Matcher m = minecraft_version.matcher(texte_version);
-		if (m.find()) {
-			// System.out.println(String.format("[Version] '%s' => %s\t%s", texte_version, texte_version.substring(0, m.end() - 1), texte_version.substring(m.end())));
-			mcversion = Version.read(texte_version.substring(0, m.end() - 1));
-			version = Version.read(texte_version.substring(m.end()));
-			
-			if (json.has("mcversion")) mcversion = Version.read(json.getString("mcversion"));
-		} else {
-			version = Version.read(texte_version);
-			mcversion = Version.read(json.getString("mcversion")); // obligatoire car non déduit de la version
-		}
-		
-		archive.mod = new Mod(modid);
-		archive.mod.name = name;
-		archive.mod.description = json.has("description") ? json.getString("description") : null;
-		archive.mod.url = json.has("url") ? json.getString("url") : null;
-		archive.mod.updateJSON = json.has("updateJSON") ? json.getString("updateJSON") : null;
-		
-		if (archive.mod.description != null && archive.mod.description.length() == 0) archive.mod.description = null;
-		if (archive.mod.url != null && archive.mod.url.length() == 0) archive.mod.url = null;
-		if (archive.mod.updateJSON != null && archive.mod.updateJSON.length() == 0) archive.mod.updateJSON = null;
-		
-		archive.modVersion = new PaquetMinecraft(modid, version,
-				new VersionIntervalle(mcversion, mcversion.precision()));
-		
-		if (json.has("requiredMods")) {
-			VersionIntervalle.lectureDependances(json.getJSONArray("requiredMods"))
-					.forEach(archive.modVersion::ajoutModRequis);
-		}
-		if (json.has("dependencies")) {
-			VersionIntervalle.lectureDependances(json.getJSONArray("dependencies"))
-					.forEach(archive.modVersion::ajoutModRequis);
-		}
-	}
-	
-	private static void lectureModTOML(ArchiveMod archive, InputStream lecture) throws IOException {
-		TomlParseResult toml = Toml.parse(lecture);
-		TomlArray mods = toml.getArray("mods");
-		if (mods == null || mods.isEmpty()) {
-			System.err.println("[mods.toml] pas de liste 'mods'");
-			return;
-		}
-		
-		TomlTable mod_info = mods.getTable(0);
-		if (mod_info == null || !mod_info.contains("modId")) {
-			System.err.println("[mods.toml] aucun 'modId'");
-			return;
-		}
-		archive.mod = new Mod(mod_info.getString("modId"));
-		archive.mod.name = mod_info.getString("displayName");
-		archive.mod.url = mod_info.contains("displayURL") ? mod_info.getString("displayURL") : null;
-		archive.mod.updateJSON = mod_info.contains("updateJSONURL") ? mod_info.getString("updateJSONURL") : null;
-		archive.mod.description = mod_info.contains("description") ? mod_info.getString("description") : null;
-		
-		
-		TomlArray dependencies_info = toml.getArray("dependencies." + archive.mod.modid);
-		if (dependencies_info == null) {
-			System.err.println("[mods.toml] pas de liste 'dependencies." + archive.mod.modid + "'");
-			return;
-		}
-		final Map<String, VersionIntervalle> dependencies = new HashMap<>();
-		VersionIntervalle mcversion = null;
-		for (int i = 0; i < dependencies_info.size(); i++) {
-			TomlTable dep_i = dependencies_info.getTable(i);
-			final String dep_modid = dep_i.getString("modId");
-			final VersionIntervalle dep_versions = VersionIntervalle.read(dep_i.getString("versionRange"));
-			
-			if ("minecraft".equals(dep_modid)) {
-				mcversion = dep_versions;
-			} else {
-				dependencies.put(dep_modid, dep_versions);
-			}
-		}
-		
-		if (mcversion == null) {
-			System.err.println("[mods.toml] Aucune version minecraft spécifiée pour " + archive.mod.modid);
-			return;
-		}
-		archive.modVersion = new PaquetMinecraft(archive.mod.modid, Version.read(mod_info.getString("version")),
-				mcversion);
-		archive.modVersion.requiredMods.putAll(dependencies);
-	}
 	
 	/**
 	 * Cette fonction lit un fichier et tente d'extraire les informations relatives au mod.
@@ -152,20 +56,119 @@ public class ArchiveMod {
 		try (ZipFile zip = new ZipFile(fichier)) {
 			ZipEntry modToml = zip.getEntry("META-INF/mods.toml");
 			if (modToml != null) {
-				lectureModTOML(archive, zip.getInputStream(modToml));
+				archive.lectureModTOML(zip.getInputStream(modToml));
 			}
 			
 			if (!archive.isPresent()) {
 				ZipEntry mcmod = zip.getEntry("mcmod.info");
 				if (mcmod != null)
 					try (BufferedInputStream lecture = new BufferedInputStream(zip.getInputStream(mcmod))) {
-						lectureMcMod(archive, lecture);
+						archive.lectureMcMod(lecture);
 					}
 			}
-		} catch (JSONException | IllegalArgumentException ignored) {
-			// System.err.println("[DEBUG] [importation] '" + fichier.getName() + "':\t" + ignored.getMessage());
+		} catch (JSONException | IllegalArgumentException error) {
+			System.err.printf("[JAR] '%s':\t%s:%s%n", fichier.getName(), error.getClass(), error.getMessage());
 		}
 		return archive;
+	}
+	
+	private void lectureMcMod(InputStream lecture) {
+		JSONTokener token = new JSONTokener(new NoNewlineReader(lecture));
+		JSONObject json;
+		JSONArray liste = new JSONArray(token);
+		json = liste.getJSONObject(0);
+		
+		if (!json.has("modid") || !json.has("name")) return;
+		final String modid = json.getString("modid");
+		final String name = json.getString("name");
+		Version version;
+		VersionIntervalle mcversion;
+		
+		String texte_version = json.getString("version");
+		Matcher m = minecraft_version.matcher(texte_version);
+		if (m.find()) {
+			// System.out.println(String.format("[Version] '%s' => %s\t%s", texte_version, texte_version.substring(0, m.end() - 1), texte_version.substring(m.end())));
+			mcversion = VersionIntervalle.read(texte_version.substring(0, m.end() - 1));
+			version = Version.read(texte_version.substring(m.end()));
+			
+			if (json.has("mcversion")) mcversion = VersionIntervalle.read(json.getString("mcversion"));
+		} else {
+			version = Version.read(texte_version);
+			mcversion = VersionIntervalle.read(json.getString("mcversion")); // obligatoire car non déduit de la version
+		}
+		
+		// archive.mod = new Mod(modid);
+		// archive.mod.name = name;
+		String description = json.has("description") ? json.getString("description") : null;
+		// archive.mod.url = json.has("url") ? json.getString("url") : null;
+		// archive.mod.updateJSON = json.has("updateJSON") ? json.getString("updateJSON") : null;
+		
+		if (description != null && description.length() == 0) description = null;
+		// if (archive.mod.url != null && archive.mod.url.length() == 0) archive.mod.url = null;
+		// if (archive.mod.updateJSON != null && archive.mod.updateJSON.length() == 0) archive.mod.updateJSON = null;
+		
+		this.modVersion = new PaquetMinecraft(modid, version, mcversion);
+		this.modVersion.nomCommun = name;
+		this.modVersion.description = description;
+		
+		if (json.has("requiredMods")) {
+			VersionIntervalle.lectureDependances(json.getJSONArray("requiredMods"))
+					.forEach(this.modVersion::ajoutModRequis);
+		}
+		if (json.has("dependencies")) {
+			VersionIntervalle.lectureDependances(json.getJSONArray("dependencies"))
+					.forEach(this.modVersion::ajoutModRequis);
+		}
+	}
+	
+	private void lectureModTOML(InputStream lecture) throws IOException {
+		TomlParseResult toml = Toml.parse(lecture);
+		TomlArray mods = toml.getArray("mods");
+		if (mods == null || mods.isEmpty()) {
+			System.err.println("[JAR/mods.toml] pas de liste 'mods'");
+			return;
+		}
+		
+		TomlTable mod_info = mods.getTable(0);
+		if (mod_info == null || !mod_info.contains("modId")) {
+			System.err.println("[JAR/mods.toml] aucun 'modId'");
+			return;
+		}
+		final String modid = mod_info.getString("modId");
+		final Version version = Version.read(mod_info.getString("version"));
+		String name = mod_info.getString("displayName");
+		// archive.mod.url = mod_info.contains("displayURL") ? mod_info.getString("displayURL") : null;
+		// archive.mod.updateJSON = mod_info.contains("updateJSONURL") ? mod_info.getString("updateJSONURL") : null;
+		String description = mod_info.contains("description") ? mod_info.getString("description") : null;
+		
+		
+		TomlArray dependencies_info = toml.getArray("dependencies." + modid);
+		if (dependencies_info == null) {
+			System.err.println("[JAR/mods.toml] pas de liste 'dependencies." + modid + "'");
+			return;
+		}
+		final Map<String, VersionIntervalle> dependencies = new HashMap<>();
+		VersionIntervalle mcversion = null;
+		for (int i = 0; i < dependencies_info.size(); i++) {
+			TomlTable dep_i = dependencies_info.getTable(i);
+			final String dep_modid = dep_i.getString("modId");
+			final VersionIntervalle dep_versions = VersionIntervalle.read(dep_i.getString("versionRange"));
+			
+			if ("minecraft".equals(dep_modid)) {
+				mcversion = dep_versions;
+			} else {
+				dependencies.put(dep_modid, dep_versions);
+			}
+		}
+		
+		if (mcversion == null) {
+			System.err.println("[JAR/mods.toml] Aucune version minecraft spécifiée pour " + modid);
+			return;
+		}
+		this.modVersion = new PaquetMinecraft(modid, version, mcversion);
+		this.modVersion.requiredMods.putAll(dependencies);
+		this.modVersion.nomCommun = name;
+		this.modVersion.description = description;
 	}
 	
 	/**
@@ -193,7 +196,7 @@ public class ArchiveMod {
 					try {
 						resultat = ArchiveMod.importationJar(f);
 					} catch (IOException i) {
-						System.err.println(String.format("[DepotInstallation] [ERROR] in '%s': %s", f, i.getMessage()));
+						System.err.printf("[ERROR] in '%s': %s%n", f, i.getMessage());
 					}
 					
 					if (resultat != null && resultat.isPresent()) {

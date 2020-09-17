@@ -237,15 +237,15 @@ public class CommandeInstall implements Callable<Integer> {
 		public URI get() {
 			try {
 				final FileSystemManager filesystem = VFS.getManager();
-				final URI dest_url = new URI("file://" + this.depotLocal.dossier.resolve("cache")
-						.resolve(version.modid + "-" + version.version.toString() + ".tar").toString());
+				final FileObject dossier_cache = filesystem
+						.resolveFile(this.depotLocal.dossier.toUri().resolve("cache"));
+				final FileObject source_dir = filesystem.resolveFile(depotLocal.dossier.toUri());
 				final PaquetMinecraft.FichierMetadata archive_metadata = depotLocal.archives.get(version);
 				
-				FileObject dest = filesystem.resolveFile(dest_url);
+				FileObject dest = dossier_cache.resolveFile(version.modid + "-" + version.version.toString() + ".tar");
 				if (!dest.exists()) {
-					FileObject fichier = filesystem
-							.resolveFile(depotLocal.dossier.toUri().resolve(archive_metadata.path));
-					dest.copyFrom(fichier, new FileDepthSelector());
+					FileObject src = source_dir.resolveFile(archive_metadata.path);
+					dest.copyFrom(src, new FileDepthSelector());
 				}
 				try (InputStream dest_is = dest.getContent().getInputStream()) {
 					archive_metadata.checkSHA(dest_is);
@@ -255,7 +255,7 @@ public class CommandeInstall implements Callable<Integer> {
 					return null;
 				}
 				
-				return dest_url;
+				return dest.getURL().toURI();
 			} catch (FileSystemException | URISyntaxException io) {
 				System.err.printf("[Install] impossible de télécharger l'archive pour %s%n", this.version);
 				System.err.println("\t" + io.getClass() + ":" + io.getMessage());
@@ -277,8 +277,11 @@ public class CommandeInstall implements Callable<Integer> {
 			
 			try {
 				FileSystemManager filesystem = VFS.getManager();
+				// Dossier dans lequel sera ouvert l'archive
+				final FileObject dossier_dest = filesystem.resolveFile(this.depotInstallation.dossier.toUri());
+				
 				FileObject archive_f = filesystem.resolveFile(archive_url);
-				FileObject archive_tar = filesystem.createFileSystem("tar", archive_f);
+				final FileObject archive_tar = filesystem.createFileSystem("tar", archive_f);
 				FileObject mods = archive_tar.resolveFile(PaquetMinecraft.INFOS);
 				
 				InputStream is = mods.getContent().getInputStream();
@@ -287,10 +290,9 @@ public class CommandeInstall implements Callable<Integer> {
 				is.close();
 				
 				FileObject data = archive_tar.resolveFile(PaquetMinecraft.FICHIERS);
-				for (PaquetMinecraft.FichierMetadata metadata : modVersion.fichiers) {
-					FileObject src = data.resolveFile("/" + metadata.path);
-					FileObject dest = filesystem.resolveFile(
-							this.depotInstallation.dossier.toAbsolutePath().toUri().resolve(metadata.path));
+				for (final PaquetMinecraft.FichierMetadata metadata : modVersion.fichiers) {
+					final FileObject src = data.resolveFile(metadata.path);
+					final FileObject dest = dossier_dest.resolveFile(metadata.path);
 					dest.copyFrom(src, new FileDepthSelector());
 					
 					try (InputStream fichier_contenu = dest.getContent().getInputStream()) {
@@ -304,7 +306,7 @@ public class CommandeInstall implements Callable<Integer> {
 					dest.close();
 				}
 				return true;
-			} catch (IOException | URISyntaxException e) {
+			} catch (IOException e) {
 				e.printStackTrace();
 			}
 			return false;

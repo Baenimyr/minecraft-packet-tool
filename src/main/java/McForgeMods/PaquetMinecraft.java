@@ -6,8 +6,6 @@ import org.json.JSONObject;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.*;
 
 /**
@@ -46,7 +44,9 @@ public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 	 */
 	public final Map<String, VersionIntervalle> requiredMods = new HashMap<>();
 	/** Une description simple pouvant être affichée */
+	public       String                         nomCommun    = null;
 	public       String                         description  = null;
+	public       Section                        section      = Section.any;
 	
 	public PaquetMinecraft(String modid, Version version, VersionIntervalle mcversion) {
 		this.modid = modid.intern();
@@ -55,10 +55,11 @@ public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 	}
 	
 	/** Lit les informations relatives à un paquet. */
-	public static PaquetMinecraft lecturePaquet(JSONObject json) throws URISyntaxException {
+	public static PaquetMinecraft lecturePaquet(JSONObject json) {
 		PaquetMinecraft modVersion = new PaquetMinecraft(json.getString("name"),
 				Version.read(json.getString("version")), VersionIntervalle.read(json.getString("mcversion")));
 		modVersion.description = json.optString("description", null);
+		modVersion.nomCommun = json.optString("displayName", null);
 		
 		if (json.has("dependencies")) {
 			JSONArray depen = json.getJSONArray("dependencies");
@@ -72,11 +73,13 @@ public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 				final JSONObject metadata = files.getJSONObject(nom);
 				FichierMetadata fichier = new FichierMetadata(nom);
 				if (metadata.has("sha256")) fichier.SHA256 = metadata.getString("sha256");
+				if (metadata.has("md5")) fichier.MD5 = metadata.getString("md5");
 				
 				modVersion.fichiers.add(fichier);
 			}
 		}
 		
+		modVersion.section = json.optEnum(Section.class, "section", Section.any);
 		return modVersion;
 	}
 	
@@ -139,6 +142,8 @@ public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 		json.put("version", this.version);
 		json.put("mcversion", this.mcversion);
 		if (this.description != null) json.put("description", this.description);
+		if (this.nomCommun != null) json.put("displayName", this.nomCommun);
+		json.put("section", this.section.name());
 		
 		JSONArray dependencies = new JSONArray();
 		for (String modid : this.requiredMods.keySet()) {
@@ -149,12 +154,22 @@ public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 		for (FichierMetadata fichier : this.fichiers) {
 			JSONObject fichier_metadata = new JSONObject();
 			if (fichier.SHA256 != null) fichier_metadata.put("sha256", fichier.SHA256);
+			if (fichier.MD5 != null) fichier_metadata.put("md5", fichier.MD5);
 			
-			files.put(fichier.path.toString(), fichier_metadata);
+			files.put(fichier.path, fichier_metadata);
 		}
 		
 		json.put("dependencies", dependencies);
 		json.put("files", files);
+	}
+	
+	public enum Section {
+		any,
+		mod,
+		ressource,
+		shader,
+		config,
+		modpack
 	}
 	
 	/**
@@ -165,23 +180,20 @@ public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 	 * fichier.
 	 */
 	public static class FichierMetadata {
-		public final URI    path;
+		public final String path;
 		public       String SHA256 = null;
+		public       String MD5    = null;
 		
-		public FichierMetadata(URI path) {
+		public FichierMetadata(String path) {
 			this.path = path;
-		}
-		
-		public FichierMetadata(String path) throws URISyntaxException {
-			this(new URI(path));
 		}
 		
 		public boolean checkSHA(InputStream stream) throws IOException {
 			if (SHA256 != null) {
-				String sha = DigestUtils.sha256Hex(stream);
-				return sha.equals(SHA256);
-			}
-			return true;
+				return DigestUtils.sha256Hex(stream).equals(SHA256);
+			} else if (MD5 != null) {
+				return DigestUtils.md5Hex(stream).equals(MD5);
+			} else return true;
 		}
 	}
 }

@@ -20,8 +20,8 @@ import java.util.regex.Pattern;
  * </ul>
  */
 public class VersionIntervalle {
-	public static final Pattern VERSION_INTERVALLE = Pattern.compile(
-			"(?<bmin>[\\(\\[]?)(?<vmin>[\\p{Alnum}\\.+-]+)?(,(?<vmax>[\\p{Alnum}\\.+-]+)?)?(?<bmax>[\\)" + "\\]]?)");
+	public static final Pattern VERSION_INTERVALLE = Pattern
+			.compile("(?<bmin>[(\\[]?)(?<vmin>[\\p{Alnum}.+-]+)?(,(?<vmax>[\\p{Alnum}.+-]+)?)?(?<bmax>[)\\]]?)");
 	
 	Version minimum, maximum;
 	boolean inclut_min, inclut_max;
@@ -87,6 +87,7 @@ public class VersionIntervalle {
 			VersionIntervalle intervalle;
 			final boolean inclut_min, inclut_max;
 			final Version v_minimale, v_maximale;
+			int precision = 0;
 			
 			inclut_min = !"(".equals(m.group("bmin"));
 			inclut_max = "]".equals(m.group("bmax"));
@@ -94,6 +95,11 @@ public class VersionIntervalle {
 			try {
 				final String s_min = m.group("vmin");
 				v_minimale = s_min == null ? null : Version.read(s_min);
+				
+				if (s_min != null) for (int i = 0; i < s_min.length(); i++) {
+					if (s_min.charAt(i) == '.') precision++;
+					else if (!Character.isDigit(s_min.charAt(i))) break;
+				}
 			} catch (IllegalArgumentException iae) {
 				throw new VersionIntervalleFormatException(
 						"La version minimale " + m.group("vmin") + " n'a pas un format valide !");
@@ -111,7 +117,7 @@ public class VersionIntervalle {
 				intervalle = new VersionIntervalle(v_minimale, v_maximale);
 			} else {
 				if (inclut_max) intervalle = new VersionIntervalle(v_minimale);
-				else intervalle = new VersionIntervalle(v_minimale, v_minimale.precision());
+				else intervalle = new VersionIntervalle(v_minimale, precision);
 			}
 			
 			intervalle.inclut_min = inclut_min;
@@ -166,8 +172,8 @@ public class VersionIntervalle {
 				} else if (c == '@' && modid_builder.length() > 0) {
 					StringBuilder intervalle = new StringBuilder();
 					c = texte.charAt(pos++);
-					while (Character.isDigit(c) || c == ',' || c == '[' || c == ']'
-							|| c == '(' || c == ')' || c == '.' || c == '-' || c == '+') {
+					while (Character.isDigit(c) || c == ',' || c == '[' || c == ']' || c == '(' || c == ')' || c == '.'
+							|| c == '-' || c == '+') {
 						intervalle.append(c);
 						if (pos >= texte.length()) break;
 						c = texte.charAt(pos++);
@@ -178,8 +184,8 @@ public class VersionIntervalle {
 					
 					versionIntervalle = read(intervalle.toString());
 					
-				} else if (Character.isAlphabetic(c) || Character.isDigit(c)) {
-					modid_builder.append((char) c);
+				} else if (Character.isAlphabetic(c) || Character.isDigit(c) || c == '-') {
+					modid_builder.append(c);
 				} else {
 					System.err.println(c);
 					throw new VersionIntervalleFormatException(texte);

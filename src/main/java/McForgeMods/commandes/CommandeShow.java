@@ -8,10 +8,7 @@ import picocli.CommandLine;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.StringJoiner;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
@@ -51,18 +48,20 @@ public class CommandeShow implements Callable<Integer> {
 				List<PaquetMinecraft> modVersion = depotLocal.getModVersions(rech.getKey()).stream()
 						.filter(v -> rech.getValue().correspond(v.version)).collect(Collectors.toList());
 				if (modVersion.size() > 0) versions.addAll(modVersion);
-				else System.err.println(
-						String.format("Aucune version disponible pour '%s@%s'", rech.getKey(), rech.getValue()));
+				else System.err.printf("Aucune version disponible pour '%s@%s'%n", rech.getKey(), rech.getValue());
 			}
 		}
 		
+		versions.sort(Comparator.naturalOrder());
 		for (PaquetMinecraft version : versions) {
-			System.out.printf("%s %s [%s]: %s%n", version.modid, version.version, version.mcversion.toStringMinimal(),
-					version.description);
+			System.out.printf("%s %s %s%n", version.nomCommun == null ? version.modid : "\"" + version.nomCommun + "\"",
+					version.version, version.mcversion.toString());
+			System.out.println("section: " + version.section.name());
 			StringJoiner joiner = new StringJoiner(",");
 			version.requiredMods.entrySet().stream().sorted(Map.Entry.comparingByKey())
 					.forEach(e -> joiner.add(e.getKey() + "@" + e.getValue()));
 			System.out.println("dependencies: " + joiner.toString());
+			if (version.description != null) System.out.println("description: " + version.description);
 			System.out.println();
 		}
 		
