@@ -54,7 +54,7 @@ Pour les joueurs qui possèdent plusieurs installations pour différentes config
 \subsection{Dépendances}
 Les mods peuvent être reliés entre eux par une relation de dépendance.
 Les dépendances sont déclarées sous la forme \verb|required-after:modid@[min_version,max_version]| dans \verb|@Mod(String dependencies)| du code, ou dans les fichiers \texttt{mcmod.info} ou \texttt{META-INF/mods.toml} dans le champs \texttt{dependencies}\footnote{\url{https://mcforge.readthedocs.io/en/1.14.x/gettingstarted/structuring/}}.
-Seuls ses derniers fichiers peuvent être lus pour les analyses automatiques.
+Seuls ces derniers fichiers peuvent être lus pour les analyses automatiques.
 
 Une version\footnote{\url{https://semver.org/}} est une suite d'entiers séparés par des points et définie une positions précise dans l'espace des versions.
 Si une sous-version n'est pas spécifiée, elle est estimée à 0.
@@ -106,22 +106,30 @@ Ces paramètres peuvent être modifiés grâce à la commande \textbf{mark}.
 \begin{verbatim}
 {
     "minecraft": {
-		"version": "1.XX.X"
+        "version": "1.XX.X"
     },
-    "mods": {
-        "cofhcore": {
-            "fichier": "CoFHCore-1.12.2-4.6.3.27-universal.jar",
+    "mods": [
+        {
+            "name": "cofhcore",
             "version": "4.6.3.27",
+            "mcversion": "[1.12.2,1.12.3)",
+            "dependencies": ["forge@(,)"],
+            "files": {
+                "mods/CoFHCore-1.12.2-4.6.3.27-universal.jar": {}
+            },
             "manual": false,
             "locked": false
         },
-        "modid": {
-            "fichier": "...",
-            "version: "X.X.XX"
+        {
+            "name": MODID,
+            "version": VERSION,
+            "mcversion": MCVERSION,
+            "dependencies": []
+            "files": {},
             "manual": true,
             "locked": false
         }
-	}
+    ]
 }
 \end{verbatim}
 \caption{Fichier .mods.json}
@@ -206,7 +214,7 @@ Seuls le fichier \texttt{Mods.json} le sera et doit contenir tout le nécessaire
             "modid@[3.2.2,4.0.0)"
         ],
         "description": "Une description toute simple",
-        "filename": "biomesoplenty-7.0.1.2399.tar"
+        "filename": "biomesoplenty-7.0.1.2399.tar",
         "files": {
             "mods/BiomesOPlenty-1.12.2-7.0.1.2399-universal.jar": {
                 "sha256": "00000000000000000000000000000000"
@@ -275,7 +283,6 @@ Pour cela, le dépôt est premièrement vidé puis les informations des dépôt 
 % ----------------------------------------
 %
 \section{Fonctionnement Interne}
-
 \subsection{Résolution des dépendances}
 Par hypothèse les dépendances sont croissantes avec la version et il n'existe pas de conflit.
 Cela signifie que pour toute version $v_b > v_a$, pour toute dépendance $d$ utile au deux versions ($v_b \Rightarrow d@i_b$, $v_a \Rightarrow d@i_a$), l'intervalle de version $i_b$ doit être supérieur ou égal à $i_a$.
