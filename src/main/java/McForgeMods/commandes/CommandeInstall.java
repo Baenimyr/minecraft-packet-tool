@@ -40,7 +40,7 @@ public class CommandeInstall implements Callable<Integer> {
 	@CommandLine.Option(names = {"-h", "--help"}, usageHelp = true)
 	boolean help;
 	
-	@CommandLine.Parameters(arity = "1..n", descriptionKey = "mods")
+	@CommandLine.Parameters(arity = "0..n", descriptionKey = "mods")
 	ArrayList<String> mods;
 	
 	@CommandLine.Mixin
@@ -56,9 +56,8 @@ public class CommandeInstall implements Callable<Integer> {
 			description = "Répond automatiquement oui à toutes les questions.")
 	boolean yes;*/
 	
-	/*@CommandLine.Option(names = {"--only-update"},
-			description = "Interdit l'installation de nouveaux mods. Les mods de la liste seront mis à jour.")
-	boolean only_update;*/
+	@CommandLine.Option(names = {"--fix"}, defaultValue = "false")
+	boolean fix;
 	
 	@CommandLine.Option(names = {"-s", "--simulate", "--dry-run"}, defaultValue = "false", descriptionKey = "simulate")
 	boolean dry_run;
@@ -75,9 +74,23 @@ public class CommandeInstall implements Callable<Integer> {
 		/* Liste des mods à installer. */
 		final SolveurDependances solveur = new SolveurDependances(depotLocal);
 		
+		/* Liste des installations explicitement demandées par l'utilisateur. */
+		final Map<String, VersionIntervalle> demandes;
+		try {
+			if (this.mods != null) demandes = VersionIntervalle.lectureDependances(this.mods);
+			else if (this.fix) demandes = new HashMap<>();
+			else {
+				System.err.println("Choississez un mod ou activer l'option --fix.");
+				return 1;
+			}
+		} catch (IllegalArgumentException iae) {
+			System.err.println("[ERROR] " + iae.getMessage());
+			return 1;
+		}
+		
 		try {
 			depotLocal.importation();
-			depotInstallation.analyseDossier();
+			depotInstallation.statusImportation();
 		} catch (IOException i) {
 			System.err.println("[ERROR] Erreur de lecture du dépot !");
 			return 1;
@@ -98,14 +111,6 @@ public class CommandeInstall implements Callable<Integer> {
 		
 		solveur.ajoutContrainte("minecraft", depotInstallation.mcversion);
 		
-		/* Liste des installations explicitement demandées par l'utilisateur. */
-		final Map<String, VersionIntervalle> demandes;
-		try {
-			demandes = VersionIntervalle.lectureDependances(this.mods);
-		} catch (IllegalArgumentException iae) {
-			System.err.println("[ERROR] " + iae.getMessage());
-			return 1;
-		}
 		for (final Map.Entry<String, VersionIntervalle> demande : demandes.entrySet()) {
 			if (!depotLocal.getModids().contains(demande.getKey())) {
 				System.err.printf("[ERROR] Modid inconnu: '%s'%n", demande.getKey());
