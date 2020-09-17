@@ -134,8 +134,7 @@ public class ForgeMods implements Runnable {
 		
 		if (all) {
 			listeRecherche = depotInstallation.getModids().stream().map(depotInstallation::informations)
-					.map(ins -> depotLocal.getModVersion(ins.modid, ins.version)).filter(Optional::isPresent)
-					.map(Optional::get).collect(Collectors.toList());
+					.map(ins -> ins.paquet).collect(Collectors.toList());
 		} else if (mods != null && mods.size() > 0) {
 			final List<PaquetMinecraft> resultat = new ArrayList<>();
 			final Map<String, VersionIntervalle> recherche;
@@ -199,12 +198,12 @@ public class ForgeMods implements Runnable {
 		for (String modid : versions.keySet()) {
 			if (depotInstallation.contains(modid)) {
 				DepotInstallation.Installation mv = depotInstallation.informations(modid);
-				if (versions.get(modid).correspond(mv.version)) {
+				if (versions.get(modid).correspond(mv.paquet.version)) {
 					if (action == MarkAction.manual || action == MarkAction.auto) {
-						if (mv.verrou) {
+						if (mv.verrou()) {
 							System.err.printf("%s est verrouillé%n", mv);
-						} else mv.manuel = action == MarkAction.manual;
-					} else mv.verrou = action == MarkAction.lock;
+						} else depotInstallation.statusChange(mv.paquet, action == MarkAction.manual);
+					} else depotInstallation.verrouillerMod(mv.paquet, action == MarkAction.lock);
 				} else {
 					System.err.printf("Le mod %s@%s n'est pas installé", modid, versions.get(modid));
 				}

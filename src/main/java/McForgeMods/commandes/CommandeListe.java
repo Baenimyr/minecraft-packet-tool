@@ -59,9 +59,9 @@ public class CommandeListe implements Callable<Integer> {
 			for (String modid : modids) {
 				DepotInstallation.Installation ins = depotInstallation.informations(modid);
 				
-				if (mode == null || (mode.manuels && ins.manuel) || (mode.auto && !ins.manuel) || (mode.verrouille
-						&& ins.verrou)) {
-					System.out.println(modid + ":" + ins.version);
+				if (mode == null || (mode.manuels && ins.manuel()) || (mode.auto && !ins.manuel()) || (mode.verrouille
+						&& ins.verrou())) {
+					System.out.println(modid + ":" + ins.paquet.version);
 				}
 			}
 			

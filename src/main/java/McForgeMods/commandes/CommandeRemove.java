@@ -8,7 +8,6 @@ import picocli.CommandLine;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.Callable;
 
 @CommandLine.Command(name = "remove", resourceBundle = "mcforgemods/lang/Remove")
@@ -36,8 +35,8 @@ public class CommandeRemove implements Callable<Integer> {
 				erreur = true;
 			}
 			if (!force && depotInstallation.getModids().stream().filter(i -> !mods.contains(i))
-					.map(depotInstallation::informations).map(i -> depotLocal.getModVersion(i.modid, i.version))
-					.filter(Optional::isPresent).map(Optional::get).anyMatch(mv -> mv.requiredMods.containsKey(id))) {
+					.map(depotInstallation::informations).map(i -> i.paquet)
+					.anyMatch(mv -> mv.requiredMods.containsKey(id))) {
 				System.err.printf("Impossible de supprimer '%s' car il est une dépendance.%n", id);
 				erreur = true;
 			}

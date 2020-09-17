@@ -130,13 +130,28 @@ public class CommandeInstall implements Callable<Integer> {
 		// Ajout de toutes les installations manuelles dans l'installation
 		for (String modid : depotInstallation.getModids()) {
 			DepotInstallation.Installation ins = depotInstallation.informations(modid);
-			if (ins.manuel && !demandes.containsKey(ins.modid)) {
-				depotLocal.getModVersion(ins.modid, ins.version).ifPresent(solveur::ajoutSelection);
+			if ((ins.manuel() || ins.verrou()) && !demandes.containsKey(ins.paquet.modid)) {
+				solveur.ajoutSelection(ins.paquet);
 			}
 		}
 		
-		/* Tente d'associer à chaque identifiant connu une version à installer. */
-		final SolveurDependances solution = solveur.resolutionTotale();
+		// Tente d'associer à chaque identifiant connu une version à installer.
+		// Première tentative en conservant l'installation totale actuelle
+		SolveurDependances solveur_minimal = new SolveurDependances(solveur);
+		for (String modid : depotInstallation.getModids()) {
+			final DepotInstallation.Installation ins = depotInstallation.informations(modid);
+			if (!ins.manuel() && !ins.verrou() && !demandes.containsKey(ins.paquet.modid)) {
+				solveur_minimal.ajoutSelection(ins.paquet);
+			}
+		}
+		SolveurDependances solution_minimale = solveur_minimal.resolutionTotale();
+		
+		
+		final SolveurDependances solution;
+		if (solution_minimale != null) solution = solution_minimale;
+			// En cas d'échec autorise la modification des versions non manuelles.
+		else solution = solveur.resolutionTotale();
+		
 		if (solution == null) {
 			System.err.println("Impossible de résoudre les dépendances:");
 			for (final String contrainte : solveur.listeContraintes()) {
@@ -155,7 +170,7 @@ public class CommandeInstall implements Callable<Integer> {
 		}
 		
 		final List<PaquetMinecraft> installations = solution.selection.stream()
-				.filter(s -> !depotInstallation.contains(s.modid) || !depotInstallation.informations(s.modid).version
+				.filter(s -> !depotInstallation.contains(s.modid) || !depotInstallation.getInstallation(s.modid).version
 						.equals(s.version)).collect(Collectors.toList());
 		if (installations.size() != 0) {
 			System.out.println("Installation des nouveaux mods:");
