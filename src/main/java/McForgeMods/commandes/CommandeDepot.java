@@ -6,7 +6,9 @@ import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.ArbreDependance;
 import McForgeMods.depot.ArchiveMod;
 import McForgeMods.depot.DepotLocal;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.codec.digest.MessageDigestAlgorithms;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.vfs2.FileObject;
@@ -20,6 +22,7 @@ import picocli.CommandLine;
 
 import java.io.*;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.Callable;
 
@@ -121,6 +124,57 @@ public class CommandeDepot implements Runnable {
 		return 0;
 	}
 	
+	private static Path pack(final PaquetMinecraft modVersion, Path dossier, Map<String, File> fichiers)
+			throws IOException {
+		final JSONObject json = new JSONObject();
+		final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+		final Path archive_destination = dossier.resolve("" + modVersion.modid.charAt(0))
+				.resolve(modVersion.toStringStandard() + ".tar");
+		
+		if (!archive_destination.toFile().exists() && !archive_destination.toFile().mkdirs()) {
+			System.err.println("[ERROR] impossible de créer un dossier pour " + archive_destination);
+			return null;
+		}
+		
+		try (FileOutputStream fos = new FileOutputStream(archive_destination.toFile());
+			 TarArchiveOutputStream tar = new TarArchiveOutputStream(fos)) {
+			for (Map.Entry<String, File> fichier : fichiers.entrySet()) {
+				try (FileInputStream fis = new FileInputStream(fichier.getValue())) {
+					TarArchiveEntry mod = new TarArchiveEntry(fichier.getValue(),
+							PaquetMinecraft.FICHIERS + fichier.getKey());
+					MessageDigest digest = DigestUtils.getDigest(MessageDigestAlgorithms.SHA_256);
+					
+					tar.putArchiveEntry(mod);
+					byte[] b = new byte[2048];
+					int l;
+					while ((l = fis.read(b)) != -1) {
+						digest.update(b, 0, l);
+						tar.write(b, 0, l);
+					}
+					tar.closeArchiveEntry();
+					
+					final String sha256 = Hex.encodeHexString(digest.digest());
+					final PaquetMinecraft.FichierMetadata fichierjar = new PaquetMinecraft.FichierMetadata(
+							fichier.getKey());
+					fichierjar.SHA256 = sha256;
+					modVersion.fichiers.add(fichierjar);
+				}
+			}
+			
+			try (OutputStreamWriter writer = new OutputStreamWriter(bytes)) {
+				modVersion.ecriturePaquet(json);
+				json.write(writer, 4, 4);
+			}
+			
+			TarArchiveEntry infos = new TarArchiveEntry(PaquetMinecraft.INFOS);
+			infos.setSize(bytes.size());
+			tar.putArchiveEntry(infos);
+			bytes.writeTo(tar);
+			tar.closeArchiveEntry();
+		}
+		return archive_destination;
+	}
+	
 	@CommandLine.Command(name = "import")
 	static class importation implements Callable<Integer> {
 		@CommandLine.Parameters(index = "0", arity = "0..*", paramLabel = "modid", descriptionKey = "modids")
@@ -132,7 +186,11 @@ public class CommandeDepot implements Runnable {
 		Path depot_path = null;
 		
 		@CommandLine.Option(names = {"-f", "--from"}, description = "Dossier à parcourir", required = true)
-		Path           dossier_import = null;
+		Path dossier_import = null;
+		
+		@CommandLine.Option(names = {"--ecraser"}, descriptionKey = "ecraser", defaultValue = "false")
+		boolean ecraser = false;
+		
 		@CommandLine.Mixin
 		ForgeMods.Help help;
 		
@@ -174,56 +232,26 @@ public class CommandeDepot implements Runnable {
 				return 2;
 			}
 			
+			if (!ecraser) {
+				// Suppression des versions déjà présentes dans le dépôt qu'il ne faut pas écraser
+				importation.removeIf(archive -> depot.contains(archive.modVersion));
+			}
+			
 			for (ArchiveMod version_client : importation) {
-				final JSONObject json = new JSONObject();
-				final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-				final Path archive_destination = depot.dossier.toAbsolutePath()
-						.resolve("" + version_client.modVersion.modid.charAt(0))
-						.resolve(version_client.modVersion.toStringStandard() + ".tar");
-				
-				try (FileInputStream fis = new FileInputStream(version_client.fichier);
-					 OutputStreamWriter writer = new OutputStreamWriter(bytes)) {
-					final String sha256 = DigestUtils.sha256Hex(fis);
-					
-					final PaquetMinecraft.FichierMetadata fichierjar = new PaquetMinecraft.FichierMetadata(
-							"mods/" + version_client.fichier.getName());
-					fichierjar.SHA256 = sha256;
-					version_client.modVersion.fichiers.add(fichierjar);
-					version_client.modVersion.ecriturePaquet(json);
-					json.write(writer, 4, 4);
+				Path archive_destination = null;
+				try {
+					archive_destination = pack(version_client.modVersion, depot.dossier.toAbsolutePath(), Collections
+							.singletonMap("mods/" + version_client.fichier.getName(), version_client.fichier));
 				} catch (IOException e) {
 					e.printStackTrace();
-					break;
 				}
 				
-				if (!archive_destination.toFile().exists() && !archive_destination.toFile().mkdirs()) {
-					System.err.println("[ERROR] impossible de créer un dossier pour " + archive_destination);
-					break;
+				if (archive_destination != null) {
+					final PaquetMinecraft.FichierMetadata archive_metadata = new PaquetMinecraft.FichierMetadata(
+							depot.dossier.relativize(archive_destination).toString());
+					depot.ajoutModVersion(version_client.modVersion);
+					depot.archives.put(version_client.modVersion, archive_metadata);
 				}
-				try (FileOutputStream fos = new FileOutputStream(archive_destination.toFile());
-					 TarArchiveOutputStream tar = new TarArchiveOutputStream(fos)) {
-					TarArchiveEntry infos = new TarArchiveEntry(PaquetMinecraft.INFOS);
-					infos.setSize(bytes.size());
-					TarArchiveEntry mod = new TarArchiveEntry(version_client.fichier,
-							PaquetMinecraft.FICHIERS + "mods/" + version_client.fichier.getName());
-					
-					tar.putArchiveEntry(infos);
-					bytes.writeTo(tar);
-					tar.closeArchiveEntry();
-					tar.putArchiveEntry(mod);
-					try (FileInputStream fichier_mod = new FileInputStream(version_client.fichier)) {
-						fichier_mod.transferTo(tar);
-					}
-					tar.closeArchiveEntry();
-				} catch (IOException e) {
-					e.printStackTrace();
-					break;
-				}
-				
-				final PaquetMinecraft.FichierMetadata archive_metadata = new PaquetMinecraft.FichierMetadata(
-						depot.dossier.relativize(archive_destination).toString());
-				depot.ajoutModVersion(version_client.modVersion);
-				depot.archives.put(version_client.modVersion, archive_metadata);
 			}
 			System.out.printf("%d versions importées.%n", importation.size());
 			
