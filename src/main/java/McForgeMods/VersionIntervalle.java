@@ -184,7 +184,7 @@ public class VersionIntervalle {
 					
 					versionIntervalle = read(intervalle.toString());
 					
-				} else if (Character.isAlphabetic(c) || Character.isDigit(c)) {
+				} else if (Character.isAlphabetic(c) || Character.isDigit(c) || c == '-') {
 					modid_builder.append(c);
 				} else {
 					System.err.println(c);

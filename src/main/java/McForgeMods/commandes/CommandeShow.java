@@ -54,13 +54,14 @@ public class CommandeShow implements Callable<Integer> {
 		
 		versions.sort(Comparator.naturalOrder());
 		for (PaquetMinecraft version : versions) {
-			System.out.printf("%s %s [%s]: %s%n",
-					version.nomCommun == null ? version.modid : "'" + version.nomCommun + "'", version.version,
-					version.mcversion.toStringMinimal(), version.description == null ? "" : version.description);
+			System.out.printf("%s %s %s%n", version.nomCommun == null ? version.modid : "\"" + version.nomCommun + "\"",
+					version.version, version.mcversion.toString());
+			System.out.println("section: " + version.section.name());
 			StringJoiner joiner = new StringJoiner(",");
 			version.requiredMods.entrySet().stream().sorted(Map.Entry.comparingByKey())
 					.forEach(e -> joiner.add(e.getKey() + "@" + e.getValue()));
 			System.out.println("dependencies: " + joiner.toString());
+			if (version.description != null) System.out.println("description: " + version.description);
 			System.out.println();
 		}
 		
