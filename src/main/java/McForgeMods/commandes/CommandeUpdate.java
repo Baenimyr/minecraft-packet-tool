@@ -41,8 +41,7 @@ public class CommandeUpdate implements Callable<Integer> {
 	public Integer call() throws Exception {
 		final DepotLocal depotLocal = new DepotLocal(adresseDepot);
 		try {
-			depotLocal.importation();
-			if (clear) depotLocal.clear();
+			if (!clear) depotLocal.importation();
 		} catch (IOException | JSONException e) {
 			System.err.println("Erreur de chargement du dépot local: " + e.getClass() + " " + e.getMessage());
 			return 1;

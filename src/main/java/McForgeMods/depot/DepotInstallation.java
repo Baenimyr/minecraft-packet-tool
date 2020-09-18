@@ -48,14 +48,9 @@ public class DepotInstallation implements Closeable {
 		this.depot = depot;
 		Path dos = Path.of(System.getProperty("user.home")).resolve(".minecraft");
 		if (dossier == null) {
-			Path d = Path.of("").toAbsolutePath();
-			int i;
-			for (i = d.getNameCount() - 1; i >= 0; i--) {
-				if (d.getName(i).toString().equals(".minecraft")) {
-					dos = d.subpath(0, i + 1);
-					break;
-				}
-			}
+			Path d = Path.of(".").toAbsolutePath();
+			while (d.getParent() != null && !d.getFileName().endsWith(".minecraft")) d = d.getParent();
+			if (d.getFileName().endsWith(".minecraft")) dos = d;
 		} else if (dossier.startsWith("~")) {
 			dos = Path.of(System.getProperty("user.home")).resolve(dossier.subpath(1, dossier.getNameCount()));
 		} else {

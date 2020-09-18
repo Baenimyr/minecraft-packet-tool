@@ -131,7 +131,7 @@ public class CommandeDepot implements Runnable {
 		final Path archive_destination = dossier.resolve("" + modVersion.modid.charAt(0))
 				.resolve(modVersion.toStringStandard() + ".tar");
 		
-		if (!archive_destination.toFile().exists() && !archive_destination.toFile().mkdirs()) {
+		if (!archive_destination.getParent().toFile().exists() && !archive_destination.getParent().toFile().mkdirs()) {
 			System.err.println("[ERROR] impossible de créer un dossier pour " + archive_destination);
 			return null;
 		}
