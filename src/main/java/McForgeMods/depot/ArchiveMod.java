@@ -6,7 +6,6 @@ import McForgeMods.Version;
 import McForgeMods.VersionIntervalle;
 import McForgeMods.outils.NoNewlineReader;
 import org.json.JSONArray;
-import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 import org.tomlj.Toml;
@@ -66,8 +65,6 @@ public class ArchiveMod {
 						archive.lectureMcMod(lecture);
 					}
 			}
-		} catch (JSONException | IllegalArgumentException error) {
-			System.err.printf("[JAR] '%s':\t%s:%s%n", fichier.getName(), error.getClass(), error.getMessage());
 		}
 		return archive;
 	}
@@ -121,56 +118,6 @@ public class ArchiveMod {
 		}
 	}
 	
-	private void lectureModTOML(InputStream lecture) throws IOException {
-		TomlParseResult toml = Toml.parse(lecture);
-		TomlArray mods = toml.getArray("mods");
-		if (mods == null || mods.isEmpty()) {
-			System.err.println("[JAR/mods.toml] pas de liste 'mods'");
-			return;
-		}
-		
-		TomlTable mod_info = mods.getTable(0);
-		if (mod_info == null || !mod_info.contains("modId")) {
-			System.err.println("[JAR/mods.toml] aucun 'modId'");
-			return;
-		}
-		final String modid = mod_info.getString("modId");
-		final Version version = Version.read(mod_info.getString("version"));
-		String name = mod_info.getString("displayName");
-		// archive.mod.url = mod_info.contains("displayURL") ? mod_info.getString("displayURL") : null;
-		// archive.mod.updateJSON = mod_info.contains("updateJSONURL") ? mod_info.getString("updateJSONURL") : null;
-		String description = mod_info.contains("description") ? mod_info.getString("description") : null;
-		
-		
-		TomlArray dependencies_info = toml.getArray("dependencies." + modid);
-		if (dependencies_info == null) {
-			System.err.println("[JAR/mods.toml] pas de liste 'dependencies." + modid + "'");
-			return;
-		}
-		final Map<String, VersionIntervalle> dependencies = new HashMap<>();
-		VersionIntervalle mcversion = null;
-		for (int i = 0; i < dependencies_info.size(); i++) {
-			TomlTable dep_i = dependencies_info.getTable(i);
-			final String dep_modid = dep_i.getString("modId");
-			final VersionIntervalle dep_versions = VersionIntervalle.read(dep_i.getString("versionRange"));
-			
-			if ("minecraft".equals(dep_modid)) {
-				mcversion = dep_versions;
-			} else {
-				dependencies.put(dep_modid, dep_versions);
-			}
-		}
-		
-		if (mcversion == null) {
-			System.err.println("[JAR/mods.toml] Aucune version minecraft spécifiée pour " + modid);
-			return;
-		}
-		this.modVersion = new PaquetMinecraft(modid, version, mcversion);
-		this.modVersion.requiredMods.putAll(dependencies);
-		this.modVersion.nomCommun = name;
-		this.modVersion.description = description;
-	}
-	
 	/**
 	 * Parcours un dossier et les sous-dossiers à la recherche de fichier de mod forge.
 	 * <p>
@@ -195,8 +142,8 @@ public class ArchiveMod {
 					ArchiveMod resultat = null;
 					try {
 						resultat = ArchiveMod.importationJar(f);
-					} catch (IOException i) {
-						System.err.printf("[ERROR] in '%s': %s%n", f, i.getMessage());
+					} catch (Exception i) {
+						System.err.printf("[ERROR] in '%s': %s:%s%n", f, i.getClass().getSimpleName(), i.getMessage());
 					}
 					
 					if (resultat != null && resultat.isPresent()) {
@@ -209,7 +156,61 @@ public class ArchiveMod {
 		return resultats;
 	}
 	
+	private void lectureModTOML(InputStream lecture) throws IOException {
+		TomlParseResult toml = Toml.parse(lecture);
+		TomlArray mods = toml.getArray("mods");
+		if (mods == null || mods.isEmpty()) {
+			throw new JarModError("Aucun mod déclaré");
+		}
+		
+		TomlTable mod_info = mods.getTable(0);
+		if (mod_info == null || !mod_info.contains("modId")) {
+			throw new JarModError("Aucun modId");
+		}
+		final String modid = mod_info.getString("modId");
+		final Version version = Version.read(mod_info.getString("version"));
+		String name = mod_info.getString("displayName");
+		// archive.mod.url = mod_info.contains("displayURL") ? mod_info.getString("displayURL") : null;
+		// archive.mod.updateJSON = mod_info.contains("updateJSONURL") ? mod_info.getString("updateJSONURL") : null;
+		String description = mod_info.contains("description") ? mod_info.getString("description") : null;
+		
+		
+		TomlArray dependencies_info = toml.getArray("dependencies." + modid);
+		final Map<String, VersionIntervalle> dependencies = new HashMap<>();
+		VersionIntervalle mcversion = null;
+		if (dependencies_info != null) for (int i = 0; i < dependencies_info.size(); i++) {
+			TomlTable dep_i = dependencies_info.getTable(i);
+			final String dep_modid = dep_i.getString("modId");
+			final VersionIntervalle dep_versions = VersionIntervalle.read(dep_i.getString("versionRange"));
+			
+			if ("minecraft".equals(dep_modid)) {
+				mcversion = dep_versions;
+			} else {
+				dependencies.put(dep_modid, dep_versions);
+			}
+		}
+		
+		if (mcversion == null) {
+			throw new JarModError("pas de version minecraft");
+		}
+		this.modVersion = new PaquetMinecraft(modid, version, mcversion);
+		this.modVersion.requiredMods.putAll(dependencies);
+		this.modVersion.nomCommun = name;
+		this.modVersion.description = description;
+	}
+	
 	public boolean isPresent() {
 		return this.modVersion != null;
+	}
+	
+	static class JarModError extends RuntimeException {
+		
+		public JarModError(String message) {
+			super(message);
+		}
+		
+		public JarModError(String message, Throwable cause) {
+			super(message, cause);
+		}
 	}
 }

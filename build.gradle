@@ -85,6 +85,7 @@ task deb(type: Deb, group: 'build') {
     dependsOn(assemble)
     // dependsOn(autocompletion)
 
+    release "dev"
     packageName 'forgemods'
     packageDescription 'Gestionnaire de paquet pour Minecraft.'
     requires('openjdk-14-jre-headless').or('openjdk-13-jre-headless').or('openjdk-11-jre-headless')
