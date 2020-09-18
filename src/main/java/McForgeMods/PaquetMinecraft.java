@@ -49,7 +49,7 @@ public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 	public       Section                        section      = Section.any;
 	
 	public PaquetMinecraft(String modid, Version version, VersionIntervalle mcversion) {
-		this.modid = modid.intern();
+		this.modid = modid.toLowerCase().intern();
 		this.version = version;
 		this.mcversion = mcversion;
 	}
@@ -119,7 +119,7 @@ public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 	}
 	
 	public String toStringStandard() {
-		return String.format("%s-%s", modid, version);
+		return String.format("%s_%s", modid, version);
 	}
 	
 	@Override
