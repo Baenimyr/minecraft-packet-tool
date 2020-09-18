@@ -11,9 +11,7 @@ class VersionIntervalleTest {
 	
 	@Test
 	public void comparaison() {
-		VersionIntervalle dep1 = new VersionIntervalle(new Version(1, 0, 0), new Version(2, 0, 0));
-		dep1.inclut_min = true;
-		dep1.inclut_max = false;
+		VersionIntervalle dep1 = new VersionIntervalle(new Version(1, 0, 0), new Version(2, 0, 0), true, false);
 		
 		assertTrue(dep1.correspond(new Version(1, 0, 0)));
 		assertTrue(dep1.correspond(new Version(1, 584, 0)));
@@ -22,9 +20,9 @@ class VersionIntervalleTest {
 		assertFalse(dep1.correspond(new Version(2, 0, 14)));
 		assertFalse(dep1.correspond(new Version(0, 0, 988)));
 		
-		assertTrue(dep1.englobe(new VersionIntervalle(new Version(1,0,0))));
+		assertTrue(dep1.englobe(new VersionIntervalle(new Version(1, 0, 0))));
 		assertTrue(dep1.englobe(dep1));
-		assertFalse(dep1.englobe(new VersionIntervalle(new Version(1,0,0), new Version(3,5,0))));
+		assertFalse(dep1.englobe(new VersionIntervalle(new Version(1, 0, 0), new Version(3, 5, 0))));
 	}
 	
 	@Test

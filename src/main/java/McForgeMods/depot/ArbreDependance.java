@@ -14,7 +14,7 @@ public class ArbreDependance {
 	private final Depot                          depot;
 	/** Versions sélectionnées */
 	private final Map<String, VersionIntervalle> contraintes = new HashMap<>();
-	public final  VersionIntervalle              mcversion   = VersionIntervalle.ouvert();
+	public        VersionIntervalle              mcversion   = VersionIntervalle.ouvert();
 	
 	public ArbreDependance(Depot depot) {
 		this.depot = depot;
@@ -27,7 +27,7 @@ public class ArbreDependance {
 	
 	/** Fixe un version pour le mod et recalcul les intervalles de dépendance. */
 	public void ajoutContrainte(PaquetMinecraft modVersion) {
-		this.mcversion.intersection(modVersion.mcversion);
+		this.mcversion = this.mcversion.intersection(modVersion.mcversion);
 		this.ajoutContrainte(modVersion.modid, new VersionIntervalle(modVersion.version));
 	}
 	
@@ -41,7 +41,7 @@ public class ArbreDependance {
 		if (!contraintes.containsKey(modid)) {
 			contraintes.put(modid, versions);
 		} else {
-			contraintes.get(modid).intersection(versions);
+			contraintes.merge(modid, versions, VersionIntervalle::intersection);
 		}
 	}
 	

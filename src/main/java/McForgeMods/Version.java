@@ -13,12 +13,13 @@ import java.util.regex.Pattern;
  * @since 2020-01-10
  */
 public class Version implements Comparable<Version> {
+	public static final int     size     = 4;
 	public static final Pattern VERSION  = Pattern.compile(
 			"(\\d+)(\\.(\\d+)(\\.(\\d+)(\\.(\\d+))?)?)?(-(?<release>\\p{Alnum}+))?(\\+(?<build>\\p{Alnum}+))" + "?");
 	/**
 	 * major, medium, minor, patch
 	 */
-	private final       int[]   versions = new int[4];
+	private final       int[]   versions = new int[size];
 	public              String  release  = null;
 	public              String  build    = null;
 	
@@ -34,13 +35,9 @@ public class Version implements Comparable<Version> {
 	}
 	
 	public Version(Version v) {
-		System.arraycopy(v.versions, 0, this.versions, 0, 4);
+		System.arraycopy(v.versions, 0, this.versions, 0, size);
 		this.release = v.release;
 		this.build = v.build;
-	}
-	
-	public int size() {
-		return 4;
 	}
 	
 	/**
@@ -51,7 +48,7 @@ public class Version implements Comparable<Version> {
 	 * @return l'index de la dernière sous-version non nulle.
 	 */
 	public int precision() {
-		for (int i = size() - 1; i >= 0; i--) {
+		for (int i = size - 1; i >= 0; i--) {
 			if (get(i) != 0) return i;
 		}
 		return 0;
@@ -61,11 +58,10 @@ public class Version implements Comparable<Version> {
 		return this.versions[index];
 	}
 	
-	/**
-	 * À utiliser avec prudence
-	 */
-	public void set(int index, int valeur) {
-		this.versions[index] = valeur;
+	public Version set(int index, int valeur) {
+		Version v = new Version(this);
+		v.versions[index] = valeur;
+		return v;
 	}
 	
 	public static Version read(String texte) throws IllegalArgumentException {
@@ -109,7 +105,7 @@ public class Version implements Comparable<Version> {
 			if (this.versions[1] == version.versions[1]) {
 				if (this.versions[2] == version.versions[2]) {
 					if (this.versions[3] == version.versions[3]) {
-						return this.release == null ? (version.release == null ? 0 : 1)
+						return this.release == null ? (version.release == null ? 0 : -1) : version.release == null ? 1
 								: Objects.compare(this.release, version.release, String::compareTo);
 					} else return Integer.compare(this.versions[3], version.versions[3]);
 				} else return Integer.compare(this.versions[2], version.versions[2]);
@@ -125,7 +121,7 @@ public class Version implements Comparable<Version> {
 	public String toString(int p, boolean release, boolean build) {
 		StringBuilder sb = new StringBuilder();
 		sb.append(this.versions[0]);
-		for (int i = 1; i < size() && i <= p; i++) {
+		for (int i = 1; i < size && i <= p; i++) {
 			sb.append('.');
 			sb.append(this.versions[i]);
 		}

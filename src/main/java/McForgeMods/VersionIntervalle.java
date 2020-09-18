@@ -20,11 +20,15 @@ import java.util.regex.Pattern;
  * </ul>
  */
 public class VersionIntervalle {
-	public static final Pattern VERSION_INTERVALLE = Pattern
-			.compile("(?<bmin>[(\\[]?)(?<vmin>[\\p{Alnum}.+-]+)?(,(?<vmax>[\\p{Alnum}.+-]+)?)?(?<bmax>[)\\]]?)");
+	public static final  Pattern ID                 = Pattern
+			.compile("\\p{Alpha}\\p{Alnum}+(-\\p{Alnum}+)*", Pattern.CASE_INSENSITIVE);
+	private static final String  VERSION            = "(\\d+)(\\.(\\d+)(\\.(\\d+)(\\.(\\d+))?)?)?(-(\\p{Alnum}+))?"
+			+ "(\\+(\\p{Alnum}+))?";
+	public static final  Pattern VERSION_INTERVALLE = Pattern.compile(
+			"(?<bmin>[(\\[]?)(?<vmin>" + VERSION + ")?(?<inter>,\\s?(?<vmax>" + VERSION + ")?)?" + "(?<bmax>[)\\]]?)");
 	
-	Version minimum, maximum;
-	boolean inclut_min, inclut_max;
+	final Version minimum, maximum;
+	final boolean inclut_min, inclut_max;
 	
 	public VersionIntervalle() {
 		this.minimum = this.maximum = null;
@@ -39,10 +43,14 @@ public class VersionIntervalle {
 	}
 	
 	public VersionIntervalle(Version minimum, Version maximum) {
+		this(minimum, maximum, true, false);
+	}
+	
+	public VersionIntervalle(Version minimum, Version maximum, boolean inclut_min, boolean inclut_max) {
 		this.minimum = minimum;
 		this.maximum = maximum;
-		this.inclut_min = true;
-		this.inclut_max = false;
+		this.inclut_min = inclut_min;
+		this.inclut_max = inclut_max;
 	}
 	
 	public VersionIntervalle(Version v) {
@@ -50,16 +58,16 @@ public class VersionIntervalle {
 		this.inclut_min = this.inclut_max = true;
 	}
 	
+	public VersionIntervalle(Version version, int precision) {
+		this(version, version.set(precision, version.get(precision) + 1));
+	}
+	
 	/**
 	 * Crée une dépendance n'acceptant qu'une seule version. Par exemple la présence d'un mod déjà installé, contraint
 	 * la résolution de version à celle disponible.
 	 */
-	public VersionIntervalle(Version version, int precision) {
-		this.minimum = version;
-		this.maximum = new Version(version);
-		if (precision < this.maximum.size()) this.maximum.set(precision, this.maximum.get(precision) + 1);
-		this.inclut_min = true;
-		this.inclut_max = false;
+	public VersionIntervalle(Version version, int precision, boolean inclut_min, boolean inclut_max) {
+		this(version, version.set(precision, version.get(precision) + 1), inclut_min, inclut_max);
 	}
 	
 	public static VersionIntervalle ouvert() {
@@ -84,6 +92,9 @@ public class VersionIntervalle {
 	public static VersionIntervalle read(String in) throws VersionIntervalleFormatException {
 		final Matcher m = VERSION_INTERVALLE.matcher(in);
 		if (m.find()) {
+			if (m.end() < in.length())
+				throw new VersionIntervalleFormatException("Format invalide à " + m.end() + ": " + in);
+			
 			VersionIntervalle intervalle;
 			final boolean inclut_min, inclut_max;
 			final Version v_minimale, v_maximale;
@@ -105,7 +116,7 @@ public class VersionIntervalle {
 						"La version minimale " + m.group("vmin") + " n'a pas un format valide !");
 			}
 			
-			if (m.group(3) != null) { // intervalle large
+			if (m.group("inter") != null) { // intervalle large
 				try {
 					final String s_max = m.group("vmax");
 					v_maximale = s_max == null ? null : Version.read(s_max);
@@ -114,14 +125,11 @@ public class VersionIntervalle {
 							"La version maximale " + m.group("vmax") + " n'a pas un format valide !");
 				}
 				
-				intervalle = new VersionIntervalle(v_minimale, v_maximale);
+				intervalle = new VersionIntervalle(v_minimale, v_maximale, inclut_min, inclut_max);
 			} else {
 				if (inclut_max) intervalle = new VersionIntervalle(v_minimale);
-				else intervalle = new VersionIntervalle(v_minimale, precision);
+				else intervalle = new VersionIntervalle(v_minimale, precision, inclut_min, inclut_max);
 			}
-			
-			intervalle.inclut_min = inclut_min;
-			intervalle.inclut_max = inclut_max;
 			
 			return intervalle;
 		} else
@@ -152,49 +160,26 @@ public class VersionIntervalle {
 		final Map<String, VersionIntervalle> resultat = new HashMap<>();
 		for (Object o : entree) {
 			final String texte = o.toString();
-			int pos = 0;
+			int pos;
 			
-			StringBuilder modid_builder = new StringBuilder();
-			VersionIntervalle versionIntervalle = VersionIntervalle.ouvert();
+			Matcher match_id = ID.matcher(texte);
+			if (!match_id.find()) {
+				throw new VersionIntervalleFormatException("id incorrect: " + texte);
+			}
+			final String modid = match_id.group();
+			pos = match_id.end();
 			
-			char c;
-			while (pos < texte.length()) {
-				c = texte.charAt(pos++);
-				if (c == ',') {
-					final String modid = modid_builder.toString().toLowerCase();
-					if (resultat.containsKey(modid) && resultat.get(modid) != null) {
-						resultat.get(modid).intersection(versionIntervalle);
-					} else resultat.put(modid, versionIntervalle);
-					
-					modid_builder = new StringBuilder();
-					versionIntervalle = VersionIntervalle.ouvert();
-					
-				} else if (c == '@' && modid_builder.length() > 0) {
-					StringBuilder intervalle = new StringBuilder();
-					c = texte.charAt(pos++);
-					while (Character.isDigit(c) || c == ',' || c == '[' || c == ']' || c == '(' || c == ')' || c == '.'
-							|| c == '-' || c == '+') {
-						intervalle.append(c);
-						if (pos >= texte.length()) break;
-						c = texte.charAt(pos++);
-					}
-					
-					if (intervalle.length() == 0)
-						throw new VersionIntervalleFormatException("Intervalle vide dans " + texte);
-					
-					versionIntervalle = read(intervalle.toString());
-					
-				} else if (Character.isAlphabetic(c) || Character.isDigit(c) || c == '-') {
-					modid_builder.append(c);
-				} else {
-					System.err.println(c);
-					throw new VersionIntervalleFormatException(texte);
-				}
+			final VersionIntervalle versionIntervalle;
+			if (pos == texte.length()) versionIntervalle = VersionIntervalle.ouvert();
+			else if (texte.charAt(pos) == '@') {
+				versionIntervalle = VersionIntervalle.read(texte.substring(pos + 1));
+			} else {
+				throw new VersionIntervalleFormatException("Intervalle illisible à " + pos + ": " + texte);
 			}
 			
-			if (modid_builder.length() > 0) {
-				resultat.put(modid_builder.toString().toLowerCase(), versionIntervalle);
-			}
+			if (resultat.containsKey(modid) && resultat.get(modid) != null) {
+				resultat.merge(modid, versionIntervalle, VersionIntervalle::intersection);
+			} else resultat.put(modid, versionIntervalle);
 		}
 		return resultat;
 	}
@@ -212,19 +197,22 @@ public class VersionIntervalle {
 	 *
 	 * @param d: une autre intervalle.
 	 */
-	public void intersection(VersionIntervalle d) {
-		if (Objects.isNull(d)) return;
-		if (Objects.equals(minimum, d.minimum)) inclut_min = !(!inclut_min || !d.inclut_min);
-		else if (minimum == null || (d.minimum != null && d.minimum.compareTo(minimum) > 0)) {
+	public VersionIntervalle intersection(VersionIntervalle d) {
+		if (Objects.isNull(d)) return this;
+		boolean inclut_min = this.inclut_min, inclut_max = this.inclut_max;
+		Version minimum = this.minimum, maximum = this.maximum;
+		if (Objects.equals(this.minimum, d.minimum)) inclut_min = !(!this.inclut_min || !d.inclut_min);
+		else if (this.minimum == null || (d.minimum != null && d.minimum.compareTo(this.minimum) > 0)) {
 			minimum = d.minimum;
 			inclut_min = d.inclut_min;
 		}
 		
-		if (Objects.equals(maximum, d.maximum)) inclut_max = !(!inclut_max || !d.inclut_max);
-		else if (maximum == null || (d.maximum != null && d.maximum.compareTo(maximum) < 0)) {
+		if (Objects.equals(this.maximum, d.maximum)) inclut_max = !(!this.inclut_max || !d.inclut_max);
+		else if (this.maximum == null || (d.maximum != null && d.maximum.compareTo(this.maximum) < 0)) {
 			maximum = d.maximum;
 			inclut_max = d.inclut_max;
 		}
+		return new VersionIntervalle(minimum, maximum, inclut_min, inclut_max);
 	}
 	
 	/**

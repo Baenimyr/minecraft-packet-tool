@@ -95,7 +95,7 @@ public class CommandeInstall implements Callable<Integer> {
 			return 1;
 		}
 		
-		arbre_dependances.mcversion.intersection(depotInstallation.mcversion);
+		arbre_dependances.mcversion = depotInstallation.mcversion;
 		
 		/* Liste des installations explicitement demandées par l'utilisateur. */
 		final Map<String, VersionIntervalle> demandes;

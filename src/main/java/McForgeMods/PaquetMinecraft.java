@@ -94,7 +94,7 @@ public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 	public void ajoutModRequis(String modid, VersionIntervalle intervalle) {
 		modid = modid.toLowerCase().intern();
 		if (this.requiredMods.containsKey(modid) && this.requiredMods.get(modid) != null)
-			this.requiredMods.get(modid).intersection(intervalle);
+			this.requiredMods.merge(modid, intervalle, VersionIntervalle::intersection);
 		else this.requiredMods.put(modid, intervalle);
 	}
 	
