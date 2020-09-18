@@ -1,9 +1,9 @@
 package McForgeMods;
 
 import McForgeMods.commandes.*;
-import McForgeMods.depot.ArbreDependance;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
+import McForgeMods.outils.SolveurDependances;
 import McForgeMods.outils.Sources;
 import picocli.CommandLine;
 
@@ -135,8 +135,7 @@ public class ForgeMods implements Runnable {
 		
 		if (all) {
 			listeRecherche = depotInstallation.getModids().stream().map(depotInstallation::informations)
-					.map(ins -> depotLocal.getModVersion(ins.modid, ins.version)).filter(Optional::isPresent)
-					.map(Optional::get).collect(Collectors.toList());
+					.map(ins -> ins.paquet).collect(Collectors.toList());
 		} else if (mods != null && mods.size() > 0) {
 			final List<PaquetMinecraft> resultat = new ArrayList<>();
 			final Map<String, VersionIntervalle> recherche;
@@ -171,20 +170,18 @@ public class ForgeMods implements Runnable {
 		}
 		
 		// Liste complète des dépendances nécessaire pour la liste des mods présent.
-		ArbreDependance arbre_dependances = new ArbreDependance(depotLocal, listeRecherche);
-		arbre_dependances.resolution();
+		SolveurDependances solveur = new SolveurDependances(depotLocal);
+		listeRecherche.forEach(solveur::ajoutSelection);
 		Map<String, VersionIntervalle> liste;
 		if (missing) {
-			liste = depotInstallation.dependancesAbsentes(arbre_dependances.requis());
+			liste = depotInstallation.dependancesAbsentes(solveur.contraintes);
 			System.out.printf("%d absents%n", liste.size());
 		} else {
-			liste = arbre_dependances.requis();
+			liste = solveur.contraintes;
 			System.out.printf("%d dépendances%n", liste.size());
 		}
 		
-		ArrayList<String> modids = new ArrayList<>(liste.keySet());
-		modids.sort(String::compareTo);
-		for (String dep : modids) {
+		for (String dep : liste.keySet().stream().sorted().collect(Collectors.toList())) {
 			System.out.println(dep + " " + liste.get(dep));
 		}
 		return 0;
@@ -202,12 +199,12 @@ public class ForgeMods implements Runnable {
 		for (String modid : versions.keySet()) {
 			if (depotInstallation.contains(modid)) {
 				DepotInstallation.Installation mv = depotInstallation.informations(modid);
-				if (versions.get(modid).correspond(mv.version)) {
+				if (versions.get(modid).correspond(mv.paquet.version)) {
 					if (action == MarkAction.manual || action == MarkAction.auto) {
-						if (mv.verrou) {
+						if (mv.verrou()) {
 							System.err.printf("%s est verrouillé%n", mv);
-						} else mv.manuel = action == MarkAction.manual;
-					} else mv.verrou = action == MarkAction.lock;
+						} else depotInstallation.statusChange(mv.paquet, action == MarkAction.manual);
+					} else depotInstallation.verrouillerMod(mv.paquet, action == MarkAction.lock);
 				} else {
 					System.err.printf("Le mod %s@%s n'est pas installé", modid, versions.get(modid));
 				}

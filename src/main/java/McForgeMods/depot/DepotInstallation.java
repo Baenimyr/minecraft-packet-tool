@@ -1,7 +1,6 @@
 package McForgeMods.depot;
 
 import McForgeMods.PaquetMinecraft;
-import McForgeMods.Version;
 import McForgeMods.VersionIntervalle;
 import org.apache.commons.vfs2.FileObject;
 import org.apache.commons.vfs2.FileSystemException;
@@ -15,7 +14,10 @@ import org.json.JSONTokener;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * Ce dépot lit les informations directement dans les fichiers qu'il rencontre. Il permet d'analyser une instance
@@ -28,13 +30,13 @@ import java.util.*;
  * détecter cette erreur.
  */
 public class DepotInstallation implements Closeable {
-	public final  Path                      dossier;
-	public final  DepotLocal                depot;
-	private final Map<String, Installation> installations = new HashMap<>();
+	public final  Path                          dossier;
+	public final  DepotLocal                    depot;
+	private final HashMap<String, Installation> installations = new HashMap<>();
 	/**
 	 * Version de minecraft pour l'installation.
 	 */
-	public        VersionIntervalle         mcversion     = null;
+	public        VersionIntervalle             mcversion     = null;
 	
 	
 	/**
@@ -87,14 +89,12 @@ public class DepotInstallation implements Closeable {
 	public boolean desinstallation(String id) throws FileSystemException {
 		if (this.installations.containsKey(id)) {
 			Installation installation = this.installations.get(id);
-			Optional<PaquetMinecraft> modVersion = this.depot.getModVersion(installation.modid, installation.version);
-			if (modVersion.isPresent()) {
-				this.suppressionFichiers(modVersion.get());
-				this.statusSuppression(id);
-				return true;
-			} else return false;
+			PaquetMinecraft modVersion = installation.paquet;
+			this.suppressionFichiers(modVersion);
+			this.statusSuppression(id);
+			return true;
 		}
-		return true;
+		return false;
 	}
 	
 	/**
@@ -129,7 +129,7 @@ public class DepotInstallation implements Closeable {
 	 */
 	public boolean suppressionConflits(PaquetMinecraft statique) throws FileSystemException {
 		if (this.installations.containsKey(statique.modid)
-				&& this.installations.get(statique.modid).version != statique.version) {
+				&& this.installations.get(statique.modid).paquet.version != statique.version) {
 			return this.desinstallation(statique.modid);
 		}
 		return true;
@@ -168,10 +168,10 @@ public class DepotInstallation implements Closeable {
 			modVersion = this.depot.ajoutModVersion(modVersion);
 			
 			Installation installation;
-			if (this.installations.containsKey(modVersion.modid) && this.installations.get(modVersion.modid).version
-					.equals(modVersion.version)) installation = this.installations.get(modVersion.modid);
+			if (this.installations.containsKey(modVersion.modid) && this.installations.get(modVersion.modid).paquet
+					.equals(modVersion)) installation = this.installations.get(modVersion.modid);
 			else {
-				installation = new Installation(modVersion.modid, modVersion.version);
+				installation = new Installation(modVersion);
 				installation.manuel = true;
 				this.installations.put(modVersion.modid, installation);
 			}
@@ -181,12 +181,24 @@ public class DepotInstallation implements Closeable {
 	
 	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+- Accès aux informations de l'installation +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 	
-	public Installation informations(String id) {
-		return this.installations.get(id);
+	public Collection<String> getModids() {
+		return this.installations.keySet();
+	}
+	
+	public Installation informations(String modid) {
+		return this.installations.get(modid);
+	}
+	
+	public PaquetMinecraft getInstallation(String modid) {
+		return this.installations.get(modid).paquet;
+	}
+	
+	public boolean contains(String modid) {
+		return this.installations.containsKey(modid);
 	}
 	
 	public boolean estManuel(PaquetMinecraft version) {
-		return this.installations.containsKey(version.modid) && this.installations.get(version.modid).manuel;
+		return this.installations.containsKey(version.modid) && this.installations.get(version.modid).manuel();
 	}
 	
 	/** Change le status associé à une version de mod. */
@@ -195,7 +207,7 @@ public class DepotInstallation implements Closeable {
 			Installation i = this.installations.get(version.modid);
 			i.manuel = manuel;
 		} else {
-			Installation i = new Installation(version.modid, version.version);
+			Installation i = new Installation(version);
 			i.manuel = manuel;
 			this.installations.put(version.modid, i);
 		}
@@ -210,7 +222,7 @@ public class DepotInstallation implements Closeable {
 			Installation i = this.installations.get(version.modid);
 			i.verrou = verrou;
 		} else {
-			Installation i = new Installation(version.modid, version.version);
+			Installation i = new Installation(version);
 			i.verrou = verrou;
 			this.installations.put(version.modid, i);
 		}
@@ -233,7 +245,7 @@ public class DepotInstallation implements Closeable {
 		final Map<String, VersionIntervalle> absents = new HashMap<>();
 		for (Map.Entry<String, VersionIntervalle> dep : demande.entrySet()) {
 			if (!this.contains(dep.getKey())) {
-				Installation i = this.informations(dep.getKey());
+				PaquetMinecraft i = this.getInstallation(dep.getKey());
 				if (!dep.getValue().correspond(i.version)) absents.put(dep.getKey(), dep.getValue());
 			}
 		}
@@ -266,7 +278,7 @@ public class DepotInstallation implements Closeable {
 							final boolean manual = mod_data.getBoolean("manual");
 							final boolean verrou = mod_data.getBoolean("locked");
 							
-							Installation inst = new Installation(paquet.modid, paquet.version);
+							Installation inst = new Installation(paquet);
 							inst.manuel = manual;
 							inst.verrou = verrou;
 							this.installations.put(paquet.modid, inst);
@@ -298,27 +310,17 @@ public class DepotInstallation implements Closeable {
 			JSONArray MODS = new JSONArray();
 			for (Map.Entry<String, Installation> entry : this.installations.entrySet()) {
 				Installation i = entry.getValue();
-				Optional<PaquetMinecraft> paquet = depot.getModVersion(i.modid, i.version);
-				if (paquet.isPresent()) {
-					JSONObject i_data = new JSONObject();
-					paquet.get().ecriturePaquet(i_data);
-					i_data.put("manual", i.manuel);
-					i_data.put("locked", i.verrou);
-					
-					MODS.put(i_data);
-				}
+				PaquetMinecraft paquet = i.paquet;
+				JSONObject i_data = new JSONObject();
+				paquet.ecriturePaquet(i_data);
+				i_data.put("manual", i.manuel());
+				i_data.put("locked", i.verrou());
+				
+				MODS.put(i_data);
 			}
 			data.put("mods", MODS);
 			data.write(bw, 4, 4);
 		}
-	}
-	
-	public Collection<String> getModids() {
-		return this.installations.keySet();
-	}
-	
-	public boolean contains(String modid) {
-		return this.installations.containsKey(modid);
 	}
 	
 	@Override
@@ -329,22 +331,26 @@ public class DepotInstallation implements Closeable {
 	/**
 	 * Toutes les informations pour la gestion des installations.
 	 * <p>
-	 * Un {@link #modid} ne peut être installé que sous une unique {@link #version}. Toute version en conflit doit être
-	 * supprimée avant. L'installation peut être manuelle ou automatique. Une installation verrouillée ne peut pas être
-	 * modifiée.
+	 * Un modid ne peut être installé que sous une unique version. Toute version en conflit doit être supprimée avant.
+	 * L'installation peut être manuelle ou automatique. Une installation verrouillée ne peut pas être modifiée.
 	 */
 	public static class Installation {
-		public final String  modid;
-		public final Version version;
-		public       String  fichier;
-		public       boolean manuel = true;
-		public       boolean verrou = false;
+		public final PaquetMinecraft paquet;
+		public       String          fichier;
+		private      boolean         manuel = true;
+		private      boolean         verrou = false;
 		
-		public Installation(String modid, Version version) {
-			Objects.requireNonNull(modid);
-			Objects.requireNonNull(version);
-			this.modid = modid.intern();
-			this.version = version;
+		public Installation(PaquetMinecraft paquet) {
+			Objects.requireNonNull(paquet);
+			this.paquet = paquet;
+		}
+		
+		public final boolean manuel() {
+			return this.manuel;
+		}
+		
+		public final boolean verrou() {
+			return this.verrou;
 		}
 		
 		@Override
@@ -352,12 +358,12 @@ public class DepotInstallation implements Closeable {
 			if (this == o) return true;
 			if (o == null || getClass() != o.getClass()) return false;
 			Installation that = (Installation) o;
-			return modid.equals(that.modid) && version.equals(that.version);
+			return this.paquet.equals(((Installation) o).paquet);
 		}
 		
 		@Override
 		public int hashCode() {
-			return Objects.hash(modid, version);
+			return Objects.hash(this.paquet);
 		}
 	}
 }
