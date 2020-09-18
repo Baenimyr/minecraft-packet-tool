@@ -240,7 +240,10 @@ public class VersionIntervalle {
 	}
 	
 	public boolean isEmpty() {
-		return !this.inclut_min && !this.inclut_max && this.minimum.compareTo(this.maximum) > 0;
+		final int i = this.minimum.compareTo(this.maximum);
+		if (i < 0) return false;
+		if (i > 0) return true;
+		return !(this.inclut_min && this.inclut_max);
 	}
 	
 	@Override

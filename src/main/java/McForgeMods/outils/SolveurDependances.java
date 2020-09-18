@@ -27,8 +27,7 @@ public class SolveurDependances {
 	}
 	
 	public void ajoutContrainte(String id, VersionIntervalle zone) {
-		if (contraintes.containsKey(id)) contraintes.get(id).intersection(zone);
-		else contraintes.put(id, zone);
+		contraintes.merge(id, zone, VersionIntervalle::intersection);
 	}
 	
 	public VersionIntervalle contrainte(String id) {

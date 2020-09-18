@@ -28,7 +28,7 @@ repositories {
 
 java.sourceCompatibility = JavaVersion.VERSION_11
 
-version = "0.4.0"
+version = "0.4.1"
 archivesBaseName = "ForgeMods"
 
 
