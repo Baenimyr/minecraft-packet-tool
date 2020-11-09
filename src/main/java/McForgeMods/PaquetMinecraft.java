@@ -3,6 +3,7 @@ package McForgeMods;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.json.JSONTokener;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -52,6 +53,11 @@ public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 		this.modid = modid.toLowerCase().intern();
 		this.version = version;
 		this.mcversion = mcversion;
+	}
+	
+	public static PaquetMinecraft lecturePaquet(InputStream is) {
+		final JSONObject json = new JSONObject(new JSONTokener(is));
+		return lecturePaquet(json);
 	}
 	
 	/** Lit les informations relatives à un paquet. */

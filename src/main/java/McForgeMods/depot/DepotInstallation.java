@@ -160,7 +160,7 @@ public class DepotInstallation implements Closeable {
 		this.statusImportation();
 		for (ArchiveMod resultat : ArchiveMod.analyseDossier(dossier.resolve("mods"))) {
 			PaquetMinecraft modVersion = resultat.modVersion;
-			modVersion = this.depot.ajoutModVersion(modVersion);
+			if (!this.depot.ajoutModVersion(modVersion)) continue;
 			
 			Installation installation;
 			if (this.installations.containsKey(modVersion.modid) && this.installations.get(modVersion.modid).paquet

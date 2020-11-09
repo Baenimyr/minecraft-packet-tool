@@ -38,7 +38,7 @@ dependencies {
     compile 'org.json:json:20200518'
     compile 'org.tomlj:tomlj:1.0.0'
     compile 'org.apache.commons:commons-compress:1.20' // tar, bzip
-    compile 'commons-codec:commons-codec:1.13'
+    // compile 'commons-codec:commons-codec:1.13'
     compile 'org.apache.commons:commons-vfs2:2.6.0'
 
     compile 'com.jcraft:jsch:0.1.55' // sftp

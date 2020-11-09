@@ -36,7 +36,7 @@ public class Depot {
 	 * Cherche une version particulière d'un mod. Pour vérifier qu'une version est disponible, utiliser {@link
 	 * #contains(PaquetMinecraft)}.
 	 *
-	 * @return {@link Optional< PaquetMinecraft >} si la version est disponible ou non.
+	 * @return {@link Optional<PaquetMinecraft>} si la version est disponible ou non.
 	 */
 	public Optional<PaquetMinecraft> getModVersion(String mod, Version version) {
 		return this.contains(mod) ? this.getModVersions(mod).stream().filter(mv -> mv.version.equals(version)).findAny()
@@ -56,20 +56,14 @@ public class Depot {
 	
 	/**
 	 * Enregistre une nouvelle version d'un mod dans le dépot.
+	 * <p>
+	 * Le dépôt ne peut contenir qu'un seul paquet par couple de modid-version.
+	 *
+	 * @return {@code false} si une version équivalente est déjà présente.
 	 */
-	public PaquetMinecraft ajoutModVersion(final PaquetMinecraft modVersion) {
+	public boolean ajoutModVersion(final PaquetMinecraft modVersion) {
 		if (!mod_version.containsKey(modVersion.modid)) mod_version.put(modVersion.modid, new HashSet<>());
-		
-		final Collection<PaquetMinecraft> liste = this.mod_version.get(modVersion.modid);
-		Optional<PaquetMinecraft> present = liste.stream().filter(m -> m.version.equals(modVersion.version))
-				.findFirst();
-		if (present.isPresent()) {
-			present.get().fusion(modVersion);
-			return present.get();
-		} else {
-			liste.add(modVersion);
-			return modVersion;
-		}
+		return mod_version.get(modVersion.modid).add(modVersion);
 	}
 	
 	/**

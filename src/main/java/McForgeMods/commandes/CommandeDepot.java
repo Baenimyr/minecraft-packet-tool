@@ -17,7 +17,6 @@ import org.apache.commons.vfs2.FileSystemManager;
 import org.apache.commons.vfs2.VFS;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.json.JSONTokener;
 import picocli.CommandLine;
 
 import java.io.*;
@@ -70,8 +69,7 @@ public class CommandeDepot implements Runnable {
 					FileObject data = archive.resolveFile(PaquetMinecraft.INFOS);
 					if (data.exists()) {
 						try (InputStream is = data.getContent().getInputStream()) {
-							JSONObject json = new JSONObject(new JSONTokener(is));
-							PaquetMinecraft paquet = PaquetMinecraft.lecturePaquet(json);
+							PaquetMinecraft paquet = PaquetMinecraft.lecturePaquet(is);
 							PaquetMinecraft.FichierMetadata metadata = new PaquetMinecraft.FichierMetadata(
 									f.getName().getPathDecoded());
 							depot.ajoutModVersion(paquet);

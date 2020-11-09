@@ -8,8 +8,6 @@ import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
 import McForgeMods.outils.SolveurDependances;
 import org.apache.commons.vfs2.*;
-import org.json.JSONObject;
-import org.json.JSONTokener;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -294,10 +292,10 @@ public class CommandeInstall implements Callable<Integer> {
 				final FileObject archive_tar = filesystem.createFileSystem("tar", archive_f);
 				FileObject mods = archive_tar.resolveFile(PaquetMinecraft.INFOS);
 				
-				InputStream is = mods.getContent().getInputStream();
-				JSONObject json = new JSONObject(new JSONTokener(is));
-				PaquetMinecraft modVersion = PaquetMinecraft.lecturePaquet(json);
-				is.close();
+				final PaquetMinecraft modVersion;
+				try (InputStream is = mods.getContent().getInputStream()) {
+					modVersion = PaquetMinecraft.lecturePaquet(is);
+				}
 				
 				FileObject data = archive_tar.resolveFile(PaquetMinecraft.FICHIERS);
 				for (final PaquetMinecraft.FichierMetadata metadata : modVersion.fichiers) {
