@@ -30,6 +30,8 @@ import java.util.Objects;
  * détecter cette erreur.
  */
 public class DepotInstallation implements Closeable {
+	private static final String DATABASE = ".mods.json";
+	
 	public final  Path                          dossier;
 	public final  DepotLocal                    depot;
 	private final HashMap<String, Installation> installations = new HashMap<>();
@@ -68,7 +70,13 @@ public class DepotInstallation implements Closeable {
 	 * @param manuel: si l'installation est manuelle ou automatique
 	 */
 	public void installation(PaquetMinecraft mversion, boolean manuel) {
-		this.statusChange(mversion, manuel);
+		
+		if (this.installations.containsKey(mversion.modid)) this.installations.get(mversion.modid).manuel = manuel;
+		else {
+			final Installation installation = new Installation(mversion);
+			installation.manuel = manuel;
+			this.installations.put(mversion.modid, installation);
+		}
 	}
 	
 	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- Désinstallation +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -192,37 +200,6 @@ public class DepotInstallation implements Closeable {
 		return this.installations.containsKey(modid);
 	}
 	
-	public boolean estManuel(PaquetMinecraft version) {
-		return this.installations.containsKey(version.modid) && this.installations.get(version.modid).manuel();
-	}
-	
-	/** Change le status associé à une version de mod. */
-	public void statusChange(PaquetMinecraft version, boolean manuel) {
-		if (this.installations.containsKey(version.modid)) {
-			Installation i = this.installations.get(version.modid);
-			i.manuel = manuel;
-		} else {
-			Installation i = new Installation(version);
-			i.manuel = manuel;
-			this.installations.put(version.modid, i);
-		}
-	}
-	
-	public boolean estVerrouille(PaquetMinecraft version) {
-		return this.installations.containsKey(version.modid) && this.installations.get(version.modid).verrou;
-	}
-	
-	public void verrouillerMod(PaquetMinecraft version, boolean verrou) {
-		if (this.installations.containsKey(version.modid)) {
-			Installation i = this.installations.get(version.modid);
-			i.verrou = verrou;
-		} else {
-			Installation i = new Installation(version);
-			i.verrou = verrou;
-			this.installations.put(version.modid, i);
-		}
-	}
-	
 	/** Efface le status associé à une version de mod. */
 	public void statusSuppression(String modid) {
 		this.installations.remove(modid);
@@ -254,7 +231,7 @@ public class DepotInstallation implements Closeable {
 	 * résultat d'une mauvaise manipulation, la restauration de l'installation doit rester possible.
 	 */
 	public void statusImportation() {
-		File infos = dossier.resolve(".mods.json").toFile();
+		File infos = dossier.resolve(DATABASE).toFile();
 		if (infos.exists()) {
 			try (FileInputStream fis = new FileInputStream(infos)) {
 				JSONObject racine = new JSONObject(new JSONTokener(fis));
@@ -291,7 +268,7 @@ public class DepotInstallation implements Closeable {
 	}
 	
 	public void statusSauvegarde() throws IOException {
-		File infos = dossier.resolve(".mods.json").toFile();
+		File infos = dossier.resolve(DATABASE).toFile();
 		try (FileOutputStream fos = new FileOutputStream(infos);
 			 BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos))) {
 			JSONObject data = new JSONObject();
@@ -332,8 +309,8 @@ public class DepotInstallation implements Closeable {
 	public static class Installation {
 		public final PaquetMinecraft paquet;
 		public       String          fichier;
-		private      boolean         manuel = true;
-		private      boolean         verrou = false;
+		public       boolean         manuel = true;
+		public       boolean         verrou = false;
 		
 		public Installation(PaquetMinecraft paquet) {
 			Objects.requireNonNull(paquet);
@@ -352,7 +329,6 @@ public class DepotInstallation implements Closeable {
 		public boolean equals(Object o) {
 			if (this == o) return true;
 			if (o == null || getClass() != o.getClass()) return false;
-			Installation that = (Installation) o;
 			return this.paquet.equals(((Installation) o).paquet);
 		}
 		

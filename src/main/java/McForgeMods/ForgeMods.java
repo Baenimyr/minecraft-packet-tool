@@ -203,8 +203,8 @@ public class ForgeMods implements Runnable {
 					if (action == MarkAction.manual || action == MarkAction.auto) {
 						if (mv.verrou()) {
 							System.err.printf("%s est verrouillé%n", mv);
-						} else depotInstallation.statusChange(mv.paquet, action == MarkAction.manual);
-					} else depotInstallation.verrouillerMod(mv.paquet, action == MarkAction.lock);
+						} else mv.manuel = action == MarkAction.manual;
+					} else mv.verrou = action == MarkAction.lock;
 				} else {
 					System.err.printf("Le mod %s@%s n'est pas installé", modid, versions.get(modid));
 				}
