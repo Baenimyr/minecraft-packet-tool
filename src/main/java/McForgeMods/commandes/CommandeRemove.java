@@ -23,8 +23,14 @@ public class CommandeRemove implements Callable<Integer> {
 	
 	@Override
 	public Integer call() {
-		DepotLocal depotLocal = new DepotLocal(dossiers.depot);
-		DepotInstallation depotInstallation = new DepotInstallation(depotLocal, dossiers.minecraft);
+		final DepotLocal depotLocal = new DepotLocal(dossiers.depot);
+		final DepotInstallation depotInstallation;
+		try {
+			depotInstallation = new DepotInstallation(depotLocal, dossiers.minecraft);
+		} catch (FileSystemException e) {
+			System.err.println("Erreur de lecture du dépôt.");
+			return 1;
+		}
 		
 		depotInstallation.statusImportation();
 		

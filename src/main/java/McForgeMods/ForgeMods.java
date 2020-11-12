@@ -119,11 +119,13 @@ public class ForgeMods implements Runnable {
 			@CommandLine.Mixin ForgeMods.DossiersOptions dossiers,
 			@CommandLine.Option(names = {"--missing"}, defaultValue = "false") boolean missing,
 			@CommandLine.Option(names = {"-a", "--all"}) boolean all, @CommandLine.Mixin ForgeMods.Help help) {
-		final DepotLocal depotLocal = new DepotLocal(dossiers.depot);
-		final DepotInstallation depotInstallation = new DepotInstallation(depotLocal, dossiers.minecraft);
+		final DepotLocal depotLocal;
+		final DepotInstallation depotInstallation;
 		
 		try {
+			depotLocal = new DepotLocal(dossiers.depot);
 			depotLocal.importation();
+			depotInstallation = new DepotInstallation(depotLocal, dossiers.minecraft);
 		} catch (IOException e) {
 			System.err.println("Erreur de lecture du dépôt.");
 			return 1;
@@ -193,7 +195,16 @@ public class ForgeMods implements Runnable {
 			@CommandLine.Parameters(arity = "1", paramLabel = "action") MarkAction action,
 			@CommandLine.Parameters(arity = "1..n", paramLabel = "mods") ArrayList<String> mods) {
 		final DepotLocal depotLocal = new DepotLocal(depot);
-		final DepotInstallation depotInstallation = new DepotInstallation(depotLocal, minecraft);
+		final DepotInstallation depotInstallation;
+		
+		try {
+			depotLocal.importation();
+			depotInstallation = new DepotInstallation(depotLocal, minecraft);
+		} catch (IOException e) {
+			System.err.println("Erreur de lecture du dépôt.");
+			return 1;
+		}
+		
 		depotInstallation.analyseDossier();
 		Map<String, VersionIntervalle> versions = VersionIntervalle.lectureDependances(mods);
 		for (String modid : versions.keySet()) {

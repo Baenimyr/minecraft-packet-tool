@@ -4,6 +4,7 @@ import McForgeMods.ForgeMods;
 import McForgeMods.PaquetMinecraft;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
+import org.apache.commons.vfs2.FileSystemException;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -51,7 +52,15 @@ public class CommandeListe implements Callable<Integer> {
 			}
 			return 0;
 		} else {
-			final DepotInstallation depotInstallation = new DepotInstallation(depotLocal, dossiers.minecraft);
+			final DepotInstallation depotInstallation;
+			
+			try {
+				depotInstallation = new DepotInstallation(depotLocal, dossiers.minecraft);
+			} catch (FileSystemException e) {
+				System.err.println("Erreur de lecture du dépôt.");
+				return 1;
+			}
+			
 			depotInstallation.analyseDossier();
 			
 			List<String> modids = new ArrayList<>(depotInstallation.getModids());

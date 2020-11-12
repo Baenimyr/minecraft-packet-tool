@@ -2,22 +2,18 @@ package McForgeMods.depot;
 
 import McForgeMods.PaquetMinecraft;
 import McForgeMods.VersionIntervalle;
-import org.apache.commons.vfs2.FileObject;
-import org.apache.commons.vfs2.FileSystemException;
-import org.apache.commons.vfs2.FileSystemManager;
-import org.apache.commons.vfs2.VFS;
+import org.apache.commons.vfs2.*;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
 import java.io.*;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * Ce dépot lit les informations directement dans les fichiers qu'il rencontre. Il permet d'analyser une instance
@@ -31,6 +27,10 @@ import java.util.Objects;
  */
 public class DepotInstallation implements Closeable {
 	private static final String DATABASE = ".mods.json";
+	
+	private final FileSystemManager filesystem;
+	private final FileObject        minecraft_dir;
+	private final FileObject        dossier_cache;
 	
 	public final  Path                          dossier;
 	public final  DepotLocal                    depot;
@@ -46,18 +46,22 @@ public class DepotInstallation implements Closeable {
 	 *
 	 * @param dossier d'installation ou {@code null}
 	 */
-	public DepotInstallation(DepotLocal depot, Path dossier) {
+	public DepotInstallation(DepotLocal depot, Path dossier) throws FileSystemException {
 		this.depot = depot;
 		Path dos = Path.of(System.getProperty("user.home")).resolve(".minecraft");
 		if (dossier == null) {
 			Path d = Path.of(".").toAbsolutePath();
 			while (d.getParent() != null && !d.getFileName().endsWith(".minecraft")) d = d.getParent();
-			if (d.getFileName().endsWith(".minecraft")) dos = d;
+			if (d.getFileName() != null && d.getFileName().endsWith(".minecraft")) dos = d;
 		} else if (dossier.startsWith("~")) {
 			dos = Path.of(System.getProperty("user.home")).resolve(dossier.subpath(1, dossier.getNameCount()));
 		} else {
 			dos = dossier.toAbsolutePath();
 		}
+		
+		this.filesystem = VFS.getManager();
+		this.minecraft_dir = this.filesystem.resolveFile(dos.toUri());
+		this.dossier_cache = filesystem.resolveFile(depot.dossier.toUri().resolve("cache"));
 		this.dossier = dos;
 	}
 	
@@ -79,41 +83,112 @@ public class DepotInstallation implements Closeable {
 		}
 	}
 	
+	/**
+	 * Télécharge le paquet.
+	 * <p>
+	 * Si le paquet est déjà présent dans le cache, il ne sera pas téléchargé à nouveau. Après le téléchargement ou non,
+	 * vérifie la somme de contrôle.
+	 *
+	 * @return le lien vers le paquet dans le cache, ou {@link Optional#empty()} en cas d'échec
+	 */
+	public Optional<URI> telechargementPaquet(final PaquetMinecraft paquet) {
+		try {
+			final FileObject source_dir = filesystem.resolveFile(depot.dossier.toUri());
+			final PaquetMinecraft.FichierMetadata archive_metadata = depot.archives.get(paquet);
+			
+			FileObject dest = dossier_cache.resolveFile(paquet.modid + "-" + paquet.version.toString() + ".tar");
+			
+			if (!dest.exists()) {
+				// téléchargement
+				FileObject src = source_dir.resolveFile(archive_metadata.path);
+				dest.copyFrom(src, new FileDepthSelector());
+			}
+			
+			try (InputStream dest_is = dest.getContent().getInputStream()) {
+				if (!archive_metadata.checkSHA(dest_is)) {
+					System.err.printf("[ERROR] mauvaise somme de contrôle de '%s'%n", dest);
+					return Optional.empty();
+				}
+			} catch (IOException e) {
+				System.err.printf("[Install] [ERROR] impossible de vérifier l'intégrité de l'archive: %s%n",
+						dest.getPublicURIString());
+				return Optional.empty();
+			}
+			
+			return Optional.of(dest.getURL().toURI());
+		} catch (FileSystemException | URISyntaxException io) {
+			System.err.printf("[Install] impossible de télécharger l'archive pour %s%n", paquet);
+			System.err.println("\t" + io.getClass() + ":" + io.getMessage());
+			return Optional.empty();
+		}
+	}
+	
+	/**
+	 * Extrait et vérifie les fichiers de l'archive d'installation.
+	 *
+	 * @param archive_url: lien vers l'archive
+	 */
+	public void ouverturePaquet(final URI archive_url) throws IOException {
+		FileObject archive_f = filesystem.resolveFile(archive_url);
+		final FileObject archive_tar = filesystem.createFileSystem("tar", archive_f);
+		FileObject mods = archive_tar.resolveFile(PaquetMinecraft.INFOS);
+		
+		final PaquetMinecraft modVersion;
+		try (InputStream is = mods.getContent().getInputStream()) {
+			modVersion = PaquetMinecraft.lecturePaquet(is);
+		}
+		
+		FileObject data = archive_tar.resolveFile(PaquetMinecraft.FICHIERS);
+		for (final PaquetMinecraft.FichierMetadata metadata : modVersion.fichiers) {
+			try (final FileObject dest = minecraft_dir.resolveFile(metadata.path);
+				 final FileObject src = data.resolveFile(metadata.path)) {
+				// copie les fichiers déclarés
+				dest.copyFrom(src, new FileDepthSelector());
+			}
+		}
+	}
+	
+	/**
+	 * Vérifie l'integrité d'une installation.
+	 * <p>
+	 * Les fichiers déclarés dans {@link PaquetMinecraft#fichiers} doivent être présents, il s'il dispose d'une somme de
+	 * contrôle elle doit être toujours valide.
+	 *
+	 * @param paquet: installation à vérifier
+	 * @return {@code false} à la moindre erreur.
+	 */
+	public boolean verificationIntegrite(final PaquetMinecraft paquet) {
+		for (PaquetMinecraft.FichierMetadata fichier : paquet.fichiers) {
+			final Path chemin_absolu = this.dossier.resolve(fichier.path);
+			if (!Files.exists(chemin_absolu)) return false;
+		}
+		return true;
+	}
+	
 	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- Désinstallation +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 	
 	/**
 	 * Désinstalle une version de mod.
 	 * <p>
-	 * Si la cible est toujours nécessaire en temps que dépendance, elle passe en installation automatique. Cette
-	 * fonction désinstalle même si cette version est la dépendance d'un autre mod.
+	 * Cette fonction supprime les fichiers installés par le paquet puis toute information conservée localement au sujet
+	 * du paquet.
 	 *
 	 * @return {@code true} si le paquet à bien été supprimé
 	 */
 	public boolean desinstallation(String id) throws FileSystemException {
 		if (this.installations.containsKey(id)) {
-			Installation installation = this.installations.get(id);
-			PaquetMinecraft modVersion = installation.paquet;
+			final Installation installation = this.installations.get(id);
+			final PaquetMinecraft modVersion = installation.paquet;
 			this.suppressionFichiers(modVersion);
-			this.statusSuppression(id);
+			this.installations.remove(id);
 			return true;
 		}
 		return false;
 	}
 	
-	/**
-	 * Supprime les fichiers associées à un paquet.
-	 * <p>
-	 * Tous les fichiers déclarés dans le paquet seront supprimés du dossier minecraft, s'ils existent toujours.
-	 *
-	 * @param paquet: paquet à effacer
-	 * @throws FileSystemException si les fichiers ne peuvent pas être modifiés. Cette erreur peut laisser
-	 * l'installation dans un état incohérent.
-	 */
-	void suppressionFichiers(final PaquetMinecraft paquet) throws FileSystemException {
-		FileSystemManager filesystem = VFS.getManager();
-		final FileObject minecraft = filesystem.resolveFile(dossier.toUri());
+	private void suppressionFichiers(final PaquetMinecraft paquet) throws FileSystemException {
 		for (PaquetMinecraft.FichierMetadata fichier : paquet.fichiers) {
-			FileObject f = minecraft.resolveFile(fichier.path);
+			FileObject f = minecraft_dir.resolveFile(fichier.path);
 			
 			if (f.exists() /* && hors config */) {
 				f.delete();
@@ -138,22 +213,7 @@ public class DepotInstallation implements Closeable {
 		return true;
 	}
 	
-	/**
-	 * Vérifie l'integrité d'une installation.
-	 * <p>
-	 * Les fichiers déclarés dans {@link PaquetMinecraft#fichiers} doivent être présents, il s'il dispose d'une somme de
-	 * contrôle elle doit être toujours valide.
-	 *
-	 * @param paquet: installation à vérifier
-	 * @return {@code false} à la moindre erreur.
-	 */
-	public boolean verificationIntegrite(PaquetMinecraft paquet) {
-		for (PaquetMinecraft.FichierMetadata fichier : paquet.fichiers) {
-			final Path chemin_absolu = this.dossier.resolve(fichier.path);
-			if (!Files.exists(chemin_absolu)) return false;
-		}
-		return true;
-	}
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 	
 	/**
 	 * Parcours le sous-dossier `mods` pour trouver les fichiers de mods présents.
