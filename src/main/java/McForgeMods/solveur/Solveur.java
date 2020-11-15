@@ -33,7 +33,7 @@ public class Solveur<K, D> {
 	 * Marque la modification du domaine d'une variable. La contrainte doit ensuite être propagée en utilisant la
 	 * fonction {@link #coherence()}.
 	 *
-	 * @param id: identifiant de la variable.
+	 * @param id identifiant de la variable.
 	 */
 	public void marquerVariable(final K id) {
 		assert this.domaines.containsKey(id);

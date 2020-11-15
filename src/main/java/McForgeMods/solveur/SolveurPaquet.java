@@ -33,7 +33,6 @@ public class SolveurPaquet extends Solveur<String, Version> {
 	 */
 	public synchronized void initialisationMod(final String modid) {
 		if (!domaines.containsKey(modid)) {
-			System.out.println("Initialisation " + modid);
 			HashSet<Version> versions = depot.getModVersions(modid).stream().map(p -> p.version)
 					.collect(Collectors.toCollection(HashSet::new));
 			versions.add(null);
@@ -47,6 +46,7 @@ public class SolveurPaquet extends Solveur<String, Version> {
 					
 					this.initialisationMod(dependance.modid_dep);
 					this.ajoutContrainte(dependance);
+					this.marquerVariable(dep.getKey());
 				}
 				
 				this.ajoutContrainte(new ContrainteDependance(modid, paquet.version, "minecraft", paquet.mcversion));
