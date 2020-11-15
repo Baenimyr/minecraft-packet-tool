@@ -1,9 +1,8 @@
 package McForgeMods.solveur;
 
-import java.util.Collection;
-import java.util.Deque;
-import java.util.LinkedList;
-import java.util.Objects;
+import java.util.*;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 /**
  * Le domaine de valeurs disponibles pour une variable.
@@ -11,7 +10,7 @@ import java.util.Objects;
  * Les valeurs du domaine ne sont jamais perdus, {@link #push()} permet de sauvegarder l'état du domaine et {@link
  * #pop()} restaure le dernier état de l'historique.
  */
-public class Domaine<D> {
+public class Domaine<D> implements Iterable<D> {
 	private final LinkedList<D>  valeurs;
 	private final Deque<Integer> limites = new LinkedList<>();
 	private       int            limite;
@@ -36,6 +35,16 @@ public class Domaine<D> {
 		return false;
 	}
 	
+	protected boolean remove(final int i) {
+		if (0 <= i && i < this.limite) {
+			this.valeurs.add(this.limite, this.get(i));
+			this.valeurs.remove(i);
+			this.limite--;
+			return true;
+		}
+		return false;
+	}
+	
 	/**
 	 * Désactive une valeurs du domaine.
 	 *
@@ -44,13 +53,16 @@ public class Domaine<D> {
 	 */
 	public boolean remove(final D v) {
 		int i = this.valeurs.indexOf(v);
-		if (0 <= i && i < this.limite) {
-			this.valeurs.add(this.limite, v);
-			this.valeurs.remove(i);
-			this.limite--;
-			return true;
-		}
-		return false;
+		return this.remove(i);
+	}
+	
+	public boolean removeIf(Predicate<D> predicate) {
+		boolean modifie = false;
+		for (int i = this.limite - 1; i >= 0; i--)
+			if (predicate.test(this.get(i))) {
+				modifie |= this.remove(i);
+			}
+		return modifie;
 	}
 	
 	/**
@@ -75,5 +87,14 @@ public class Domaine<D> {
 	
 	public void pop() {
 		this.limite = this.limites.removeLast();
+	}
+	
+	@Override
+	public Iterator<D> iterator() {
+		return this.valeurs.subList(0, this.limite).iterator();
+	}
+	
+	public Stream<D> stream() {
+		return this.valeurs.subList(0, this.limite).stream();
 	}
 }
