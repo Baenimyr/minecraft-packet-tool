@@ -37,6 +37,10 @@ public class Solveur<K, D> {
 	 */
 	public void marquerVariable(final K id) {
 		assert this.domaines.containsKey(id);
+		if (this.domaineVariable(id).size() == 0) {
+			throw new InsolubleException(id);
+		}
+		
 		if (!this.modifies.contains(id)) {
 			this.modifies.add(id);
 		}
@@ -51,6 +55,54 @@ public class Solveur<K, D> {
 			for (final Contrainte<K, D> contrainte : this.contraintes.get(modid)) {
 				contrainte.reductionArc(this);
 			}
+		}
+	}
+	
+	/**
+	 * Sélectionne une variable qui possède encore des libertés.
+	 */
+	private Optional<K> cleLibre() {
+		for (final Map.Entry<K, Domaine<D>> variable : this.domaines.entrySet()) {
+			if (variable.getValue().size() > 1) return Optional.of(variable.getKey());
+		}
+		return Optional.empty();
+	}
+	
+	/**
+	 * Tente de résoudre toutes les contraintes et sélectionne une valeurs par variable déclarée.
+	 */
+	public void resolution() {
+		this.coherence();
+		this.domaines.values().forEach(Domaine::push);
+		Optional<K> variable = this.cleLibre();
+		while (variable.isPresent()) {
+			final Domaine<D> domaine = this.domaineVariable(variable.get());
+			final D valeur = domaine.get(0);
+			domaine.reduction(valeur);
+			
+			try {
+				this.marquerVariable(variable.get());
+				this.coherence();
+				// enregistre l'historique
+				this.domaines.values().forEach(Domaine::push);
+			} catch (InsolubleException ie) {
+				this.domaines.values().forEach(Domaine::pop);
+				// désactive la valeur problématique
+				domaine.remove(valeur);
+				this.domaines.values().forEach(Domaine::push);
+			}
+			
+			final int liberte = this.domaineVariable(variable.get()).size();
+			if (liberte == 0) this.domaines.values().forEach(Domaine::pop);
+			if (liberte <= 1) variable = this.cleLibre(); // change de variable
+		}
+	}
+	
+	public static class InsolubleException extends RuntimeException {
+		final Object variable;
+		
+		public InsolubleException(final Object variable) {
+			this.variable = variable;
 		}
 	}
 }

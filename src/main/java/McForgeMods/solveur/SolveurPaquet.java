@@ -6,9 +6,9 @@ import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.Depot;
 
 import java.util.Collections;
-import java.util.HashSet;
+import java.util.Comparator;
+import java.util.LinkedList;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * Solveur de dépendance pour les paquets minecraft.
@@ -33,9 +33,10 @@ public class SolveurPaquet extends Solveur<String, Version> {
 	 */
 	public synchronized void initialisationMod(final String modid) {
 		if (!domaines.containsKey(modid)) {
-			HashSet<Version> versions = depot.getModVersions(modid).stream().map(p -> p.version)
-					.collect(Collectors.toCollection(HashSet::new));
+			LinkedList<Version> versions = new LinkedList<>();
 			versions.add(null);
+			depot.getModVersions(modid).stream().map(p -> p.version).sorted(Comparator.reverseOrder())
+					.forEach(versions::addLast);
 			this.ajoutVariable(modid, versions);
 			this.marquerVariable(modid);
 			

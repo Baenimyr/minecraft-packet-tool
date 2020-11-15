@@ -9,8 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class SolveurPaquetTest {
 	static final VersionIntervalle mc_1_12 = new VersionIntervalle(new Version(1, 12, 2), new Version(1, 13, 0), true,
@@ -51,7 +50,7 @@ class SolveurPaquetTest {
 	}
 	
 	@Test
-	void resolutionVide() {
+	void coherenceVide() {
 		final HashMap<String, VersionIntervalle> demande = new HashMap<>();
 		final SolveurPaquet solveur = new SolveurPaquet(depot, new Version(1, 12, 2), new Version(14, 23, 5, 2854));
 		solveur.initialisationMod("core");
@@ -68,7 +67,7 @@ class SolveurPaquetTest {
 	}
 	
 	@Test
-	void resolutionMod() {
+	void coherenceMod() {
 		final HashMap<String, VersionIntervalle> demande = new HashMap<>();
 		demande.put("modcore", new VersionIntervalle(new Version(1, 0, 0), new Version(2, 0, 0)));
 		final SolveurPaquet solveur = new SolveurPaquet(depot, new Version(1, 12, 2), new Version(14, 23, 5, 2854));
@@ -104,5 +103,25 @@ class SolveurPaquetTest {
 		assertEquals(2 + 1, solveur.domaineVariable("modcore").size());
 		assertEquals(1, solveur.domaineVariable("modext1").size());
 		assertEquals(2, solveur.domaineVariable("modext2").size());
+	}
+	
+	@Test
+	void resolutionModCore() {
+		final HashMap<String, VersionIntervalle> demande = new HashMap<>();
+		demande.put("modcore", new VersionIntervalle(new Version(1, 0, 0), new Version(2, 0, 0)));
+		final SolveurPaquet solveur = new SolveurPaquet(depot, new Version(1, 12, 2), new Version(14, 23, 5, 2854));
+		solveur.initialisationMod("core");
+		solveur.initialisationMod("modcore");
+		solveur.initialisationMod("modext1");
+		solveur.initialisationMod("modext2");
+		solveur.init(demande);
+		solveur.resolution();
+		
+		assertEquals(1, solveur.domaineVariable("core").size());
+		assertEquals(1, solveur.domaineVariable("modcore").size());
+		assertEquals(1, solveur.domaineVariable("modext1").size());
+		assertEquals(1, solveur.domaineVariable("modext2").size());
+		assertNull(solveur.domaineVariable("modext1").get(0));
+		assertNull(solveur.domaineVariable("modext2").get(0));
 	}
 }
