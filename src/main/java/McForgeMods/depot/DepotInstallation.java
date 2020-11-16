@@ -11,7 +11,6 @@ import org.json.JSONTokener;
 import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
@@ -30,10 +29,7 @@ public class DepotInstallation implements Closeable {
 	
 	private final FileSystemManager filesystem;
 	private final FileObject        minecraft_dir;
-	private final FileObject        dossier_cache;
 	
-	public final  Path                          dossier;
-	public final  DepotLocal                    depot;
 	private final HashMap<String, Installation> installations = new HashMap<>();
 	/**
 	 * Version de minecraft pour l'installation.
@@ -44,25 +40,21 @@ public class DepotInstallation implements Closeable {
 	/**
 	 * Ouvre un dossier pour l'installation des mods. Par défaut, ce dossier est ~/.minecraft/mods.
 	 *
-	 * @param dossier d'installation ou {@code null}
+	 * @param dossier: dossier .minecraft d'installation
 	 */
-	public DepotInstallation(DepotLocal depot, Path dossier) throws FileSystemException {
-		this.depot = depot;
-		Path dos = Path.of(System.getProperty("user.home")).resolve(".minecraft");
-		if (dossier == null) {
-			Path d = Path.of(".").toAbsolutePath();
-			while (d.getParent() != null && !d.getFileName().endsWith(".minecraft")) d = d.getParent();
-			if (d.getFileName() != null && d.getFileName().endsWith(".minecraft")) dos = d;
-		} else if (dossier.startsWith("~")) {
-			dos = Path.of(System.getProperty("user.home")).resolve(dossier.subpath(1, dossier.getNameCount()));
-		} else {
-			dos = dossier.toAbsolutePath();
-		}
-		
+	public DepotInstallation(URI dossier) throws FileSystemException {
 		this.filesystem = VFS.getManager();
-		this.minecraft_dir = this.filesystem.resolveFile(dos.toUri());
-		this.dossier_cache = filesystem.resolveFile(depot.dossier.toUri().resolve("cache"));
-		this.dossier = dos;
+		this.minecraft_dir = this.filesystem.resolveFile(dossier);
+	}
+	
+	public static DepotInstallation depot(Path dossier) throws FileSystemException {
+		final URI dos;
+		if (dossier == null) dos = Path.of(System.getProperty("user.home")).resolve(".minecraft").toUri();
+		else if (dossier.startsWith("~"))
+			dos = Path.of(System.getProperty("user.home")).resolve(dossier.subpath(1, dossier.getNameCount())).toUri();
+		else dos = dossier.toUri();
+		
+		return new DepotInstallation(dos);
 	}
 	
 	/**
@@ -89,18 +81,19 @@ public class DepotInstallation implements Closeable {
 	 * Si le paquet est déjà présent dans le cache, il ne sera pas téléchargé à nouveau. Après le téléchargement ou non,
 	 * vérifie la somme de contrôle.
 	 *
+	 * @param dossier_cache est le dossier sur le système de fichier local où entroposer les fichiers téléchargés.
+	 * @param paquet à installer
+	 * @param archive_metadata données associées à l'archive: somme de contrôle
 	 * @return le lien vers le paquet dans le cache, ou {@link Optional#empty()} en cas d'échec
 	 */
-	public Optional<URI> telechargementPaquet(final PaquetMinecraft paquet) {
+	public Optional<URI> telechargementPaquet(final FileObject dossier_cache, final PaquetMinecraft paquet,
+			PaquetMinecraft.FichierMetadata archive_metadata) {
 		try {
-			final FileObject source_dir = filesystem.resolveFile(depot.dossier.toUri());
-			final PaquetMinecraft.FichierMetadata archive_metadata = depot.archives.get(paquet);
-			
 			FileObject dest = dossier_cache.resolveFile(paquet.modid + "-" + paquet.version.toString() + ".tar");
 			
 			if (!dest.exists()) {
 				// téléchargement
-				FileObject src = source_dir.resolveFile(archive_metadata.path);
+				FileObject src = filesystem.resolveFile(archive_metadata.path);
 				dest.copyFrom(src, new FileDepthSelector());
 			}
 			
@@ -157,10 +150,10 @@ public class DepotInstallation implements Closeable {
 	 * @param paquet: installation à vérifier
 	 * @return {@code false} à la moindre erreur.
 	 */
-	public boolean verificationIntegrite(final PaquetMinecraft paquet) {
+	public boolean verificationIntegrite(final PaquetMinecraft paquet) throws FileSystemException {
 		for (PaquetMinecraft.FichierMetadata fichier : paquet.fichiers) {
-			final Path chemin_absolu = this.dossier.resolve(fichier.path);
-			if (!Files.exists(chemin_absolu)) return false;
+			final FileObject f = minecraft_dir.resolveFile(fichier.path);
+			if (!f.exists()) return false;
 		}
 		return true;
 	}
@@ -213,35 +206,6 @@ public class DepotInstallation implements Closeable {
 		return true;
 	}
 	
-	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
-	
-	/**
-	 * Parcours le sous-dossier `mods` pour trouver les fichiers de mods présents.
-	 * <p>
-	 * Les informations relatives au mod sont fusionnées avec celles déjà connues. Les informations relatives à la
-	 * version de ce mod sont associées au fichier dont elles sont originaires. Aucune information ne provenant pas des
-	 * fichiers n'est ajoutée.
-	 * <p>
-	 * Si un fichier d'un mod non installé est trouvé, il est marqué comme installé manuellement.
-	 */
-	public void analyseDossier() {
-		this.statusImportation();
-		for (ArchiveMod resultat : ArchiveMod.analyseDossier(dossier.resolve("mods"))) {
-			PaquetMinecraft modVersion = resultat.modVersion;
-			if (!this.depot.ajoutModVersion(modVersion)) continue;
-			
-			Installation installation;
-			if (this.installations.containsKey(modVersion.modid) && this.installations.get(modVersion.modid).paquet
-					.equals(modVersion)) installation = this.installations.get(modVersion.modid);
-			else {
-				installation = new Installation(modVersion);
-				installation.manuel = true;
-				this.installations.put(modVersion.modid, installation);
-			}
-			installation.fichier = dossier.relativize(Path.of(resultat.fichier.getAbsolutePath())).toString();
-		}
-	}
-	
 	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+- Accès aux informations de l'installation +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 	
 	public Collection<String> getModids() {
@@ -290,10 +254,10 @@ public class DepotInstallation implements Closeable {
 	 * Tous les status sont importés même si les mods ont disparus. Un mod pourrait ne pas être détecté ou ce serait le
 	 * résultat d'une mauvaise manipulation, la restauration de l'installation doit rester possible.
 	 */
-	public void statusImportation() {
-		File infos = dossier.resolve(DATABASE).toFile();
+	public void statusImportation() throws FileSystemException {
+		FileObject infos = minecraft_dir.resolveFile(DATABASE);
 		if (infos.exists()) {
-			try (FileInputStream fis = new FileInputStream(infos)) {
+			try (InputStream fis = infos.getContent().getInputStream()) {
 				JSONObject racine = new JSONObject(new JSONTokener(fis));
 				
 				if (racine.has("minecraft")) {
@@ -314,8 +278,6 @@ public class DepotInstallation implements Closeable {
 							inst.manuel = manual;
 							inst.verrou = verrou;
 							this.installations.put(paquet.modid, inst);
-							
-							if (!depot.contains(paquet)) depot.ajoutModVersion(paquet);
 						} catch (JSONException jsonException) {
 							jsonException.printStackTrace();
 						}
@@ -328,8 +290,8 @@ public class DepotInstallation implements Closeable {
 	}
 	
 	public void statusSauvegarde() throws IOException {
-		File infos = dossier.resolve(DATABASE).toFile();
-		try (FileOutputStream fos = new FileOutputStream(infos);
+		FileObject infos = minecraft_dir.resolveFile(DATABASE);
+		try (OutputStream fos = infos.getContent().getOutputStream();
 			 BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos))) {
 			JSONObject data = new JSONObject();
 			

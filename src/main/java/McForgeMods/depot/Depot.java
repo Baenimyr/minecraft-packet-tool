@@ -6,15 +6,15 @@ import McForgeMods.Version;
 import java.util.*;
 
 /**
- * Un dépôt est un ensemble de mod et leur versions. Il maintient une liste de mods connus et une liste de versions pour
- * ces mods. Un mod peut ne pas disposer de versions connues, cependant une version doit toujours disposer des
- * informations sur le mod.
+ * Un dépôt est un ensemble de paquets. Il maintient une liste de identifiants connus et des versions pour ces
+ * identifiants.
  * <p>
- * Un exemple de dépot est le {@link DepotInstallation} qui représente les mods trouvés dans une installations
- * minecraft.
+ * Cette classe est un contenant, il faut donc définir une façon de le remplir.
  */
 public class Depot {
-	protected final Map<String, Set<PaquetMinecraft>> mod_version = new HashMap<>();
+	/** Emplacement des fichiers */
+	public final    HashMap<PaquetMinecraft, PaquetMinecraft.FichierMetadata> archives    = new HashMap<>();
+	protected final HashMap<String, Set<PaquetMinecraft>>                     mod_version = new HashMap<>();
 	
 	/**
 	 * Renvoit la liste complète, sans doublons, des mods présents dans le dépôt.

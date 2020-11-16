@@ -125,12 +125,11 @@ public class ForgeMods implements Runnable {
 		try {
 			depotLocal = new DepotLocal(dossiers.depot);
 			depotLocal.importation();
-			depotInstallation = new DepotInstallation(depotLocal, dossiers.minecraft);
+			depotInstallation = DepotInstallation.depot(dossiers.minecraft);
 		} catch (IOException e) {
 			System.err.println("Erreur de lecture du dépôt.");
 			return 1;
 		}
-		depotInstallation.analyseDossier();
 		
 		// Liste des versions pour lesquels chercher les dépendances.
 		List<PaquetMinecraft> listeRecherche;
@@ -199,13 +198,12 @@ public class ForgeMods implements Runnable {
 		
 		try {
 			depotLocal.importation();
-			depotInstallation = new DepotInstallation(depotLocal, minecraft);
+			depotInstallation = DepotInstallation.depot(minecraft);
 		} catch (IOException e) {
 			System.err.println("Erreur de lecture du dépôt.");
 			return 1;
 		}
 		
-		depotInstallation.analyseDossier();
 		Map<String, VersionIntervalle> versions = VersionIntervalle.lectureDependances(mods);
 		for (String modid : versions.keySet()) {
 			if (depotInstallation.contains(modid)) {

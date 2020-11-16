@@ -7,12 +7,18 @@ import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
 import McForgeMods.outils.SolveurDependances;
+import org.apache.commons.vfs2.FileObject;
+import org.apache.commons.vfs2.FileSystemException;
+import org.apache.commons.vfs2.FileSystemManager;
+import org.apache.commons.vfs2.VFS;
 import picocli.CommandLine;
 
 import java.io.IOException;
 import java.net.URI;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -27,9 +33,6 @@ public class CommandeInstall implements Callable<Integer> {
 	static final int ERREUR_NOM     = 10;
 	static final int ERREUR_MODID   = ERREUR_NOM + 1;
 	static final int ERREUR_VERSION = ERREUR_NOM + 2;
-	
-	static final ExecutorService executor = new ThreadPoolExecutor(0, 4, 1L, TimeUnit.SECONDS,
-			new LinkedBlockingQueue<>());
 	
 	@CommandLine.Option(names = {"-h", "--help"}, usageHelp = true)
 	boolean help;
@@ -84,7 +87,7 @@ public class CommandeInstall implements Callable<Integer> {
 		
 		try {
 			depotLocal.importation();
-			depotInstallation = new DepotInstallation(depotLocal, dossiers.minecraft);
+			depotInstallation = DepotInstallation.depot(dossiers.minecraft);
 			depotInstallation.statusImportation();
 		} catch (IOException i) {
 			System.err.println("[ERROR] Erreur de lecture du dépot !");
@@ -175,9 +178,14 @@ public class CommandeInstall implements Callable<Integer> {
 			
 			if (!dry_run) {
 				// Déclenche le téléchargement des mods
-				final Installation I = new Installation(depotInstallation, installations);
-				I.manuels.addAll(demandes.keySet());
-				if (!I.get()) {
+				try {
+					final Installation I = new Installation(depotInstallation, depotLocal, installations);
+					I.manuels.addAll(demandes.keySet());
+					if (!I.get()) {
+						System.err.println("Echec de l'installation !");
+						return 2;
+					}
+				} catch (Exception e) {
 					System.err.println("Echec de l'installation !");
 					return 2;
 				}
@@ -197,22 +205,30 @@ public class CommandeInstall implements Callable<Integer> {
 	}
 	
 	private static class Installation implements Supplier<Boolean> {
-		private final DepotInstallation                                      depotInstallation;
+		private final DepotInstallation depotInstallation;
+		private final DepotLocal        depotLocal;
+		private final FileObject        dossier_cache;
+		
 		private final Map<PaquetMinecraft, CompletableFuture<Optional<URI>>> telechargements = new HashMap<>();
 		private final Map<PaquetMinecraft, CompletableFuture<Boolean>>       ouverture       = new HashMap<>();
 		private final Map<PaquetMinecraft, CompletableFuture<Boolean>>       verification    = new HashMap<>();
 		private final List<String>                                           manuels         = new ArrayList<>();
 		private final List<PaquetMinecraft>                                  installations;
 		
-		public Installation(final DepotInstallation depot, final List<PaquetMinecraft> installation) {
+		public Installation(final DepotInstallation depot, final DepotLocal depotLocal,
+				final List<PaquetMinecraft> installation) throws FileSystemException {
+			FileSystemManager fileSystem = VFS.getManager();
 			this.depotInstallation = depot;
+			this.depotLocal = depotLocal;
 			this.installations = installation;
+			this.dossier_cache = fileSystem.resolveFile(depotLocal.dossier.toUri());
 		}
 		
 		private CompletableFuture<Optional<URI>> telechargementPaquet(final PaquetMinecraft paquet) {
 			if (!telechargements.containsKey(paquet)) {
 				telechargements.put(paquet, CompletableFuture.supplyAsync(() -> {
-					final Optional<URI> uri = depotInstallation.telechargementPaquet(paquet);
+					final Optional<URI> uri = depotInstallation
+							.telechargementPaquet(dossier_cache, paquet, depotLocal.archives.get(paquet));
 					if (uri.isPresent()) System.out.printf("%s téléchargé%n", paquet);
 					else System.err.printf("Erreur téléchargement %s%n", paquet);
 					return uri;
@@ -240,7 +256,12 @@ public class CommandeInstall implements Callable<Integer> {
 			if (!verification.containsKey(paquet))
 				verification.put(paquet, installationPaquet(paquet).thenApply((i) -> {
 					if (i) {
-						boolean verification = depotInstallation.verificationIntegrite(paquet);
+						boolean verification = false;
+						try {
+							verification = depotInstallation.verificationIntegrite(paquet);
+						} catch (FileSystemException e) {
+							e.printStackTrace();
+						}
 						if (!verification) System.err.printf("Echec vérification du paquet %s%n", paquet);
 						return verification;
 					}

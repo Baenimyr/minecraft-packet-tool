@@ -11,8 +11,6 @@ import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * @see Mod
@@ -21,8 +19,7 @@ import java.util.Map;
 public class DepotLocal extends Depot {
 	public final static String MODS = "Mods.json";
 	
-	public final Path                                                  dossier;
-	public final Map<PaquetMinecraft, PaquetMinecraft.FichierMetadata> archives = new HashMap<>();
+	public final Path dossier;
 	
 	/**
 	 * Ouvre un dépôt local. Si aucun chemin n'est spécifié, l'emplacement par défaut est ~/.minecraft/forgemods
