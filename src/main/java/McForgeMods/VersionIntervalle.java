@@ -218,16 +218,18 @@ public class VersionIntervalle {
 	/**
 	 * @return {@code true} si la version est comprise dans l'intervalle.
 	 */
+	public boolean contains(Version version) {
+		return version != null && ((minimum == null || version.compareTo(minimum) >= (inclut_min ? 0 : 1)) && (
+				maximum == null || version.compareTo(maximum) <= (inclut_max ? 0 : -1)));
+	}
+	
+	@Deprecated
 	public boolean correspond(Version version) {
-		return version == null ? (minimum == null || maximum == null)
-				: ((minimum == null || version.compareTo(minimum) >= (inclut_min ? 0 : 1)) && (maximum == null
-						|| version.compareTo(maximum) <= (inclut_max ? 0 : -1)));
+		return this.contains(version);
 	}
 	
 	public boolean englobe(VersionIntervalle intervalle) {
-		return (this.correspond(intervalle.minimum) || (!inclut_min && intervalle.minimum != null
-				&& this.minimum.compareTo(intervalle.minimum) == 0)) && (this.correspond(intervalle.maximum) || (
-				!inclut_max && intervalle.maximum != null && this.maximum.compareTo(intervalle.maximum) == 0));
+		return (this.contains(intervalle.minimum) || !inclut_min) && (this.contains(intervalle.maximum) || !inclut_max);
 	}
 	
 	@Override

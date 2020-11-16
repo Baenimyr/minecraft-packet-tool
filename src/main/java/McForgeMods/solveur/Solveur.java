@@ -37,10 +37,6 @@ public class Solveur<K, D> {
 	 */
 	public void marquerVariable(final K id) {
 		assert this.domaines.containsKey(id);
-		if (this.domaineVariable(id).size() == 0) {
-			throw new InsolubleException(id);
-		}
-		
 		if (!this.modifies.contains(id)) {
 			this.modifies.add(id);
 		}
@@ -48,14 +44,19 @@ public class Solveur<K, D> {
 	
 	/**
 	 * Assure la cohérence des dépendances.
+	 *
+	 * @return {@code true} si le solveur est dans un état cohérent.
 	 */
-	public void coherence() {
+	public boolean coherence() {
 		while (!modifies.isEmpty()) {
 			final K modid = modifies.removeFirst();
+			if (this.domaineVariable(modid).size() == 0) return false;
+			
 			for (final Contrainte<K, D> contrainte : this.contraintes.get(modid)) {
 				contrainte.reductionArc(this);
 			}
 		}
+		return true;
 	}
 	
 	/**
@@ -70,39 +71,48 @@ public class Solveur<K, D> {
 	
 	/**
 	 * Tente de résoudre toutes les contraintes et sélectionne une valeurs par variable déclarée.
+	 *
+	 * @return {@code true} si la résolution est possible
 	 */
-	public void resolution() {
-		this.coherence();
-		this.domaines.values().forEach(Domaine::push);
+	public boolean resolution() {
+		if (!this.coherence()) return false;
+		final LinkedList<K> historique = new LinkedList<>();
+		
 		Optional<K> variable = this.cleLibre();
 		while (variable.isPresent()) {
-			final Domaine<D> domaine = this.domaineVariable(variable.get());
-			final D valeur = domaine.get(0);
-			domaine.reduction(valeur);
+			this.domaines.values().forEach(Domaine::push);
+			final K var = variable.get();
+			final Domaine<D> domaine = this.domaineVariable(var);
 			
-			try {
-				this.marquerVariable(variable.get());
-				this.coherence();
-				// enregistre l'historique
-				this.domaines.values().forEach(Domaine::push);
-			} catch (InsolubleException ie) {
-				this.domaines.values().forEach(Domaine::pop);
-				// désactive la valeur problématique
-				domaine.remove(valeur);
-				this.domaines.values().forEach(Domaine::push);
+			if (domaine.size() > 0) {
+				final D valeur = domaine.get(0);
+				domaine.reduction(valeur);
+				
+				this.marquerVariable(var);
+				if (this.coherence()) {
+					// enregistre l'historique
+					historique.push(var);
+					variable = this.cleLibre();
+				} else {
+					this.domaines.values().forEach(Domaine::pop);
+					// désactive la valeur problématique
+					domaine.remove(valeur);
+					if (domaine.size() != 0) this.domaines.values().forEach(Domaine::push);
+				}
+			} else {
+				if (historique.size() == 0) return false;
+				else {
+					// rétablissement de l'historique au dernier état valide et désactivation de la dernière valeur
+					// choisie.
+					final K h = historique.removeLast();
+					final D erreur = this.domaineVariable(h).get(0);
+					this.domaines.values().forEach(Domaine::pop);
+					this.domaineVariable(h).remove(erreur);
+					this.marquerVariable(h);
+					variable = Optional.of(h);
+				}
 			}
-			
-			final int liberte = this.domaineVariable(variable.get()).size();
-			if (liberte == 0) this.domaines.values().forEach(Domaine::pop);
-			if (liberte <= 1) variable = this.cleLibre(); // change de variable
 		}
-	}
-	
-	public static class InsolubleException extends RuntimeException {
-		final Object variable;
-		
-		public InsolubleException(final Object variable) {
-			this.variable = variable;
-		}
+		return true;
 	}
 }

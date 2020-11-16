@@ -22,10 +22,9 @@ public class SolveurPaquet extends Solveur<String, Version> {
 	
 	final Depot depot;
 	
-	public SolveurPaquet(Depot info, Version minecraft, Version forge) {
+	public SolveurPaquet(Depot info, Version minecraft) {
 		this.depot = info;
 		this.ajoutVariable("minecraft", Collections.singleton(minecraft));
-		this.ajoutVariable("forge", Collections.singleton(forge));
 	}
 	
 	/**
@@ -67,9 +66,8 @@ public class SolveurPaquet extends Solveur<String, Version> {
 		for (final String modid : demandes.keySet()) {
 			this.initialisationMod(modid);
 			final VersionIntervalle intervalle = demandes.get(modid);
-			this.domaineVariable(modid).removeIf(version -> !intervalle.correspond(version));
+			this.domaineVariable(modid).removeIf(version -> !intervalle.contains(version));
 			this.domaineVariable(modid).push();
 		}
-		this.coherence();
 	}
 }

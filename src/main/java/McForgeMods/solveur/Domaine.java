@@ -86,7 +86,8 @@ public class Domaine<D> implements Iterable<D> {
 	}
 	
 	public void pop() {
-		this.limite = this.limites.removeLast();
+		if (this.limites.size() > 0) this.limite = this.limites.removeLast();
+		else this.limite = this.valeurs.size();
 	}
 	
 	@Override
@@ -96,5 +97,12 @@ public class Domaine<D> implements Iterable<D> {
 	
 	public Stream<D> stream() {
 		return this.valeurs.subList(0, this.limite).stream();
+	}
+	
+	@Override
+	public String toString() {
+		StringJoiner join = new StringJoiner(", ");
+		this.stream().map(Objects::toString).forEach(join::add);
+		return "Domaine{" + join.toString() + "}";
 	}
 }

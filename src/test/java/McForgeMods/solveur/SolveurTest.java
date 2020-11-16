@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
+import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -69,7 +70,7 @@ class SolveurTest {
 	
 	@Test
 	void coherenceVide() {
-		solveur.coherence();
+		assertTrue(solveur.coherence());
 		
 		assertEquals(3, solveur.domaineVariable("libcrypt1").size());
 		assertEquals(3, solveur.domaineVariable("libgcc-s1").size());
@@ -81,8 +82,8 @@ class SolveurTest {
 	
 	@Test
 	void coherenceAscendanteLibc6() {
-		solveur.domaineVariable("libc6").removeIf(version -> version == null || !version.equals(new Version(2, 31, 0)));
-		solveur.coherence();
+		solveur.domaineVariable("libc6").reduction(new Version(2, 31, 0));
+		assertTrue(solveur.coherence());
 		
 		assertEquals(1, solveur.domaineVariable("libc6").size());
 		assertEquals(4, solveur.domaineVariable("make").size());
@@ -92,9 +93,8 @@ class SolveurTest {
 	
 	@Test
 	void coherenceAscendanteThunderbird() {
-		solveur.domaineVariable("thunderbird")
-				.removeIf(version -> version == null || !version.equals(new Version(68, 7, 0)));
-		solveur.coherence();
+		solveur.domaineVariable("thunderbird").reduction(new Version(68, 7, 0));
+		assertTrue(solveur.coherence());
 		
 		assertEquals(3, solveur.domaineVariable("libcrypt1").size());
 		assertEquals(3, solveur.domaineVariable("libgcc-s1").size());
@@ -106,7 +106,7 @@ class SolveurTest {
 	
 	@Test
 	void resolutionVide() {
-		solveur.resolution();
+		assertTrue(solveur.resolution());
 		assertEquals(1, solveur.domaineVariable("libcrypt1").size());
 		assertEquals(1, solveur.domaineVariable("libgcc-s1").size());
 		assertEquals(1, solveur.domaineVariable("libc6").size());
@@ -117,8 +117,8 @@ class SolveurTest {
 	
 	@Test
 	void resolutionAscendanteLibc6() {
-		solveur.domaineVariable("libc6").removeIf(version -> version == null || !version.equals(new Version(2, 31, 0)));
-		solveur.resolution();
+		solveur.domaineVariable("libc6").reduction(new Version(2, 31, 0));
+		assertTrue(solveur.resolution());
 		
 		assertEquals(1, solveur.domaineVariable("libc6").size());
 		assertEquals(1, solveur.domaineVariable("make").size());
@@ -128,9 +128,8 @@ class SolveurTest {
 	
 	@Test
 	void resolutionAscendanteThunderbird() {
-		solveur.domaineVariable("thunderbird")
-				.removeIf(version -> version == null || !version.equals(new Version(68, 7, 0)));
-		solveur.resolution();
+		solveur.domaineVariable("thunderbird").reduction(new Version(68, 7, 0));
+		assertTrue(solveur.resolution());
 		
 		assertEquals(1, solveur.domaineVariable("libcrypt1").size());
 		assertEquals(1, solveur.domaineVariable("libgcc-s1").size());
@@ -142,5 +141,26 @@ class SolveurTest {
 		assertNotNull(solveur.domaineVariable("libgcc-s1").get(0));
 		assertNotNull(solveur.domaineVariable("thunderbird").get(0));
 		assertNull(solveur.domaineVariable("thunderbird-locale-fr").get(0));
+	}
+	
+	@Test
+	void contrainteConflit() {
+		solveur.ajoutVariable("gmail", Collections.singleton(new Version(17, 0, 0)));
+		solveur.ajoutContrainte(
+				new ContrainteConflit<>("gmail", new Version(17, 0, 0), "thunderbird", VersionIntervalle.ouvert()));
+		assertTrue(solveur.resolution());
+		assertEquals(1, solveur.domaineVariable("thunderbird").size());
+		assertNull(solveur.domaineVariable("thunderbird").get(0));
+	}
+	
+	@Test
+	void conflitInsatifiable() {
+		solveur.ajoutVariable("gmail", Collections.singleton(new Version(17, 0, 0)));
+		solveur.ajoutContrainte(
+				new ContrainteConflit<>("gmail", new Version(17, 0, 0), "thunderbird", VersionIntervalle.ouvert()));
+		solveur.domaineVariable("thunderbird").remove(null);
+		solveur.marquerVariable("thunderbird");
+		
+		assertFalse(solveur.resolution());
 	}
 }
