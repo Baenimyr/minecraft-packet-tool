@@ -27,11 +27,17 @@ repositories {
     mavenCentral()
 }
 
-java.sourceCompatibility = JavaVersion.VERSION_11
+wrapper {
+    gradleVersion = "6.7"
+}
 
-version = "0.4.1"
-archivesBaseName = "ForgeMods"
+//
 
+version = "0.4.2"
+archivesBaseName = "MinecraftPacket"
+mainClassName = 'McForgeMods.ForgeMods'
+applicationName = "minpac"
+java.sourceCompatibility = java.targetCompatibility = JavaVersion.VERSION_1_8
 
 dependencies {
     compile 'info.picocli:picocli:4.2.0'
@@ -47,39 +53,38 @@ dependencies {
     annotationProcessor 'info.picocli:picocli-codegen:4.2.0'
 
     testCompile 'org.junit.jupiter:junit-jupiter:5.6.2'
-    // testCompile 'junit:junit:4.13.1'
 }
 
 compileJava {
     options.compilerArgs += ["-Aproject=${project.name}"]
 }
 
-application {
-    // Define the main class for the application.
-    mainClassName = 'McForgeMods.ForgeMods'
-    applicationName 'forgemods'
-}
-
 jar {
     manifest {
         attributes (
-            'Main-Class': application.mainClassName
+            'Main-Class': mainClassName
         )
     }
 }
 
-test {
-    // Use junit platform for unit tests
-    useJUnitPlatform()
+task uberJar(type: Jar, group: "build") {
+    appendix = 'uber'
+    from sourceSets.main.output
+    from configurations.runtimeClasspath
+            .findAll{it.name.endsWith('jar')}
+            .collect{zipTree(it)}
+    manifest {
+        attributes (
+                'Main-Class': mainClassName
+        )
+    }
 }
 
-task autocompletion(type: JavaExec) {
-    dependsOn('assemble')
-
+task autocompletion(type: JavaExec, dependsOn: "assemble") {
     workingDir('build/scripts')
     classpath(configurations.runtime, jar.outputs.files)
     main 'picocli.AutoComplete'
-    args application.mainClassName, '-n', 'forgemods'
+    args application.mainClassName, '-n', applicationName
 }
 
 task deb(type: Deb, group: 'build') {
@@ -87,9 +92,9 @@ task deb(type: Deb, group: 'build') {
     // dependsOn(autocompletion)
 
     release "dev"
-    packageName 'forgemods'
-    packageDescription 'Gestionnaire de paquet pour Minecraft.'
-    requires('openjdk-14-jre-headless').or('openjdk-13-jre-headless').or('openjdk-11-jre-headless')
+    packageName applicationName
+    packageDescription 'Gestionnaire de paquets pour Minecraft.'
+    requires('java-runtime>=8')
 
     into '/opt/' + packageName
     from (jar.outputs.files) {
@@ -106,13 +111,7 @@ task deb(type: Deb, group: 'build') {
     }
 }
 
-
-task fatJar(type: Jar, group: "build") {
-    manifest {
-        attributes (
-                'Main-Class': application.mainClassName
-        )
-    }
-    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
-    with jar
+// Tests
+test {
+    useJUnitPlatform()
 }
