@@ -151,9 +151,15 @@ public class DepotInstallation implements Closeable {
 	 * @return {@code false} à la moindre erreur.
 	 */
 	public boolean verificationIntegrite(final PaquetMinecraft paquet) throws FileSystemException {
-		for (PaquetMinecraft.FichierMetadata fichier : paquet.fichiers) {
-			final FileObject f = minecraft_dir.resolveFile(fichier.path);
-			if (!f.exists()) return false;
+		for (PaquetMinecraft.FichierMetadata metadata : paquet.fichiers) {
+			final FileObject fichier = minecraft_dir.resolveFile(metadata.path);
+			if (!fichier.exists()) return false;
+			try (final InputStream is = fichier.getContent().getInputStream()) {
+				metadata.checkSHA(is);
+			} catch (IOException e) {
+				System.err.printf("Impossible de lire le fichier '%s'%n", fichier.getName().getPath());
+				return false;
+			}
 		}
 		return true;
 	}
