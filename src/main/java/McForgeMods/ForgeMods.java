@@ -3,8 +3,8 @@ package McForgeMods;
 import McForgeMods.commandes.*;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
-import McForgeMods.outils.SolveurDependances;
 import McForgeMods.outils.Sources;
+import McForgeMods.solveur.SolveurPaquet;
 import picocli.CommandLine;
 
 import java.io.*;
@@ -117,7 +117,6 @@ public class ForgeMods implements Runnable {
 	public int depends(
 			@CommandLine.Parameters(index = "0", arity = "0..n", descriptionKey = "mods") ArrayList<String> mods,
 			@CommandLine.Mixin ForgeMods.DossiersOptions dossiers,
-			@CommandLine.Option(names = {"--missing"}, defaultValue = "false") boolean missing,
 			@CommandLine.Option(names = {"-a", "--all"}) boolean all, @CommandLine.Mixin ForgeMods.Help help) {
 		final DepotLocal depotLocal = new DepotLocal(dossiers.depot);
 		final DepotInstallation depotInstallation = new DepotInstallation(depotLocal, dossiers.minecraft);
@@ -152,7 +151,7 @@ public class ForgeMods implements Runnable {
 				if (depotLocal.contains(modid)) {
 					Optional<PaquetMinecraft> trouvee = depotLocal.getModVersions(modid).stream()
 							.filter(modVersion -> version.equals(VersionIntervalle.ouvert()) || version
-									.correspond(modVersion.version)).max(Comparator.comparing(mv -> mv.version));
+									.contains(modVersion.version)).max(Comparator.comparing(mv -> mv.version));
 					if (trouvee.isPresent()) resultat.add(trouvee.get());
 					else {
 						System.err.printf("Version inconnue pour '%s': '%s'%n", modid, version);
@@ -170,19 +169,13 @@ public class ForgeMods implements Runnable {
 		}
 		
 		// Liste complète des dépendances nécessaire pour la liste des mods présent.
-		SolveurDependances solveur = new SolveurDependances(depotLocal);
-		listeRecherche.forEach(solveur::ajoutSelection);
-		Map<String, VersionIntervalle> liste;
-		if (missing) {
-			liste = depotInstallation.dependancesAbsentes(solveur.contraintes);
-			System.out.printf("%d absents%n", liste.size());
-		} else {
-			liste = solveur.contraintes;
-			System.out.printf("%d dépendances%n", liste.size());
-		}
+		final SolveurPaquet solveur = new SolveurPaquet(depotLocal, depotInstallation.mcversion.minimum());
+		listeRecherche.forEach(p -> solveur.domaineVariable(p.modid).reduction(p.version));
+		solveur.coherence();
 		
-		for (String dep : liste.keySet().stream().sorted().collect(Collectors.toList())) {
-			System.out.println(dep + " " + liste.get(dep));
+		System.out.printf("%d dépendances%n", solveur.variables().size());
+		for (String dep : solveur.variables()) {
+			System.out.println(dep + " " + solveur.domaineVariable(dep).get(0));
 		}
 		return 0;
 	}
@@ -199,7 +192,7 @@ public class ForgeMods implements Runnable {
 		for (String modid : versions.keySet()) {
 			if (depotInstallation.contains(modid)) {
 				DepotInstallation.Installation mv = depotInstallation.informations(modid);
-				if (versions.get(modid).correspond(mv.paquet.version)) {
+				if (versions.get(modid).contains(mv.paquet.version)) {
 					if (action == MarkAction.manual || action == MarkAction.auto) {
 						if (mv.verrou()) {
 							System.err.printf("%s est verrouillé%n", mv);

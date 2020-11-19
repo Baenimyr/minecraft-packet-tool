@@ -34,8 +34,10 @@ public class SolveurPaquet extends Solveur<String, Version> {
 		if (!domaines.containsKey(modid)) {
 			LinkedList<Version> versions = new LinkedList<>();
 			versions.add(null);
-			depot.getModVersions(modid).stream().map(p -> p.version).sorted(Comparator.reverseOrder())
-					.forEach(versions::addLast);
+			if (depot.contains(modid)) {
+				depot.getModVersions(modid).stream().map(p -> p.version).sorted(Comparator.reverseOrder())
+						.forEach(versions::addLast);
+			}
 			this.ajoutVariable(modid, versions);
 			this.marquerVariable(modid);
 			

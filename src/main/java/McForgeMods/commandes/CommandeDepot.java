@@ -5,7 +5,6 @@ import McForgeMods.PaquetMinecraft;
 import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.ArchiveMod;
 import McForgeMods.depot.DepotLocal;
-import McForgeMods.outils.SolveurDependances;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.codec.digest.MessageDigestAlgorithms;
@@ -96,13 +95,11 @@ public class CommandeDepot implements Runnable {
 			
 			for (final String modid : modids) {
 				for (final PaquetMinecraft version : depot.getModVersions(modid)) {
-					SolveurDependances dependances = new SolveurDependances(depot);
-					dependances.ajoutSelection(version);
-					for (final String dep : dependances.listeContraintes()) {
+					for (final String dep : version.requiredMods.keySet()) {
 						if (!dep.equals("forge") && !dep.equals("minecraft")) {
-							final VersionIntervalle demande = dependances.contrainte(dep);
+							final VersionIntervalle demande = version.requiredMods.get(dep);
 							if (!depot.contains(dep) || depot.getModVersions(dep).stream()
-									.noneMatch(v -> demande.correspond(v.version))) {
+									.noneMatch(v -> demande.contains(v.version))) {
 								System.err
 										.printf("'%s' a besoin de '%s@%s', mais il n'est pas disponible dans le dépôt !%n",
 												version.toStringStandard(), dep, demande);

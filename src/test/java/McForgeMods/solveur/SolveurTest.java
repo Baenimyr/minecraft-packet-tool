@@ -148,6 +148,7 @@ class SolveurTest {
 		solveur.ajoutVariable("gmail", Collections.singleton(new Version(17, 0, 0)));
 		solveur.ajoutContrainte(
 				new ContrainteConflit<>("gmail", new Version(17, 0, 0), "thunderbird", VersionIntervalle.ouvert()));
+		assertTrue(solveur.coherence());
 		assertTrue(solveur.resolution());
 		assertEquals(1, solveur.domaineVariable("thunderbird").size());
 		assertNull(solveur.domaineVariable("thunderbird").get(0));

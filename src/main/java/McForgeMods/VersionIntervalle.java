@@ -229,7 +229,9 @@ public class VersionIntervalle {
 	}
 	
 	public boolean englobe(VersionIntervalle intervalle) {
-		return (this.contains(intervalle.minimum) || !inclut_min) && (this.contains(intervalle.maximum) || !inclut_max);
+		return (this.contains(intervalle.minimum) || (!inclut_min && !intervalle.inclut_min && Objects
+				.equals(minimum, intervalle.minimum))) && (this.contains(intervalle.maximum) || (!inclut_max
+				&& !intervalle.inclut_max && Objects.equals(maximum, intervalle.maximum)));
 	}
 	
 	@Override

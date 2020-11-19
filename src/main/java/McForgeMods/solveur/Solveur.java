@@ -7,6 +7,10 @@ public class Solveur<K, D> {
 	protected final Map<K, List<Contrainte<K, D>>> contraintes = new HashMap<>();
 	private final   LinkedList<K>                  modifies    = new LinkedList<>();
 	
+	public Set<K> variables() {
+		return this.domaines.keySet();
+	}
+	
 	/** Enregistre une nouvelle variable et initialise son domaine. */
 	public void ajoutVariable(final K id, Collection<D> versions) {
 		assert !domaines.containsKey(id);
@@ -48,15 +52,19 @@ public class Solveur<K, D> {
 	 * @return {@code true} si le solveur est dans un état cohérent.
 	 */
 	public boolean coherence() {
+		boolean coherent = true;
 		while (!modifies.isEmpty()) {
 			final K modid = modifies.removeFirst();
-			if (this.domaineVariable(modid).size() == 0) return false;
+			if (this.domaineVariable(modid).size() == 0) {
+				coherent = false;
+				continue;
+			}
 			
 			for (final Contrainte<K, D> contrainte : this.contraintes.get(modid)) {
 				contrainte.reductionArc(this);
 			}
 		}
-		return true;
+		return coherent;
 	}
 	
 	/**

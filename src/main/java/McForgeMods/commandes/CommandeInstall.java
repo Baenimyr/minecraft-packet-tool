@@ -6,7 +6,7 @@ import McForgeMods.Version;
 import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
-import McForgeMods.outils.SolveurDependances;
+import McForgeMods.solveur.SolveurPaquet;
 import org.apache.commons.vfs2.*;
 import org.json.JSONObject;
 import org.json.JSONTokener;
@@ -71,8 +71,6 @@ public class CommandeInstall implements Callable<Integer> {
 	public Integer call() {
 		final DepotLocal depotLocal = new DepotLocal(dossiers.depot);
 		final DepotInstallation depotInstallation = new DepotInstallation(depotLocal, dossiers.minecraft);
-		/* Liste des mods à installer. */
-		final SolveurDependances solveur = new SolveurDependances(depotLocal);
 		
 		/* Liste des installations explicitement demandées par l'utilisateur. */
 		final Map<String, VersionIntervalle> demandes;
@@ -99,7 +97,7 @@ public class CommandeInstall implements Callable<Integer> {
 		if (this.mcversion != null) {
 			if (depotInstallation.mcversion == null)
 				depotInstallation.mcversion = VersionIntervalle.read(this.mcversion);
-			else if (!depotInstallation.mcversion.correspond(Version.read(this.mcversion))) {
+			else if (!depotInstallation.mcversion.contains(Version.read(this.mcversion))) {
 				System.err.println("[ERROR] Il est impossible de changer la version de minecraft ici.");
 				return 1;
 			}
@@ -109,7 +107,11 @@ public class CommandeInstall implements Callable<Integer> {
 			return 1;
 		}
 		
-		solveur.ajoutContrainte("minecraft", depotInstallation.mcversion);
+		
+		// +-+-+-+-+-+-+-+- Solveur +-+-+-+-+-+-+-+-
+		final SolveurPaquet solveur = new SolveurPaquet(depotLocal, depotInstallation.mcversion.minimum());
+		solveur.ajoutVariable("forge", Collections.singleton(new Version(14, 23, 6)));
+		depotInstallation.getModids().forEach(solveur::initialisationMod);
 		
 		for (final Map.Entry<String, VersionIntervalle> demande : demandes.entrySet()) {
 			if (!depotLocal.getModids().contains(demande.getKey())) {
@@ -119,59 +121,39 @@ public class CommandeInstall implements Callable<Integer> {
 			// Vérification que l'intervalle n'est pas trop large.
 			if (demande.getValue().minimum() == null && demande.getValue().maximum() == null && (
 					depotInstallation.mcversion.minimum() == null || depotInstallation.mcversion.maximum() == null)) {
-				System.err.printf("[ERROR] Vous devez spécifier une version, pour le mod '%s' ou " + "minecraft.%n",
+				System.err.printf("[ERROR] Vous devez spécifier une version, pour le mod '%s' ou minecraft.%n",
 						demande.getKey());
 				return ERREUR_VERSION;
 			}
 			
-			solveur.ajoutContrainte(demande.getKey(), demande.getValue());
+			solveur.domaineVariable(demande.getKey()).removeIf(v -> !demande.getValue().contains(v));
 		}
 		
 		// Ajout de toutes les installations manuelles dans l'installation
+		// Les mods installés manuellement n'acceptent pas la version 'null'
 		for (String modid : depotInstallation.getModids()) {
 			DepotInstallation.Installation ins = depotInstallation.informations(modid);
 			if ((ins.manuel() || ins.verrou()) && !demandes.containsKey(ins.paquet.modid)) {
-				solveur.ajoutSelection(ins.paquet);
+				solveur.domaineVariable(ins.paquet.modid).removeIf(Objects::isNull);
 			}
 		}
 		
-		// Tente d'associer à chaque identifiant connu une version à installer.
-		// Première tentative en conservant l'installation totale actuelle
-		SolveurDependances solveur_minimal = new SolveurDependances(solveur);
-		for (String modid : depotInstallation.getModids()) {
-			final DepotInstallation.Installation ins = depotInstallation.informations(modid);
-			if (!ins.manuel() && !ins.verrou() && !demandes.containsKey(ins.paquet.modid)) {
-				solveur_minimal.ajoutSelection(ins.paquet);
-			}
-		}
-		SolveurDependances solution_minimale = solveur_minimal.resolutionTotale();
-		
-		
-		final SolveurDependances solution;
-		if (solution_minimale != null) solution = solution_minimale;
-			// En cas d'échec autorise la modification des versions non manuelles.
-		else solution = solveur.resolutionTotale();
-		
-		if (solution == null) {
+		if (!solveur.resolution()) {
 			System.err.println("Impossible de résoudre les dépendances:");
-			for (final String contrainte : solveur.listeContraintes()) {
-				System.err.print(contrainte + "@" + solveur.contrainte(contrainte) + " ");
-			}
+			//for (final String contrainte : solveur.listeContraintes()) {
+			//	System.err.print(contrainte + "@" + solveur.contrainte(contrainte) + " ");
+			//}
 			System.err.println();
 			return 10;
 		}
-		for (final String modid : solution.listeContraintes()) {
-			if (modid.equalsIgnoreCase("forge") || modid.equalsIgnoreCase("minecraft")) continue;
-			
-			if (!depotLocal.contains(modid)) {
-				System.err.printf("Modid requis inconnu: '%s'%n", modid);
-				if (!this.force) return ERREUR_MODID;
-			}
-		}
 		
-		final List<PaquetMinecraft> installations = solution.selection.stream()
-				.filter(s -> !depotInstallation.contains(s.modid) || !depotInstallation.getInstallation(s.modid).version
-						.equals(s.version)).collect(Collectors.toList());
+		final List<PaquetMinecraft> installations = solveur.variables().stream()
+				.filter(modid -> !modid.equals("forge") && !modid.equals("minecraft"))
+				.filter(modid -> solveur.domaineVariable(modid).get(0) != null)
+				.map(modid -> depotLocal.getModVersion(modid, solveur.domaineVariable(modid).get(0))).map(Optional::get)
+				.filter(paquet -> !depotInstallation.contains(paquet.modid) || !depotInstallation
+						.getInstallation(paquet.modid).version.equals(paquet.version)).collect(Collectors.toList());
+		
 		if (installations.size() != 0) {
 			System.out.println("Installation des nouveaux mods:");
 			StringJoiner joiner = new StringJoiner(" ");
