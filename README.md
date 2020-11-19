@@ -1,95 +1,60 @@
-Projet de gestionnaire de mods Minecraft Forge.
+# MinecraftPacket
 
-L'objectif final de ce projet est un équivalent _apt install_ pour minecraft et en particulier [MinecraftForge](https://forums.minecraftforge.net/).
-Pour une complète description, voir le fichier de [specifications](doc/documentation.tex).
+Ce logiciel vous permet d'installer et supprimer des extensions minecraft en quelques commandes.
 
-# Installation
+## Installation
 Cet outil est développé en java.
-Vous avez besoin de java 11 ou versions supérieures.
+Vous avez besoin de java 8 ou versions supérieures qui est la version utilisée par Minecraft.
 
 * [oracle.com](https://www.oracle.com/java/technologies/javase-downloads.html#JDK11)
 * [openjdk-11-jre](apt://openjdk-11-jre)
-* [openjdk-13-jre](apt://openjdk-13-jre)
 
-## Linux
-Un paquet debian peut être construit à partir des sources grâce à `./gradlew deb`.
-Ce paquet nécessite OpenJDK-11+.
+### Linux
+Utilisez `./gradlew deb` pour générer un paquet deb.
+Le programme est installé dans le dossier **/opt/minepac/bin**.
 
-Le programme est installé dans le dossier **/opt/forgemods/bin**.
-Pour optenir durablement un raccourci, utilisez la commande `echo "alias forgemods='/opt/forgemods/bin/forgemods'" >> ~/.bash_aliases`.
+### Windows
+Utilisez `./gradlew distZip` pour obtenir une archive zip contenant le programme et ses dépendances.
+L'exécutable en ligne de commande est _'bin/minepac.bat'_.
 
-## Windows
-Une archive zip, contenant le programme et ses librairies, peut être obtenu avec `./gradlew distZip`.
 
-Décompresser l'archive `forgemods_0.4.0.zip` et exécuter le programme `bin/forgemods.bat` dans un terminal.
+## Utilisation
+Le dossier _.minecraft_ est utilisé par défaut.
+Mais si vous avez plusieurs dossiers minecraft (MultiMC), il est possible d'utiliser un autre dossier avec l'option `--minecraft DIR`.
+Le programme est conçu pour pouvoir manipuler certains dossiers distants comme _ftp_ ou _sftp_ (en cours de développement).
 
-# Utilisation
-## Mise à jour
-Pour pouvoir télécharger et installer des paquets minecraft, vous devez d'abord ajouter un dépôt qui en contient.
+### Mise à jour de la base de données
+Les fichiers d'installation sont distribués sous forme de paquets, réunis dans des dépôts sur internet.
+Il faut donc enregistrer et télécharger des dépôts.
+
+```shell
+minepac add-repository URL
+minepac update
 ```
-forgemods add-repository URL
-forgemods update
-```
 
-## Recherche
-```shell script
-forgemods search REGEX
+### Installation/suppression de paquets
+```
+minepac install optifine@1.16 thermalexpansion
+minepac remove galacticraft
+```
+Les versions sont automatiquement choisies pour être compatibles avec la version de minecraft installée ([Configuration](#Configuration)).
+Les dépendances de paquet sont téléchargées automatiquement.
+
+### Recherche
+```shell
+minepac search REGEX
 ```
 
 Pour afficher plus d'informations au sujet d'un mod
-```shell script
-forgemods show MODID
-forgemods show MODID@VERSION
+```shell
+minepac show MODID
+minepac show MODID@VERSION
 ```
 
-## Installation
-La première fois, il peut vous être demandé de préciser quelle est la version de minecraft utilisée.
-Il suffit d'ajouter l'argument `--mcversion MCVERSION`.
-```shell script
-forgemods install MODID@VERSION --mcversion 1.16.2
+### Configuration
+L'installateur doit connaître la configuration Minecraft pour assurer la comptabilité.
+Il est nécessaire de configurer la version de Minecraft et/ou la version de forge.
+
+```shell
+minepac set --minecraft 1.16.2 --forge 33.0 --dir $MINECRAFT
 ```
-
-# Dépot
-## Empaqueter un mod
-Les paquets utilisés sont des fichiers tar contenant le fichier de contrôle **mods.json**
-et les fichiers à installer positionnés comme dans un dossier minecraft.
-Tous les fichiers à dépaqueter doivent être déclarés dans le champs `files`, sinon ils ne seront pas installés.
-Il est conseillé d'associer à chaque fichier installé sa somme de contrôle sha256.
-
-Un paquet n'est pas systématiquement l'installation d'un mod MinecrafForge.
-Il est possible de créer des **modpacks** en déclarant en dépendances tous les mods à installer
-et ajouter les fichiers de configuration si nécessaire dans le paquet.
-
-### Exemple
-mods.json:
-```json
-{
-  "name": "MODID",
-  "files": {
-    "mods/MOD-1.12.2-VERSION-universal.jar": {"sha256": "b76aa424cd4968fcb551e7a37f002cb53dea3f9a51b5f64f200f5e1a23af663e"},
-    "config/modid.cfg":  {}
-  },
-  "version": "VERSION",
-  "mcversion": "[1.12.2,1.12.3)",
-  "dependencies": [
-    "autre_mod@[V1, V2)"
-  ]
-}
-```
-
-contenu de l'archive:
-```shell script
-> tar --list MODID-VERSION.tar
-mods.json
-config/modid.cfg
-mods/MOD-1.12.2-VERSION-universal.jar
-```
-
-## Génération automatique
-Pour les mods Forge, dont les fichiers `META-INF/mods.toml` ou `mcmod.info` sont correctement renseignés,
-il est possible de générer automatiquement des paquets avec
-```shell script
-forgemods depot import --from DOSSIER
-```
-Les paquets générés sont placés dans le dépôt choisi (_~/.minecraft/forgemods_ par défaut).
-Ce dépôt peut être rendu publique immédiatement ou après `forgemods depot refresh`.

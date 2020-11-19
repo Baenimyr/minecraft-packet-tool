@@ -1,21 +1,13 @@
 # Ignore Gradle project-specific cache directory
 .gradle
+gradle
+gradlew
+gradlew.bat
 
 # Ignore Gradle build output directory
 build
-/bin
-/libs
+out
 
 # Ignore IDE and auxilary files
 .idea
 .vscode
-.settings
-.classpath
-
-*.aux
-*.log
-*.out
-*.synctex.gz
-*.toc
-*~
-*.pdf
