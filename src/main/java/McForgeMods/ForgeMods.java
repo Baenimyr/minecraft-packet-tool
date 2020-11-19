@@ -189,15 +189,12 @@ public class ForgeMods implements Runnable {
 	}
 	
 	@CommandLine.Command(name = "mark")
-	public int mark(@CommandLine.Option(names = {"-d", "--depot"}) Path depot,
-			@CommandLine.Option(names = {"-m", "--minecraft"}) Path minecraft,
+	public int mark(@CommandLine.Option(names = {"-m", "--minecraft"}) Path minecraft,
 			@CommandLine.Parameters(arity = "1", paramLabel = "action") MarkAction action,
 			@CommandLine.Parameters(arity = "1..n", paramLabel = "mods") ArrayList<String> mods) {
-		final DepotLocal depotLocal = new DepotLocal(depot);
 		final DepotInstallation depotInstallation;
 		
 		try {
-			depotLocal.importation();
 			depotInstallation = DepotInstallation.depot(minecraft);
 		} catch (IOException e) {
 			System.err.println("Erreur de lecture du dépôt.");
@@ -226,6 +223,36 @@ public class ForgeMods implements Runnable {
 			e.printStackTrace();
 		}
 		return 0;
+	}
+	
+	@CommandLine.Command(name = "set")
+	public int set(@CommandLine.Option(names = {"--minecraft"}) String mcversion,
+			@CommandLine.Option(names = {"--forge"}) String forgeversion,
+			@CommandLine.Option(names = {"-m", "--dir"}, description = "dossier de minecraft") Path minecraft) {
+		final DepotInstallation depotInstallation;
+		
+		try {
+			depotInstallation = DepotInstallation.depot(minecraft);
+		} catch (IOException e) {
+			System.err.println("Erreur de lecture du dépôt.");
+			return 1;
+		}
+		
+		if (mcversion != null) {
+			depotInstallation.mcversion = Version.read(mcversion);
+		}
+		
+		if (forgeversion != null) {
+			depotInstallation.forge = Version.read(forgeversion);
+		}
+		
+		try {
+			depotInstallation.close();
+			return 0;
+		} catch (IOException e) {
+			System.err.println("Impossible de sauvegarder la configuration de l'installation.");
+			return 1;
+		}
 	}
 	
 	private enum MarkAction {

@@ -2,7 +2,6 @@ package McForgeMods.commandes;
 
 import McForgeMods.ForgeMods;
 import McForgeMods.PaquetMinecraft;
-import McForgeMods.Version;
 import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
@@ -43,9 +42,6 @@ public class CommandeInstall implements Callable<Integer> {
 	
 	@CommandLine.Mixin
 	ForgeMods.DossiersOptions dossiers;
-	
-	@CommandLine.Option(names = {"-mc", "--mcversion"})
-	String mcversion;
 	
 	@CommandLine.Option(names = {"--no-dependencies"}, negatable = true, descriptionKey = "dependencies")
 	boolean dependances = true;
@@ -95,20 +91,12 @@ public class CommandeInstall implements Callable<Integer> {
 			return 1;
 		}
 		
-		if (this.mcversion != null) {
-			if (depotInstallation.mcversion == null)
-				depotInstallation.mcversion = VersionIntervalle.read(this.mcversion);
-			else if (!depotInstallation.mcversion.correspond(Version.read(this.mcversion))) {
-				System.err.println("[ERROR] Il est impossible de changer la version de minecraft ici.");
-				return 1;
-			}
-		} else if (depotInstallation.mcversion == null) {
-			System.err.println(
-					"Aucune version de minecraft spécifiée. Veuillez compléter l'option -mc une première fois.");
+		if (depotInstallation.mcversion == null) {
+			System.err.println("Version de minecraft inconnu: utilisez 'set --minecraft VERSION'");
 			return 1;
 		}
 		
-		solveur.ajoutContrainte("minecraft", depotInstallation.mcversion);
+		solveur.ajoutContrainte("minecraft", new VersionIntervalle(depotInstallation.mcversion));
 		
 		for (final Map.Entry<String, VersionIntervalle> demande : demandes.entrySet()) {
 			if (!depotLocal.getModids().contains(demande.getKey())) {
@@ -117,7 +105,7 @@ public class CommandeInstall implements Callable<Integer> {
 			}
 			// Vérification que l'intervalle n'est pas trop large.
 			if (demande.getValue().minimum() == null && demande.getValue().maximum() == null && (
-					depotInstallation.mcversion.minimum() == null || depotInstallation.mcversion.maximum() == null)) {
+					depotInstallation.mcversion == null)) {
 				System.err.printf("[ERROR] Vous devez spécifier une version, pour le mod '%s' ou " + "minecraft.%n",
 						demande.getKey());
 				return ERREUR_VERSION;

@@ -1,6 +1,7 @@
 package McForgeMods.depot;
 
 import McForgeMods.PaquetMinecraft;
+import McForgeMods.Version;
 import McForgeMods.VersionIntervalle;
 import org.apache.commons.vfs2.*;
 import org.json.JSONArray;
@@ -12,6 +13,7 @@ import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 
 /**
@@ -34,7 +36,8 @@ public class DepotInstallation implements Closeable {
 	/**
 	 * Version de minecraft pour l'installation.
 	 */
-	public        VersionIntervalle             mcversion     = null;
+	public        Version                       mcversion     = null;
+	public        Version                       forge         = null;
 	
 	
 	/**
@@ -49,9 +52,10 @@ public class DepotInstallation implements Closeable {
 	
 	public static DepotInstallation depot(Path dossier) throws FileSystemException {
 		final URI dos;
-		if (dossier == null) dos = Path.of(System.getProperty("user.home")).resolve(".minecraft").toUri();
+		if (dossier == null) dos = Paths.get(System.getProperty("user.home"), ".minecraft").toUri();
 		else if (dossier.startsWith("~"))
-			dos = Path.of(System.getProperty("user.home")).resolve(dossier.subpath(1, dossier.getNameCount())).toUri();
+			dos = Paths.get(System.getProperty("user.home")).resolve(dossier.subpath(1, dossier.getNameCount()))
+					.toUri();
 		else dos = dossier.toUri();
 		
 		return new DepotInstallation(dos);
@@ -266,9 +270,10 @@ public class DepotInstallation implements Closeable {
 			try (InputStream fis = infos.getContent().getInputStream()) {
 				JSONObject racine = new JSONObject(new JSONTokener(fis));
 				
-				if (racine.has("minecraft")) {
-					JSONObject minecraft = racine.getJSONObject("minecraft");
-					this.mcversion = VersionIntervalle.read(minecraft.getString("version"));
+				if (racine.has("config")) {
+					JSONObject config = racine.getJSONObject("config");
+					this.mcversion = Version.read(config.getString("minecraft"));
+					this.forge = config.has("forge") ? Version.read(config.getString("forge")) : null;
 				}
 				
 				if (racine.has("mods")) {
@@ -302,9 +307,10 @@ public class DepotInstallation implements Closeable {
 			JSONObject data = new JSONObject();
 			
 			if (this.mcversion != null) {
-				JSONObject minecraft = new JSONObject();
-				minecraft.put("version", this.mcversion.toString());
-				data.put("minecraft", minecraft);
+				JSONObject config = new JSONObject();
+				config.put("minecraft", this.mcversion.toString());
+				if (forge != null) config.put("forge", forge.toString());
+				data.put("config", config);
 			}
 			
 			JSONArray MODS = new JSONArray();
