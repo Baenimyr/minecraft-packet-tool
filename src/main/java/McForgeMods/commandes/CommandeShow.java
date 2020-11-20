@@ -52,12 +52,12 @@ public class CommandeShow implements Callable<Integer> {
 			}
 		}
 		
-		versions.sort(Comparator.naturalOrder());
+		versions.sort(Comparator.reverseOrder());
 		for (PaquetMinecraft version : versions) {
-			System.out.printf("%s %s %s%n", version.nomCommun == null ? version.modid : "\"" + version.nomCommun + "\"",
-					version.version, version.mcversion.toString());
+			System.out.printf("%s %s%n", version.nomCommun == null ? version.modid : "\"" + version.nomCommun + "\"",
+					version.version);
 			System.out.println("section: " + version.section.name());
-			StringJoiner joiner = new StringJoiner(",");
+			StringJoiner joiner = new StringJoiner(", ");
 			version.requiredMods.entrySet().stream().sorted(Map.Entry.comparingByKey())
 					.forEach(e -> joiner.add(e.getKey() + "@" + e.getValue()));
 			System.out.println("dependencies: " + joiner.toString());

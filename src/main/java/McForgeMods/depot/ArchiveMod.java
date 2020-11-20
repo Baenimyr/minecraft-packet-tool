@@ -104,10 +104,10 @@ public class ArchiveMod {
 		// if (archive.mod.url != null && archive.mod.url.length() == 0) archive.mod.url = null;
 		// if (archive.mod.updateJSON != null && archive.mod.updateJSON.length() == 0) archive.mod.updateJSON = null;
 		
-		this.modVersion = new PaquetMinecraft(modid, version, mcversion);
+		this.modVersion = new PaquetMinecraft(modid, version);
 		this.modVersion.nomCommun = name;
 		this.modVersion.description = description;
-		
+		this.modVersion.ajoutModRequis("minecraft", mcversion);
 		if (json.has("requiredMods")) {
 			VersionIntervalle.lectureDependances(json.getJSONArray("requiredMods"))
 					.forEach(this.modVersion::ajoutModRequis);
@@ -193,7 +193,8 @@ public class ArchiveMod {
 		if (mcversion == null) {
 			throw new JarModError("pas de version minecraft");
 		}
-		this.modVersion = new PaquetMinecraft(modid, version, mcversion);
+		this.modVersion = new PaquetMinecraft(modid, version);
+		this.modVersion.ajoutModRequis("minecraft", mcversion);
 		this.modVersion.requiredMods.putAll(dependencies);
 		this.modVersion.nomCommun = name;
 		this.modVersion.description = description;

@@ -60,7 +60,7 @@ public class SolveurDependances {
 	 * @return {@code true} si toujours solvable
 	 */
 	private boolean propagation(PaquetMinecraft p) {
-		this.ajoutContrainte("minecraft", p.mcversion);
+		this.ajoutContrainte("minecraft", p.mcversion());
 		final VersionIntervalle intervalle_minecraft = contrainte("minecraft");
 		if (intervalle_minecraft.isEmpty()) return false;
 		
