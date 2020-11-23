@@ -88,12 +88,12 @@ public class Solveur<K, D> {
 		
 		Optional<K> variable = this.cleLibre();
 		while (variable.isPresent()) {
-			this.domaines.values().forEach(Domaine::push);
 			final K var = variable.get();
 			final Domaine<D> domaine = this.domaineVariable(var);
 			
-			if (domaine.size() > 0) {
+			if (domaine.size() >= 1) {
 				final D valeur = domaine.get(0);
+				this.domaines.values().forEach(Domaine::push);
 				domaine.reduction(valeur);
 				
 				this.marquerVariable(var);
@@ -105,14 +105,14 @@ public class Solveur<K, D> {
 					this.domaines.values().forEach(Domaine::pop);
 					// désactive la valeur problématique
 					domaine.remove(valeur);
-					if (domaine.size() != 0) this.domaines.values().forEach(Domaine::push);
+					// if (domaine.size() != 0) this.domaines.values().forEach(Domaine::push);
 				}
 			} else {
 				if (historique.size() == 0) return false;
 				else {
 					// rétablissement de l'historique au dernier état valide et désactivation de la dernière valeur
 					// choisie.
-					final K h = historique.removeLast();
+					final K h = historique.pop();
 					final D erreur = this.domaineVariable(h).get(0);
 					this.domaines.values().forEach(Domaine::pop);
 					this.domaineVariable(h).remove(erreur);
