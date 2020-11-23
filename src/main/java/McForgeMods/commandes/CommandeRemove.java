@@ -1,19 +1,18 @@
 package McForgeMods.commandes;
 
-import McForgeMods.ForgeMods;
 import McForgeMods.depot.DepotInstallation;
-import McForgeMods.depot.DepotLocal;
 import org.apache.commons.vfs2.FileSystemException;
 import picocli.CommandLine;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.Callable;
 
 @CommandLine.Command(name = "remove", resourceBundle = "mcforgemods/lang/Remove")
 public class CommandeRemove implements Callable<Integer> {
-	@CommandLine.Mixin
-	ForgeMods.DossiersOptions dossiers;
+	@CommandLine.Option(names = {"-m", "--minecraft"})
+	Path minecraft;
 	
 	@CommandLine.Parameters(arity = "1..n", descriptionKey = "mods")
 	List<String> mods;
@@ -23,10 +22,15 @@ public class CommandeRemove implements Callable<Integer> {
 	
 	@Override
 	public Integer call() {
-		DepotLocal depotLocal = new DepotLocal(dossiers.depot);
-		DepotInstallation depotInstallation = new DepotInstallation(depotLocal, dossiers.minecraft);
+		final DepotInstallation depotInstallation;
+		try {
+			depotInstallation = DepotInstallation.depot(minecraft);
+			depotInstallation.statusImportation();
+		} catch (FileSystemException e) {
+			System.err.println("Erreur de lecture du dépôt.");
+			return 1;
+		}
 		
-		depotInstallation.statusImportation();
 		
 		boolean erreur = false;
 		for (String id : mods) {

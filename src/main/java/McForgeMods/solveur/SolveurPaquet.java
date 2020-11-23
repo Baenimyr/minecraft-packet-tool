@@ -50,8 +50,6 @@ public class SolveurPaquet extends Solveur<String, Version> {
 					this.ajoutContrainte(dependance);
 					this.marquerVariable(dep.getKey());
 				}
-				
-				this.ajoutContrainte(new ContrainteDependance(modid, paquet.version, "minecraft", paquet.mcversion));
 			}
 		}
 	}

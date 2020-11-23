@@ -6,15 +6,15 @@ import McForgeMods.Version;
 import java.util.*;
 
 /**
- * Un dépôt est un ensemble de mod et leur versions. Il maintient une liste de mods connus et une liste de versions pour
- * ces mods. Un mod peut ne pas disposer de versions connues, cependant une version doit toujours disposer des
- * informations sur le mod.
+ * Un dépôt est un ensemble de paquets. Il maintient une liste de identifiants connus et des versions pour ces
+ * identifiants.
  * <p>
- * Un exemple de dépot est le {@link DepotInstallation} qui représente les mods trouvés dans une installations
- * minecraft.
+ * Cette classe est un contenant, il faut donc définir une façon de le remplir.
  */
 public class Depot {
-	protected final Map<String, Set<PaquetMinecraft>> mod_version = new HashMap<>();
+	/** Emplacement des fichiers */
+	public final    HashMap<PaquetMinecraft, PaquetMinecraft.FichierMetadata> archives    = new HashMap<>();
+	protected final HashMap<String, Set<PaquetMinecraft>>                     mod_version = new HashMap<>();
 	
 	/**
 	 * Renvoit la liste complète, sans doublons, des mods présents dans le dépôt.
@@ -36,7 +36,7 @@ public class Depot {
 	 * Cherche une version particulière d'un mod. Pour vérifier qu'une version est disponible, utiliser {@link
 	 * #contains(PaquetMinecraft)}.
 	 *
-	 * @return {@link Optional< PaquetMinecraft >} si la version est disponible ou non.
+	 * @return {@link Optional<PaquetMinecraft>} si la version est disponible ou non.
 	 */
 	public Optional<PaquetMinecraft> getModVersion(String mod, Version version) {
 		return this.contains(mod) ? this.getModVersions(mod).stream().filter(mv -> mv.version.equals(version)).findAny()
@@ -56,20 +56,14 @@ public class Depot {
 	
 	/**
 	 * Enregistre une nouvelle version d'un mod dans le dépot.
+	 * <p>
+	 * Le dépôt ne peut contenir qu'un seul paquet par couple de modid-version.
+	 *
+	 * @return {@code false} si une version équivalente est déjà présente.
 	 */
-	public PaquetMinecraft ajoutModVersion(final PaquetMinecraft modVersion) {
+	public boolean ajoutModVersion(final PaquetMinecraft modVersion) {
 		if (!mod_version.containsKey(modVersion.modid)) mod_version.put(modVersion.modid, new HashSet<>());
-		
-		final Collection<PaquetMinecraft> liste = this.mod_version.get(modVersion.modid);
-		Optional<PaquetMinecraft> present = liste.stream().filter(m -> m.version.equals(modVersion.version))
-				.findFirst();
-		if (present.isPresent()) {
-			present.get().fusion(modVersion);
-			return present.get();
-		} else {
-			liste.add(modVersion);
-			return modVersion;
-		}
+		return mod_version.get(modVersion.modid).add(modVersion);
 	}
 	
 	/**

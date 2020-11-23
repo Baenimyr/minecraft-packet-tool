@@ -7,19 +7,20 @@ import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
 import McForgeMods.solveur.SolveurPaquet;
-import org.apache.commons.vfs2.*;
-import org.json.JSONObject;
-import org.json.JSONTokener;
+import org.apache.commons.vfs2.FileObject;
+import org.apache.commons.vfs2.FileSystemException;
+import org.apache.commons.vfs2.FileSystemManager;
+import org.apache.commons.vfs2.VFS;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.BiFunction;
 import java.util.function.Function;
-import java.util.function.Supplier;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -34,9 +35,6 @@ public class CommandeInstall implements Callable<Integer> {
 	static final int ERREUR_MODID   = ERREUR_NOM + 1;
 	static final int ERREUR_VERSION = ERREUR_NOM + 2;
 	
-	static final ExecutorService executor = new ThreadPoolExecutor(0, 4, 1L, TimeUnit.SECONDS,
-			new LinkedBlockingQueue<>());
-	
 	@CommandLine.Option(names = {"-h", "--help"}, usageHelp = true)
 	boolean help;
 	
@@ -45,9 +43,6 @@ public class CommandeInstall implements Callable<Integer> {
 	
 	@CommandLine.Mixin
 	ForgeMods.DossiersOptions dossiers;
-	
-	@CommandLine.Option(names = {"-mc", "--mcversion"})
-	String mcversion;
 	
 	@CommandLine.Option(names = {"--no-dependencies"}, negatable = true, descriptionKey = "dependencies")
 	boolean dependances = true;
@@ -70,7 +65,7 @@ public class CommandeInstall implements Callable<Integer> {
 	@Override
 	public Integer call() {
 		final DepotLocal depotLocal = new DepotLocal(dossiers.depot);
-		final DepotInstallation depotInstallation = new DepotInstallation(depotLocal, dossiers.minecraft);
+		final DepotInstallation depotInstallation;
 		
 		/* Liste des installations explicitement demandées par l'utilisateur. */
 		final Map<String, VersionIntervalle> demandes;
@@ -88,28 +83,21 @@ public class CommandeInstall implements Callable<Integer> {
 		
 		try {
 			depotLocal.importation();
+			depotInstallation = DepotInstallation.depot(dossiers.minecraft);
 			depotInstallation.statusImportation();
 		} catch (IOException i) {
 			System.err.println("[ERROR] Erreur de lecture du dépot !");
 			return 1;
 		}
 		
-		if (this.mcversion != null) {
-			if (depotInstallation.mcversion == null)
-				depotInstallation.mcversion = VersionIntervalle.read(this.mcversion);
-			else if (!depotInstallation.mcversion.contains(Version.read(this.mcversion))) {
-				System.err.println("[ERROR] Il est impossible de changer la version de minecraft ici.");
-				return 1;
-			}
-		} else if (depotInstallation.mcversion == null) {
-			System.err.println(
-					"Aucune version de minecraft spécifiée. Veuillez compléter l'option -mc une première fois.");
+		if (depotInstallation.mcversion == null) {
+			System.err.println("Version de minecraft inconnu: utilisez 'set --minecraft VERSION'");
 			return 1;
 		}
 		
 		
 		// +-+-+-+-+-+-+-+- Solveur +-+-+-+-+-+-+-+-
-		final SolveurPaquet solveur = new SolveurPaquet(depotLocal, depotInstallation.mcversion.minimum());
+		final SolveurPaquet solveur = new SolveurPaquet(depotLocal, depotInstallation.mcversion);
 		solveur.ajoutVariable("forge", Collections.singleton(new Version(14, 23, 6)));
 		depotInstallation.getModids().forEach(solveur::initialisationMod);
 		
@@ -120,7 +108,7 @@ public class CommandeInstall implements Callable<Integer> {
 			}
 			// Vérification que l'intervalle n'est pas trop large.
 			if (demande.getValue().minimum() == null && demande.getValue().maximum() == null && (
-					depotInstallation.mcversion.minimum() == null || depotInstallation.mcversion.maximum() == null)) {
+					depotInstallation.mcversion == null)) {
 				System.err.printf("[ERROR] Vous devez spécifier une version, pour le mod '%s' ou minecraft.%n",
 						demande.getKey());
 				return ERREUR_VERSION;
@@ -134,7 +122,7 @@ public class CommandeInstall implements Callable<Integer> {
 		for (String modid : depotInstallation.getModids()) {
 			DepotInstallation.Installation ins = depotInstallation.informations(modid);
 			if ((ins.manuel() || ins.verrou()) && !demandes.containsKey(ins.paquet.modid)) {
-				solveur.domaineVariable(ins.paquet.modid).removeIf(Objects::isNull);
+				solveur.domaineVariable(ins.paquet.modid).remove(null);
 			}
 		}
 		
@@ -162,45 +150,17 @@ public class CommandeInstall implements Callable<Integer> {
 			
 			if (!dry_run) {
 				// Déclenche le téléchargement des mods
-				Map<PaquetMinecraft, CompletableFuture<Void>> telechargements = new HashMap<>();
-				for (PaquetMinecraft mversion : installations) {
-					CompletableFuture<Void> t = CompletableFuture
-							.supplyAsync(new TelechargementArchive(depotLocal, mversion), executor)
-							.thenApplyAsync(url -> {
-								if (url != null) {
-									synchronized (depotInstallation) {
-										try {
-											if (!depotInstallation.suppressionConflits(mversion)) {
-												System.err.println("[Install] [ERROR] " + mversion + " impossible de "
-														+ "supprimer les versions en conflit.");
-												return null;
-											}
-										} catch (FileSystemException fse) {
-											System.err
-													.println("[ERROR] suppression ancienne version: " + fse.getCode());
-											return null;
-										}
-									}
-								}
-								return url;
-							}).thenApplyAsync(new OuvertureArchive(depotInstallation)).thenAcceptAsync(succes -> {
-								if (succes) {
-									synchronized (depotInstallation) {
-										depotInstallation.installation(mversion, demandes.containsKey(mversion.modid));
-									}
-								}
-							});
-					telechargements.put(mversion, t);
-				}
-				telechargements.forEach((mversion, cf) -> {
-					try {
-						cf.get();
-					} catch (InterruptedException ignored) {
-					} catch (ExecutionException erreur) {
-						System.err.printf("Erreur téléchargement de '%s': %s%n", mversion, erreur.getMessage());
-						erreur.printStackTrace();
+				try {
+					final Superviseur I = new Superviseur(depotInstallation, depotLocal);
+					if (I.installationListe(installations, (paquet) -> demandes.containsKey(paquet.modid))) {
+						System.err.println("Echec de l'installation !");
+						return 2;
 					}
-				});
+				} catch (FileSystemException e) {
+					System.err.printf("Echec de l'installation, impossible d'accéder aux fichiers : %s%n",
+							e.getMessage());
+					return 2;
+				}
 			}
 		} else {
 			System.out.println("Pas de nouveaux mods à télécharger.");
@@ -216,90 +176,128 @@ public class CommandeInstall implements Callable<Integer> {
 		return 0;
 	}
 	
-	private static class TelechargementArchive implements Supplier<URI> {
-		final DepotLocal      depotLocal;
-		final PaquetMinecraft version;
+	/**
+	 * Le superviseur contrôle le flux des opérations de modification de l'installation.
+	 * <p>
+	 * Chaque opération d'installation/suppression est divisée en tâches simples parallélisables.
+	 */
+	public static class Superviseur {
+		private final DepotInstallation depotInstallation;
+		private final DepotLocal        depotLocal;
+		private final FileObject        dossier_cache;
 		
-		public TelechargementArchive(DepotLocal depot, PaquetMinecraft version) {
-			this.depotLocal = depot;
-			this.version = version;
+		private final Map<PaquetMinecraft, CompletableFuture<Optional<URI>>> f_telechargement = new HashMap<>();
+		private final Map<PaquetMinecraft, CompletableFuture<Boolean>>       f_suppression    = new HashMap<>();
+		private final Map<PaquetMinecraft, CompletableFuture<Boolean>>       f_ouverture      = new HashMap<>();
+		private final Map<PaquetMinecraft, CompletableFuture<Boolean>>       f_verification   = new HashMap<>();
+		
+		public Superviseur(final DepotInstallation depotInstallation, final DepotLocal depotLocal)
+				throws FileSystemException {
+			FileSystemManager fileSystem = VFS.getManager();
+			this.depotInstallation = depotInstallation;
+			this.depotLocal = depotLocal;
+			this.dossier_cache = fileSystem.resolveFile(depotLocal.dossier.toUri());
 		}
 		
-		@Override
-		public URI get() {
-			try {
-				final FileSystemManager filesystem = VFS.getManager();
-				final FileObject dossier_cache = filesystem
-						.resolveFile(this.depotLocal.dossier.toUri().resolve("cache"));
-				final FileObject source_dir = filesystem.resolveFile(depotLocal.dossier.toUri());
-				final PaquetMinecraft.FichierMetadata archive_metadata = depotLocal.archives.get(version);
-				
-				FileObject dest = dossier_cache.resolveFile(version.modid + "-" + version.version.toString() + ".tar");
-				if (!dest.exists()) {
-					FileObject src = source_dir.resolveFile(archive_metadata.path);
-					dest.copyFrom(src, new FileDepthSelector());
-				}
-				try (InputStream dest_is = dest.getContent().getInputStream()) {
-					archive_metadata.checkSHA(dest_is);
-				} catch (IOException e) {
-					System.err.printf("[Install] [ERROR] impossible de vérifier l'intégrité de l'archive: %s%n",
-							dest.getPublicURIString());
-					return null;
-				}
-				
-				return dest.getURL().toURI();
-			} catch (FileSystemException | URISyntaxException io) {
-				System.err.printf("[Install] impossible de télécharger l'archive pour %s%n", this.version);
-				System.err.println("\t" + io.getClass() + ":" + io.getMessage());
-				return null;
+		/** Télécharge l'archive d'un paquet. */
+		private CompletableFuture<Optional<URI>> telechargementPaquet(final PaquetMinecraft paquet) {
+			if (!f_telechargement.containsKey(paquet)) {
+				f_telechargement.put(paquet, CompletableFuture.supplyAsync(() -> {
+					final Optional<URI> uri = depotInstallation
+							.telechargementPaquet(dossier_cache, paquet, depotLocal.archives.get(paquet));
+					if (uri.isPresent()) System.out.printf("%s téléchargé%n", paquet);
+					else System.err.printf("Erreur téléchargement %s%n", paquet);
+					return uri;
+				}));
 			}
-		}
-	}
-	
-	private static class OuvertureArchive implements Function<URI, Boolean> {
-		final DepotInstallation depotInstallation;
-		
-		public OuvertureArchive(DepotInstallation depot) {
-			this.depotInstallation = depot;
+			return f_telechargement.get(paquet);
 		}
 		
-		@Override
-		public Boolean apply(URI archive_url) {
-			if (archive_url == null) return false;
-			
-			try {
-				FileSystemManager filesystem = VFS.getManager();
-				// Dossier dans lequel sera ouvert l'archive
-				final FileObject dossier_dest = filesystem.resolveFile(this.depotInstallation.dossier.toUri());
-				
-				FileObject archive_f = filesystem.resolveFile(archive_url);
-				final FileObject archive_tar = filesystem.createFileSystem("tar", archive_f);
-				FileObject mods = archive_tar.resolveFile(PaquetMinecraft.INFOS);
-				
-				InputStream is = mods.getContent().getInputStream();
-				JSONObject json = new JSONObject(new JSONTokener(is));
-				PaquetMinecraft modVersion = PaquetMinecraft.lecturePaquet(json);
-				is.close();
-				
-				FileObject data = archive_tar.resolveFile(PaquetMinecraft.FICHIERS);
-				for (final PaquetMinecraft.FichierMetadata metadata : modVersion.fichiers) {
-					final FileObject src = data.resolveFile(metadata.path);
-					final FileObject dest = dossier_dest.resolveFile(metadata.path);
-					dest.copyFrom(src, new FileDepthSelector());
-					
-					try (InputStream fichier_contenu = dest.getContent().getInputStream()) {
-						if (!metadata.checkSHA(fichier_contenu)) {
-							System.err.printf("[ERROR] fichier %s non conforme.%n", dest.getName());
-							return false;
+		/** Supprime un paquet */
+		private CompletableFuture<Boolean> suppressionVersion(final PaquetMinecraft paquet) {
+			if (!f_suppression.containsKey(paquet)) {
+				final CompletableFuture<Boolean> suppression = CompletableFuture.supplyAsync(() -> {
+					try {
+						depotInstallation.desinstallation(paquet.modid);
+						return true;
+					} catch (FileSystemException fse) {
+						return false;
+					}
+				});
+				f_suppression.put(paquet, suppression);
+			}
+			return f_suppression.get(paquet);
+		}
+		
+		/** Ouvre une archive et place les fichiers dans le répertoire d'installation. */
+		private CompletableFuture<Boolean> ouverturePaquet(final PaquetMinecraft paquet) {
+			if (!f_ouverture.containsKey(paquet)) {
+				final Function<Optional<URI>, Boolean> ouverture = uri -> {
+					if (uri.isPresent()) {
+						try {
+							depotInstallation.ouverturePaquet(uri.get());
+							return true;
+						} catch (IOException e) {
+							e.printStackTrace();
 						}
 					}
-					
-					src.close();
-					dest.close();
+					return false;
+				};
+				// Vérifie que les anciennes versions ont été supprimées avant d'ouvrir l'archive.
+				// TODO: ajout attente de la confirmation de l'installation des dépendances.
+				CompletableFuture<Boolean> suppression = CompletableFuture.completedFuture(true);
+				if (depotInstallation.contains(paquet.modid)) {
+					suppression = suppressionVersion(depotInstallation.getInstallation(paquet.modid))
+							.thenCombineAsync(suppression, (suppr, c) -> suppr && c);
 				}
-				return true;
-			} catch (IOException e) {
-				e.printStackTrace();
+				f_ouverture.put(paquet, suppression.thenCombineAsync(this.telechargementPaquet(paquet),
+						(BiFunction<Boolean, Optional<URI>, Optional<URI>>) (s, uri) -> s ? uri : Optional.empty())
+						.thenApplyAsync(ouverture));
+			}
+			return f_ouverture.get(paquet);
+		}
+		
+		/** Vérifie que les fichiers extraits sont corrects. */
+		private CompletableFuture<Boolean> verificationPaquet(final PaquetMinecraft paquet) {
+			if (!f_verification.containsKey(paquet)) {
+				f_verification.put(paquet, ouverturePaquet(paquet).thenApplyAsync((i) -> {
+					if (i) {
+						boolean verification = false;
+						try {
+							verification = depotInstallation.verificationIntegrite(paquet);
+						} catch (FileSystemException e) {
+							e.printStackTrace();
+						}
+						if (!verification) System.err.printf("Echec vérification du paquet %s%n", paquet);
+						return verification;
+					}
+					return false;
+				}));
+			}
+			return f_verification.get(paquet);
+		}
+		
+		/** Enregistre l'installation. */
+		private CompletableFuture<Void> finalisation(final PaquetMinecraft paquet, boolean manuel) {
+			return verificationPaquet(paquet).thenAcceptAsync((b) -> {
+				depotInstallation.installation(paquet, manuel);
+				System.out.printf("%s installé.%n", paquet);
+			});
+		}
+		
+		/**
+		 * Installe une liste de paquet.
+		 *
+		 * @return {@code true} s'il y a un erreur durant l'installation.
+		 */
+		public boolean installationListe(final List<PaquetMinecraft> paquets, Predicate<PaquetMinecraft> manuel) {
+			for (final PaquetMinecraft paquet : paquets) {
+				try {
+					this.finalisation(paquet, manuel.test(paquet)).get();
+				} catch (Exception e) {
+					e.printStackTrace();
+					return true;
+				}
 			}
 			return false;
 		}

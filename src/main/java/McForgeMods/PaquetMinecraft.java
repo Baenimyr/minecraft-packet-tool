@@ -1,8 +1,8 @@
 package McForgeMods;
 
 import org.apache.commons.codec.digest.DigestUtils;
-import org.json.JSONArray;
 import org.json.JSONObject;
+import org.json.JSONTokener;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -35,7 +35,6 @@ public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 	
 	public final String                         modid;
 	public final Version                        version;
-	public final VersionIntervalle              mcversion;
 	/** Liste des fichiers associés à l'installation. */
 	public final List<FichierMetadata>          fichiers     = new ArrayList<>();
 	/**
@@ -43,28 +42,39 @@ public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 	 * pour n'importe quelle version.
 	 */
 	public final Map<String, VersionIntervalle> requiredMods = new HashMap<>();
+	public final Map<String, VersionIntervalle> conflits     = new HashMap<>();
 	/** Une description simple pouvant être affichée */
 	public       String                         nomCommun    = null;
 	public       String                         description  = null;
 	public       Section                        section      = Section.any;
 	
-	public PaquetMinecraft(String modid, Version version, VersionIntervalle mcversion) {
+	public PaquetMinecraft(String modid, Version version) {
 		this.modid = modid.toLowerCase().intern();
 		this.version = version;
-		this.mcversion = mcversion;
+	}
+	
+	public static PaquetMinecraft lecturePaquet(InputStream is) {
+		final JSONObject json = new JSONObject(new JSONTokener(is));
+		return lecturePaquet(json);
 	}
 	
 	/** Lit les informations relatives à un paquet. */
 	public static PaquetMinecraft lecturePaquet(JSONObject json) {
 		PaquetMinecraft modVersion = new PaquetMinecraft(json.getString("name"),
-				Version.read(json.getString("version")), VersionIntervalle.read(json.getString("mcversion")));
+				Version.read(json.getString("version")));
 		modVersion.description = json.optString("description", null);
 		modVersion.nomCommun = json.optString("displayName", null);
 		
 		if (json.has("dependencies")) {
-			JSONArray depen = json.getJSONArray("dependencies");
-			Map<String, VersionIntervalle> dependences = VersionIntervalle.lectureDependances(depen);
-			dependences.forEach(modVersion::ajoutModRequis);
+			final JSONObject depen = json.getJSONObject("dependencies");
+			for (final String dep_id : depen.keySet())
+				modVersion.ajoutModRequis(dep_id, VersionIntervalle.read(depen.getString(dep_id)));
+		}
+		
+		if (json.has("conflicts")) {
+			final JSONObject conflits = json.getJSONObject("conflicts");
+			for (final String conf_id : conflits.keySet())
+				modVersion.ajoutConflit(conf_id, VersionIntervalle.read(conflits.getString(conf_id)));
 		}
 		
 		if (json.has("files")) {
@@ -83,6 +93,11 @@ public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 		return modVersion;
 	}
 	
+	public VersionIntervalle mcversion() {
+		if (this.requiredMods.containsKey("minecraft")) return this.requiredMods.get("minecraft");
+		return VersionIntervalle.ouvert();
+	}
+	
 	/**
 	 * Ajoute une nouvelle dépendance.
 	 * <p>
@@ -98,14 +113,11 @@ public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 		else this.requiredMods.put(modid, intervalle);
 	}
 	
-	/**
-	 * Importe les nouvelles données à partir d'une instance similaire.
-	 */
-	public void fusion(PaquetMinecraft autre) {
-		if (this.description == null) this.description = autre.description;
-		autre.requiredMods.forEach(this::ajoutModRequis);
-		autre.fichiers.stream().filter(f -> this.fichiers.stream().noneMatch(f2 -> f.path.equals(f2.path)))
-				.forEach(this.fichiers::add);
+	public void ajoutConflit(String modid, VersionIntervalle versions) {
+		modid = modid.toLowerCase().intern();
+		if (this.conflits.containsKey(modid) && this.conflits.get(modid) != null)
+			this.conflits.merge(modid, versions, VersionIntervalle::intersection);
+		else this.conflits.put(modid, versions);
 	}
 	
 	@Override
@@ -140,15 +152,18 @@ public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 	public void ecriturePaquet(JSONObject json) {
 		json.put("name", this.modid);
 		json.put("version", this.version);
-		json.put("mcversion", this.mcversion);
 		if (this.description != null) json.put("description", this.description);
 		if (this.nomCommun != null) json.put("displayName", this.nomCommun);
 		json.put("section", this.section.name());
 		
-		JSONArray dependencies = new JSONArray();
-		for (String modid : this.requiredMods.keySet()) {
-			dependencies.put(modid + "@" + this.requiredMods.get(modid).toString());
+		final JSONObject dependencies = new JSONObject();
+		for (final String id : this.requiredMods.keySet()) {
+			dependencies.put(id, this.requiredMods.get(id).toString());
 		}
+		
+		final JSONObject conflits = new JSONObject();
+		for (final String id : this.conflits.keySet())
+			conflits.put(id, this.conflits.get(id).toString());
 		
 		JSONObject files = new JSONObject();
 		for (FichierMetadata fichier : this.fichiers) {
@@ -160,6 +175,7 @@ public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 		}
 		
 		json.put("dependencies", dependencies);
+		json.put("conflicts", conflits);
 		json.put("files", files);
 	}
 	

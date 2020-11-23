@@ -4,6 +4,7 @@ import McForgeMods.ForgeMods;
 import McForgeMods.PaquetMinecraft;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
+import org.apache.commons.vfs2.FileSystemException;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -51,8 +52,15 @@ public class CommandeListe implements Callable<Integer> {
 			}
 			return 0;
 		} else {
-			final DepotInstallation depotInstallation = new DepotInstallation(depotLocal, dossiers.minecraft);
-			depotInstallation.analyseDossier();
+			final DepotInstallation depotInstallation;
+			
+			try {
+				depotInstallation = DepotInstallation.depot(dossiers.minecraft);
+				depotInstallation.statusImportation();
+			} catch (FileSystemException e) {
+				System.err.println("Erreur de lecture du dépôt.");
+				return 1;
+			}
 			
 			List<String> modids = new ArrayList<>(depotInstallation.getModids());
 			modids.sort(String::compareTo);
@@ -63,13 +71,6 @@ public class CommandeListe implements Callable<Integer> {
 						&& ins.verrou())) {
 					System.out.println(modid + ":" + ins.paquet.version);
 				}
-			}
-			
-			try {
-				depotInstallation.close();
-			} catch (IOException e) {
-				System.err.println("Impossible de sauvegarder la configuration de l'installation.");
-				return 1;
 			}
 			return 0;
 		}
