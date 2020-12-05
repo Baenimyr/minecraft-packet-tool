@@ -22,25 +22,25 @@ class SolveurPaquetTest {
 	void generationDepot() {
 		depot = new Depot();
 		
-		final PaquetMinecraft lib_core_1 = new PaquetMinecraft("core", new Version(1, 0, 0), mc_1_12);
-		final PaquetMinecraft lib_core_2 = new PaquetMinecraft("core", new Version(1, 1, 0), mc_1_12);
-		final PaquetMinecraft lib_core_3 = new PaquetMinecraft("core", new Version(2, 0, 1), mc_1_12);
+		final PaquetMinecraft lib_core_1 = new PaquetMinecraft("core", new Version(1, 0, 0));
+		final PaquetMinecraft lib_core_2 = new PaquetMinecraft("core", new Version(1, 1, 0));
+		final PaquetMinecraft lib_core_3 = new PaquetMinecraft("core", new Version(2, 0, 1));
 		lib_core_1.ajoutModRequis("forge", VersionIntervalle.read("[14.23,14.24)"));
 		lib_core_2.ajoutModRequis("forge", VersionIntervalle.read("[14.23,14.24)"));
 		lib_core_3.ajoutModRequis("forge", VersionIntervalle.read("[14.23,14.24)"));
 		
-		final PaquetMinecraft mod_core_1 = new PaquetMinecraft("modcore", new Version(1, 0, 0), mc_1_12);
-		final PaquetMinecraft mod_core_2 = new PaquetMinecraft("modcore", new Version(1, 1, 0), mc_1_12);
-		final PaquetMinecraft mod_core_3 = new PaquetMinecraft("modcore", new Version(2, 0, 0), mc_1_12);
+		final PaquetMinecraft mod_core_1 = new PaquetMinecraft("modcore", new Version(1, 0, 0));
+		final PaquetMinecraft mod_core_2 = new PaquetMinecraft("modcore", new Version(1, 1, 0));
+		final PaquetMinecraft mod_core_3 = new PaquetMinecraft("modcore", new Version(2, 0, 0));
 		mod_core_1.ajoutModRequis("core", VersionIntervalle.read("[1.0,2)"));
 		mod_core_2.ajoutModRequis("core", VersionIntervalle.read("[1.1,2)"));
 		mod_core_3.ajoutModRequis("core", VersionIntervalle.read("[2.0,3)"));
 		
-		final PaquetMinecraft mod_ext_1 = new PaquetMinecraft("modext1", new Version(1, 2, 0), mc_1_12);
+		final PaquetMinecraft mod_ext_1 = new PaquetMinecraft("modext1", new Version(1, 2, 0));
 		mod_ext_1.ajoutModRequis("modcore", VersionIntervalle.read("[1.0,2)"));
 		mod_ext_1.ajoutModRequis("core", VersionIntervalle.read("[1.0,1.1)"));
 		
-		final PaquetMinecraft mod_ext_2 = new PaquetMinecraft("modext2", new Version(0, 6, 0), mc_1_12);
+		final PaquetMinecraft mod_ext_2 = new PaquetMinecraft("modext2", new Version(0, 6, 0));
 		mod_ext_2.ajoutModRequis("modcore", VersionIntervalle.read("[1.0,2)"));
 		mod_ext_2.ajoutModRequis("core", new VersionIntervalle(new Version(1, 1, 0), new Version(2, 0, 0)));
 		
@@ -129,10 +129,8 @@ class SolveurPaquetTest {
 	
 	@Test
 	void conflit() {
-		final PaquetMinecraft fabric = new PaquetMinecraft("fabric", new Version(9, 5, 0),
-				VersionIntervalle.read("[1" + ".12.2,1.13)"));
-		final PaquetMinecraft sodium = new PaquetMinecraft("sodium", new Version(1, 0, 0),
-				VersionIntervalle.read("[1.12.2,1.13)"));
+		final PaquetMinecraft fabric = new PaquetMinecraft("fabric", new Version(9, 5, 0));
+		final PaquetMinecraft sodium = new PaquetMinecraft("sodium", new Version(1, 0, 0));
 		sodium.ajoutModRequis("fabric", VersionIntervalle.read("[9,10)"));
 		depot.ajoutModVersion(fabric);
 		depot.ajoutModVersion(sodium);

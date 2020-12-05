@@ -58,9 +58,9 @@ public class Domaine<D> implements Iterable<D> {
 	
 	public boolean removeIf(Predicate<D> predicate) {
 		boolean modifie = false;
-		for (int i = this.limite - 1; i >= 0; i--)
+		for (int i = this.size() - 1; i >= 0; i--)
 			if (predicate.test(this.get(i))) {
-				modifie |= this.remove(i);
+				modifie |= this.remove(this.get(i));
 			}
 		return modifie;
 	}
@@ -72,10 +72,16 @@ public class Domaine<D> implements Iterable<D> {
 	 */
 	public boolean reduction(final D v) {
 		int i = this.valeurs.indexOf(v);
-		if (0 <= i && i < this.limite) {
-			this.valeurs.remove(i);
-			this.valeurs.addFirst(v);
+		if (i == 0 && this.limite == 1) return false;
+		else if (i == 0 && this.limite > 1) {
 			this.limite = 1;
+			return true;
+		} else if (1 <= i && i < this.limite) {
+			Collections.swap(this.valeurs, 0, i);
+			this.limite = 1;
+			return true;
+		} else if (this.limite > 0) {
+			this.limite = 0;
 			return true;
 		}
 		return false;
@@ -102,7 +108,8 @@ public class Domaine<D> implements Iterable<D> {
 	@Override
 	public String toString() {
 		StringJoiner join = new StringJoiner(", ");
-		this.stream().map(Objects::toString).forEach(join::add);
+		for (int i = 0; i < this.size(); i++)
+			join.add(this.get(i).toString());
 		return "Domaine{" + join.toString() + "}";
 	}
 }
