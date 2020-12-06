@@ -177,24 +177,15 @@ public class ArchiveMod {
 		
 		TomlArray dependencies_info = toml.getArray("dependencies." + modid);
 		final Map<String, VersionIntervalle> dependencies = new HashMap<>();
-		VersionIntervalle mcversion = null;
 		if (dependencies_info != null) for (int i = 0; i < dependencies_info.size(); i++) {
 			TomlTable dep_i = dependencies_info.getTable(i);
 			final String dep_modid = dep_i.getString("modId");
 			final VersionIntervalle dep_versions = VersionIntervalle.read(dep_i.getString("versionRange"));
 			
-			if ("minecraft".equals(dep_modid)) {
-				mcversion = dep_versions;
-			} else {
-				dependencies.put(dep_modid, dep_versions);
-			}
+			dependencies.put(dep_modid, dep_versions);
 		}
 		
-		if (mcversion == null) {
-			throw new JarModError("pas de version minecraft");
-		}
 		this.modVersion = new PaquetMinecraft(modid, version);
-		this.modVersion.ajoutModRequis("minecraft", mcversion);
 		this.modVersion.requiredMods.putAll(dependencies);
 		this.modVersion.nomCommun = name;
 		this.modVersion.description = description;

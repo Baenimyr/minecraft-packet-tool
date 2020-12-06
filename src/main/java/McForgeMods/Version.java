@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
 public class Version implements Comparable<Version> {
 	public static final int     size     = 4;
 	public static final Pattern VERSION  = Pattern.compile(
-			"(\\d+)(\\.(\\d+)(\\.(\\d+)(\\.(\\d+))?)?)?(-(?<release>\\p{Alnum}+))?(\\+(?<build>\\p{Alnum}+))" + "?");
+			"(\\d+)(\\.(\\d+)(\\.(\\d+)(\\.(\\d+))?)?)?(-(?<release>[\\p{Alnum}.]+))?(\\+(?<build>[\\p{Alnum}.]+))?");
 	/**
 	 * major, medium, minor, patch
 	 */
@@ -66,7 +66,7 @@ public class Version implements Comparable<Version> {
 	
 	public static Version read(String texte) throws IllegalArgumentException {
 		Matcher m = VERSION.matcher(texte);
-		if (m.find()) {
+		if (m.find() && m.hitEnd()) {
 			return read(m);
 		} else throw new IllegalArgumentException(String.format("Version illisible: '%s'", texte));
 	}
