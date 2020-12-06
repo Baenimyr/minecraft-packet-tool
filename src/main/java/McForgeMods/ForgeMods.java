@@ -171,6 +171,7 @@ public class ForgeMods implements Runnable {
 		
 		// Liste complète des dépendances nécessaire pour la liste des mods présent.
 		final SolveurPaquet solveur = new SolveurPaquet(depotLocal, depotInstallation.mcversion);
+		solveur.ajoutVariable("forge", Collections.singleton(depotInstallation.forge));
 		listeRecherche.forEach(p -> solveur.domaineVariable(p.modid).reduction(p.version));
 		solveur.coherence();
 		

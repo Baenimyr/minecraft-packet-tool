@@ -41,7 +41,7 @@ public class SolveurPaquet extends Solveur<String, Version> {
 			this.ajoutVariable(modid, versions);
 			this.marquerVariable(modid);
 			
-			for (final PaquetMinecraft paquet : depot.getModVersions(modid)) {
+			if (depot.contains(modid)) for (final PaquetMinecraft paquet : depot.getModVersions(modid)) {
 				for (Map.Entry<String, VersionIntervalle> dep : paquet.requiredMods.entrySet()) {
 					final ContrainteDependance dependance = new ContrainteDependance(modid, paquet.version,
 							dep.getKey(), dep.getValue());

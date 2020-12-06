@@ -2,7 +2,6 @@ package McForgeMods.commandes;
 
 import McForgeMods.ForgeMods;
 import McForgeMods.PaquetMinecraft;
-import McForgeMods.Version;
 import McForgeMods.VersionIntervalle;
 import McForgeMods.depot.DepotInstallation;
 import McForgeMods.depot.DepotLocal;
@@ -98,7 +97,7 @@ public class CommandeInstall implements Callable<Integer> {
 		
 		// +-+-+-+-+-+-+-+- Solveur +-+-+-+-+-+-+-+-
 		final SolveurPaquet solveur = new SolveurPaquet(depotLocal, depotInstallation.mcversion);
-		solveur.ajoutVariable("forge", Collections.singleton(new Version(14, 23, 6)));
+		solveur.ajoutVariable("forge", Collections.singleton(depotInstallation.forge));
 		depotInstallation.getModids().forEach(solveur::initialisationMod);
 		
 		for (final Map.Entry<String, VersionIntervalle> demande : demandes.entrySet()) {
@@ -128,10 +127,9 @@ public class CommandeInstall implements Callable<Integer> {
 		
 		if (!solveur.resolution()) {
 			System.err.println("Impossible de résoudre les dépendances:");
-			//for (final String contrainte : solveur.listeContraintes()) {
-			//	System.err.print(contrainte + "@" + solveur.contrainte(contrainte) + " ");
-			//}
-			System.err.println();
+			for (final String id : solveur.variables()) {
+				if (solveur.domaineVariable(id).size() == 0) System.err.println(id);
+			}
 			return 10;
 		}
 		
@@ -196,7 +194,7 @@ public class CommandeInstall implements Callable<Integer> {
 			FileSystemManager fileSystem = VFS.getManager();
 			this.depotInstallation = depotInstallation;
 			this.depotLocal = depotLocal;
-			this.dossier_cache = fileSystem.resolveFile(depotLocal.dossier.toUri());
+			this.dossier_cache = fileSystem.resolveFile(depotLocal.dossier.toUri()).resolveFile("cache");
 		}
 		
 		/** Télécharge l'archive d'un paquet. */
@@ -206,7 +204,10 @@ public class CommandeInstall implements Callable<Integer> {
 					final Optional<URI> uri = depotInstallation
 							.telechargementPaquet(dossier_cache, paquet, depotLocal.archives.get(paquet));
 					if (uri.isPresent()) System.out.printf("%s téléchargé%n", paquet);
-					else System.err.printf("Erreur téléchargement %s%n", paquet);
+					else {
+						System.err.printf("Erreur téléchargement %s%n", paquet);
+						return Optional.empty();
+					}
 					return uri;
 				}));
 			}
@@ -280,8 +281,10 @@ public class CommandeInstall implements Callable<Integer> {
 		/** Enregistre l'installation. */
 		private CompletableFuture<Void> finalisation(final PaquetMinecraft paquet, boolean manuel) {
 			return verificationPaquet(paquet).thenAcceptAsync((b) -> {
-				depotInstallation.installation(paquet, manuel);
-				System.out.printf("%s installé.%n", paquet);
+				if (b) {
+					depotInstallation.installation(paquet, manuel);
+					System.out.printf("%s installé.%n", paquet);
+				}
 			});
 		}
 		
