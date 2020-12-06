@@ -268,7 +268,7 @@ public class ForgeMods implements Runnable {
 		/**
 		 * Spécifie le dossier de dépot à utiliser.
 		 */
-		@CommandLine.Option(names = {"-d", "--depot"}, description = "Dépot local à utiliser")
+		@CommandLine.Option(names = {"-r", "--repo"}, description = "Dépot local à utiliser")
 		public Path depot = null;
 		
 		/**

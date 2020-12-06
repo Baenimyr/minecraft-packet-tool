@@ -32,8 +32,8 @@ import java.util.concurrent.Callable;
  * <i>import</i> associée avec une installation minecraft récupère les informations directement dans les
  * <i>mcmod.info</i> des fichiers jar trouvés.
  */
-@CommandLine.Command(name = "depot", subcommands = {CommandeDepot.importation.class, CommandeUpdate.class},
-		resourceBundle = "mcforgemods/lang/Depot")
+@CommandLine.Command(name = "repo", subcommands = {CommandeDepot.importation.class, CommandeUpdate.class},
+		resourceBundle = "mcforgemods/lang/Repo")
 public class CommandeDepot implements Runnable {
 	
 	@CommandLine.Option(names = {"--help"}, usageHelp = true)
@@ -48,7 +48,8 @@ public class CommandeDepot implements Runnable {
 	}
 	
 	@CommandLine.Command(name = "refresh")
-	public int refresh(@CommandLine.Option(names = "--depot") Path chemin_depot, @CommandLine.Mixin ForgeMods.Help help,
+	public int refresh(@CommandLine.Option(names = {"-d", "--dir"}) Path chemin_depot,
+			@CommandLine.Mixin ForgeMods.Help help,
 			@CommandLine.Option(names = {"-f", "--force"}, defaultValue = "false", descriptionKey = "force")
 					boolean force,
 			@CommandLine.Option(names = {"-v", "--verbose"}, defaultValue = "false", descriptionKey = "verbose")
@@ -177,7 +178,7 @@ public class CommandeDepot implements Runnable {
 		@CommandLine.Option(names = {"-a", "--all"}, defaultValue = "false")
 		boolean      all;
 		
-		@CommandLine.Option(names = {"-d", "--depot"}, description = "Dépot local à utiliser")
+		@CommandLine.Option(names = {"-d", "--dir"}, description = "Dépot local à utiliser")
 		Path depot_path = null;
 		
 		@CommandLine.Option(names = {"-f", "--from"}, description = "Dossier à parcourir", required = true)

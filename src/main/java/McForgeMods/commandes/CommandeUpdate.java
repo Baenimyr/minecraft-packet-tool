@@ -30,7 +30,7 @@ public class CommandeUpdate implements Callable<Integer> {
 	
 	@CommandLine.Mixin
 	ForgeMods.Help help;
-	@CommandLine.Option(names = {"-d", "--depot"})
+	@CommandLine.Option(names = {"-r", "--repo"})
 	Path           adresseDepot;
 	@CommandLine.Option(names = {"-f", "--from"}, arity = "0..n", descriptionKey = "from")
 	List<String>   urlDistant;

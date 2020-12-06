@@ -17,7 +17,7 @@ public class CommandeShow implements Callable<Integer> {
 	@CommandLine.Mixin
 	ForgeMods.Help help;
 	
-	@CommandLine.Option(names = {"-d", "--depot"})
+	@CommandLine.Option(names = {"-r", "--repo"})
 	public Path depot = null;
 	
 	@CommandLine.Parameters(arity = "1..n", descriptionKey = "recherche")
@@ -46,7 +46,7 @@ public class CommandeShow implements Callable<Integer> {
 			if (!depotLocal.contains(rech.getKey())) System.err.printf("Mod inconnu: '%s'%n", rech.getKey());
 			else {
 				List<PaquetMinecraft> modVersion = depotLocal.getModVersions(rech.getKey()).stream()
-						.filter(v -> rech.getValue().correspond(v.version)).collect(Collectors.toList());
+						.filter(v -> rech.getValue().contains(v.version)).collect(Collectors.toList());
 				if (modVersion.size() > 0) versions.addAll(modVersion);
 				else System.err.printf("Aucune version disponible pour '%s@%s'%n", rech.getKey(), rech.getValue());
 			}
