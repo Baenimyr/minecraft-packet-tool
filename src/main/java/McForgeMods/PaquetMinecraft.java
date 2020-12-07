@@ -1,6 +1,7 @@
 package McForgeMods;
 
 import org.apache.commons.codec.digest.DigestUtils;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
@@ -59,7 +60,7 @@ public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 	}
 	
 	/** Lit les informations relatives à un paquet. */
-	public static PaquetMinecraft lecturePaquet(JSONObject json) {
+	public static PaquetMinecraft lecturePaquet(JSONObject json) throws JSONException {
 		PaquetMinecraft modVersion = new PaquetMinecraft(json.getString("name"),
 				Version.read(json.getString("version")));
 		modVersion.description = json.optString("description", null);
@@ -131,7 +132,7 @@ public class PaquetMinecraft implements Comparable<PaquetMinecraft> {
 	}
 	
 	public String toStringStandard() {
-		return String.format("%s_%s", modid, version);
+		return String.format("%s-%s", modid, version);
 	}
 	
 	@Override

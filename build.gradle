@@ -37,7 +37,10 @@ version = "0.4.2"
 archivesBaseName = "MinecraftPacket"
 mainClassName = 'McForgeMods.ForgeMods'
 applicationName = "minepac"
-java.sourceCompatibility = java.targetCompatibility = JavaVersion.VERSION_1_8
+
+compileJava {
+    sourceCompatibility = targetCompatibility = JavaVersion.VERSION_1_8
+}
 
 dependencies {
     compile 'info.picocli:picocli:4.2.0'
@@ -79,6 +82,8 @@ task uberJar(type: Jar, group: "build") {
         )
     }
 }
+
+startScripts.defaultJvmOpts = ['-XX:MinHeapFreeRatio=0', '-XX:MaxHeapFreeRatio=10']
 
 task autocompletion(type: JavaExec, dependsOn: "assemble") {
     workingDir('build/scripts')

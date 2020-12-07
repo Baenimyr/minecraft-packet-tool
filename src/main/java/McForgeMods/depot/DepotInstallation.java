@@ -50,10 +50,21 @@ public class DepotInstallation implements Closeable {
 		this.minecraft_dir = this.filesystem.resolveFile(dossier);
 	}
 	
+	private static URI local(Path dossier) {
+		while (!dossier.getRoot().equals(dossier)) {
+			if (dossier.getFileName().equals(dossier.getFileSystem().getPath(".minecraft"))) {
+				return dossier.toUri();
+			}
+			dossier = dossier.getParent();
+		}
+		return Paths.get(System.getProperty("user.home"), ".minecraft").toUri();
+	}
+	
 	public static DepotInstallation depot(Path dossier) throws FileSystemException {
 		final URI dos;
-		if (dossier == null) dos = Paths.get(System.getProperty("user.home"), ".minecraft").toUri();
-		else if (dossier.startsWith("~"))
+		if (dossier == null) {
+			dos = local(Paths.get("").toAbsolutePath());
+		} else if (dossier.startsWith("~"))
 			dos = Paths.get(System.getProperty("user.home")).resolve(dossier.subpath(1, dossier.getNameCount()))
 					.toUri();
 		else dos = dossier.toUri();
@@ -290,7 +301,7 @@ public class DepotInstallation implements Closeable {
 							inst.verrou = verrou;
 							this.installations.put(paquet.modid, inst);
 						} catch (JSONException jsonException) {
-							jsonException.printStackTrace();
+							System.err.printf("[ERREUR] %s: %s%n", infos.getURL(), jsonException.getMessage());
 						}
 					}
 				}
